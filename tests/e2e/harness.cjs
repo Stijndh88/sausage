@@ -30,10 +30,41 @@ class GameDriver {
     });
   }
 
-  /** Load the page and wait for the menu. */
+  /**
+   * Load the page and wait for the menu.
+   * Headless Chromium never focuses the page, and Phaser caps every frame's delta at 16.7ms
+   * while unfocused, so game time would crawl at ~20-25% of wall time. We mark the loop as
+   * focused so game time tracks wall time as closely as the frame rate allows.
+   */
   async open(url) {
     await this.page.goto(url);
     await this.waitForScene('Menu', 15000);
+    await this.page.evaluate(() => {
+      window.__game.loop.inFocus = true;
+      window.__game.loop._coolDown = 0;
+    });
+  }
+
+  /** Game time (ms) of the active Game scene; pauses with the game. Null outside a Game. */
+  gameTime() {
+    return this.page.evaluate(() => {
+      const s = window.__game.scene.getScene('Game');
+      return s && window.__game.scene.isActive('Game') ? s.gameTime : null;
+    });
+  }
+
+  /** Wait until the Game scene's own clock has advanced by `ms` (wall-clock waits mean little headless). */
+  async waitGameMs(ms, timeoutMs = 60000) {
+    const start = await this.gameTime();
+    if (start === null) throw new Error('waitGameMs: no active Game scene');
+    await this.page.waitForFunction(
+      ([t0, d]) => {
+        const s = window.__game.scene.getScene('Game');
+        return !window.__game.scene.isActive('Game') || s.gameTime - t0 >= d;
+      },
+      [start, ms],
+      { timeout: timeoutMs, polling: 50 },
+    );
   }
 
   /** Run a function in the page with access to the Phaser game. Use `window.__game` inside. */
@@ -227,14 +258,19 @@ class GameDriver {
     });
   }
 
-  /** JS heap in MB (Chromium only). Call with gc=true to collect first. */
+  /**
+   * JS heap in MB (Chromium only), read through the DevTools protocol.
+   * performance.memory is bucketed by Chromium and can't see small leaks.
+   */
   async heapMB(gc = true) {
-    if (gc) {
-      const client = await this.page.context().newCDPSession(this.page);
-      await client.send('HeapProfiler.collectGarbage');
+    const client = await this.page.context().newCDPSession(this.page);
+    try {
+      if (gc) await client.send('HeapProfiler.collectGarbage');
+      const { usedSize } = await client.send('Runtime.getHeapUsage');
+      return +(usedSize / 1048576).toFixed(2);
+    } finally {
       await client.detach();
     }
-    return this.page.evaluate(() => +(performance.memory.usedJSHeapSize / 1048576).toFixed(2));
   }
 
   /** Fail if any uncaught page errors or console errors were seen. */
