@@ -1,0 +1,22 @@
+{
+  "name": "wurst-case-scenario",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A sausage roguelite bullet-hell. Escape the BBQ.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "6.4.5",
+    "vitest": "3.2.7"
+  }
+}

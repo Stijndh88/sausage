@@ -1,0 +1,86 @@
+import Phaser from 'phaser';
+
+export const BASE_SPEED = 235;
+const DASH_SPEED_MULT = 3.2;
+const DASH_MS = 170;
+const HIT_INVULN_MS = 750;
+
+/** The player. Only the head can be hit; its hitbox is the small dot in the middle. */
+export class SausageHead extends Phaser.Physics.Arcade.Sprite {
+  facing = 0;
+  private invulnUntil = 0;
+  private dashUntil = 0;
+  private dashReadyAt = 0;
+  private dashAngle = 0;
+  private readonly dot: Phaser.GameObjects.Image;
+
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y, 'sausage-head');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setCircle(8, this.width / 2 - 8, this.height / 2 - 8);
+    body.setCollideWorldBounds(true);
+    this.setDepth(10);
+    this.dot = scene.add.image(x, y, 'hitbox').setDepth(11).setAlpha(0.85);
+  }
+
+  get isDashing(): boolean {
+    return this.scene.time.now < this.dashUntil;
+  }
+
+  get invulnerable(): boolean {
+    const now = this.scene.time.now;
+    return now < this.invulnUntil || now < this.dashUntil;
+  }
+
+  /** 0..1, how charged the dash is. */
+  dashCharge(cooldownMs: number): number {
+    const remaining = this.dashReadyAt - this.scene.time.now;
+    return remaining <= 0 ? 1 : 1 - remaining / cooldownMs;
+  }
+
+  drive(ix: number, iy: number, speedMult: number, wantDash: boolean, dashCooldownMs: number): void {
+    const now = this.scene.time.now;
+    const len = Math.hypot(ix, iy);
+    const moving = len > 0.01;
+    if (moving) {
+      ix /= len;
+      iy /= len;
+    }
+    if (wantDash && now >= this.dashReadyAt) {
+      this.dashAngle = moving ? Math.atan2(iy, ix) : this.facing;
+      this.dashUntil = now + DASH_MS;
+      this.dashReadyAt = now + dashCooldownMs;
+    }
+    const speed = BASE_SPEED * speedMult;
+    if (now < this.dashUntil) {
+      this.setVelocity(Math.cos(this.dashAngle) * speed * DASH_SPEED_MULT, Math.sin(this.dashAngle) * speed * DASH_SPEED_MULT);
+    } else {
+      this.setVelocity(ix * speed, iy * speed);
+    }
+    if (moving) {
+      const target = Math.atan2(iy, ix);
+      this.facing = Phaser.Math.Angle.RotateTo(this.facing, target, 0.25);
+    }
+    this.setRotation(this.facing);
+
+    // Blink while invulnerable after a hit.
+    const blinking = now < this.invulnUntil;
+    this.setAlpha(blinking && Math.floor(now / 70) % 2 === 0 ? 0.4 : 1);
+    this.dot.setPosition(this.x, this.y);
+  }
+
+  markHit(): void {
+    this.invulnUntil = this.scene.time.now + HIT_INVULN_MS;
+  }
+
+  halt(): void {
+    this.setVelocity(0, 0);
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.dot?.destroy();
+    super.destroy(fromScene);
+  }
+}
