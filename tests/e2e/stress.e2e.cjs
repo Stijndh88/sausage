@@ -279,7 +279,10 @@ module.exports = {
         await installSim(g);
         const menu = {};
         for (let i = 1; i <= 60; i++) {
-          await page.keyboard.press('Enter');
+          await page.keyboard.press('Enter'); // menu → sausage select
+          await sim(g, 5, { until: 'Select' });
+          await sim(g, 20); // the select screen ignores keys for 250ms
+          await page.keyboard.press('Enter'); // select → game
           await sim(g, 5, { until: 'Game' });
           assert.equal(await g.scene(), 'Game', `cycle ${i}: Enter on menu did not start`);
           await sim(g, 60, { bot: true });
@@ -287,7 +290,7 @@ module.exports = {
           await sim(g, 300, { until: 'GameOver' });
           await g.evaluate(() => {
             const go = window.__game.scene.getScene('GameOver');
-            go.children.list.find((o) => o.label && o.label.text === 'Main menu').emit('pointerdown');
+            go.children.list.find((o) => o.label && o.label.text.startsWith('Main menu')).emit('pointerdown');
           });
           await sim(g, 5, { until: 'Menu' });
           assert.equal(await g.scene(), 'Menu', `cycle ${i}: did not return to the menu`);

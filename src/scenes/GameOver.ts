@@ -32,8 +32,9 @@ export function endScreen(scene: Phaser.Scene, run: RunState, title: string, sub
     `Links            ${run.weapons.length}`,
     `Sausage          ${SAUSAGES[run.sausage].name}`,
   ];
-  scene.add.text(GAME_W / 2, 425, lines.join('\n'), {
-    fontFamily: 'monospace', fontSize: '22px', color: '#ffffff', lineSpacing: 8,
+  // Six lines, kept clear of the "new sausage unlocked" banner below.
+  scene.add.text(GAME_W / 2, 428, lines.join('\n'), {
+    fontFamily: 'monospace', fontSize: '20px', color: '#ffffff', lineSpacing: 4,
   }).setOrigin(0.5);
 
   // One shared guard: a click and a key in the same frame must not start two scenes.
@@ -48,7 +49,7 @@ export function endScreen(scene: Phaser.Scene, run: RunState, title: string, sub
   const again = () => go('Game', { run: newRun(undefined, run.sausage) });
   if (unlocked.length) {
     audio.play('unlock');
-    const t = scene.add.text(GAME_W / 2, 535, `NEW SAUSAGE UNLOCKED: ${unlocked.map((id) => SAUSAGES[id].name).join(', ')}!`, {
+    const t = scene.add.text(GAME_W / 2, 545, `NEW SAUSAGE UNLOCKED: ${unlocked.map((id) => SAUSAGES[id].name).join(', ')}!`, {
       fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: '#000', strokeThickness: 5,
     }).setOrigin(0.5);
     scene.tweens.add({ targets: t, scale: 1.08, duration: 500, yoyo: true, repeat: -1 });

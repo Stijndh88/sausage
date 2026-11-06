@@ -225,7 +225,7 @@ module.exports = {
         const texts = await textBounds(page, 'Menu');
         const buttons = await buttonBounds(page, 'Menu');
         assert.ok(texts.length >= 3, 'expected title, subtitle and help text');
-        assert.equal(buttons.length, 1);
+        assert.equal(buttons.length, 3, 'Settings, START and Fullscreen');
         assertAllInside([...texts, ...buttons], 'menu');
         const free = texts.filter((t) => !buttons.some((b) => b.text === t.text));
         assertNoOverlaps([...free, ...buttons], 'menu');
