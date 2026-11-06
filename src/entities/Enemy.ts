@@ -7,6 +7,8 @@ export interface EnemyContext {
   patterns: BulletPatterns;
   arena: Phaser.Geom.Rectangle;
   spawnMinion(kind: EnemyKind, x: number, y: number): void;
+  /** True once the wave is over (death, victory, wave clear): delayed attacks must not fire. */
+  halted(): boolean;
 }
 
 type Mode = 'move' | 'windup' | 'charge' | 'recover' | 'idle' | 'spray';
@@ -93,6 +95,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   shove(fromX: number, fromY: number, strength: number): void {
+    // Turrets are rooted and the boss is immovable.
+    if (this.isBoss || this.def.kind === 'hotsauce') return;
     const a = Math.atan2(this.y - fromY, this.x - fromX);
     this.kbX = Math.cos(a) * strength;
     this.kbY = Math.sin(a) * strength;
@@ -231,13 +235,13 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           // Three aimed fans.
           for (let k = 0; k < 3; k++) {
             this.scene.time.delayedCall(k * 220, () => {
-              if (!this.dead) p.spread(this.x, this.y + 30, Math.atan2(ctx.player.y - this.y, ctx.player.x - this.x), 9, 1.1, 230, heat, 'eb-boss');
+              if (!this.dead && !ctx.halted()) p.spread(this.x, this.y + 30, Math.atan2(ctx.player.y - this.y, ctx.player.x - this.x), 9, 1.1, 230, heat, 'eb-boss');
             });
           }
         } else {
           p.ring(this.x, this.y + 30, 22, 170, heat, 'eb-boss', i * 0.15);
           this.scene.time.delayedCall(350, () => {
-            if (!this.dead) p.ring(this.x, this.y + 30, 22, 170, heat, 'eb-boss', i * 0.15 + 0.14);
+            if (!this.dead && !ctx.halted()) p.ring(this.x, this.y + 30, 22, 170, heat, 'eb-boss', i * 0.15 + 0.14);
           });
         }
         this.nextFireAt = now + 1700;
@@ -250,7 +254,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         } else if (pick === 1) {
           for (let k = 0; k < 14; k++) {
             this.scene.time.delayedCall(k * 90, () => {
-              if (!this.dead) p.spiral(this.x, this.y + 30, this.spiralAngle += 0.33, 4, 180, heat, 'eb-hot');
+              if (!this.dead && !ctx.halted()) p.spiral(this.x, this.y + 30, this.spiralAngle += 0.33, 4, 180, heat, 'eb-hot');
             });
           }
         } else {

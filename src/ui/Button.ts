@@ -34,6 +34,7 @@ export class Button extends Phaser.GameObjects.Container {
 
   setEnabled(enabled: boolean): this {
     this.enabled = enabled;
+    if (this.input) this.input.cursor = enabled ? 'pointer' : 'default';
     this.draw();
     return this;
   }

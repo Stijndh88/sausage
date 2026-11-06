@@ -36,7 +36,7 @@ class FakeScene {
       return img;
     },
   };
-  tweens = { add: () => ({}) };
+  tweens = { add: () => ({}), killTweensOf: () => {} };
   time = {
     delayedCall: (ms: number, fn: () => void) => { this.timers.push({ at: this.now + ms, fn }); },
   };

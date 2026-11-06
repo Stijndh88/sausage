@@ -37,6 +37,32 @@ npm test           # unit tests for the game logic
 npm run build      # production build into dist/ (static files; host anywhere)
 ```
 
+## Testing
+```bash
+npm test                                   # Vitest: game logic, economy, balance invariants (~1s)
+npm run e2e                                # browser tests in headless Chromium (~15 min for all)
+npm run e2e -- tests/e2e/smoke.e2e.cjs     # one file
+npm run e2e -- --grep shop                 # tests whose name matches
+```
+Browser tests live in `tests/e2e/*.e2e.cjs` and use the helpers in `tests/e2e/harness.cjs`
+(start a run at any wave, god mode, a kiting bot, frame timing, heap). Each test fails on any
+uncaught page error. A test marked `knownBug: '...'` reproduces an open bug and is expected to
+fail; when the bug is fixed the runner flags it so the marker can be removed.
+
+| File | Covers |
+|---|---|
+| `smoke` | menu → waves → shop → boss → victory / game over |
+| `review` | lifecycle and logic bugs found in code review (pause, timers, death/win races, HUD) |
+| `adversarial` | key mashing through transitions, pause abuse, shop abuse, resizing, every wave |
+| `stress` | full bullet pools, max enemies, 100+ scene cycles for leaks, frame cost per wave, lag spikes |
+| `balance` | economy, boss time-to-kill, weapon/item rules |
+| `ux` | layout at phone/tablet/ultrawide sizes, contrast, pause/blur behaviour |
+
+### Timing rule
+All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on
+unpaused frames by the same capped delta physics uses. Never use `scene.time.now` for gameplay:
+it follows the wall clock and keeps running while paused.
+
 ## Project layout
 ```
 src/

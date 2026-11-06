@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { GameClock } from '../systems/clock';
 
 export const BASE_SPEED = 235;
 const DASH_SPEED_MULT = 3.2;
@@ -14,7 +15,7 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
   private dashAngle = 0;
   private readonly dot: Phaser.GameObjects.Image;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, private readonly clock: GameClock) {
     super(scene, x, y, 'sausage-head');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -26,22 +27,22 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
   }
 
   get isDashing(): boolean {
-    return this.scene.time.now < this.dashUntil;
+    return this.clock.now() < this.dashUntil;
   }
 
   get invulnerable(): boolean {
-    const now = this.scene.time.now;
+    const now = this.clock.now();
     return now < this.invulnUntil || now < this.dashUntil;
   }
 
   /** 0..1, how charged the dash is. */
   dashCharge(cooldownMs: number): number {
-    const remaining = this.dashReadyAt - this.scene.time.now;
+    const remaining = this.dashReadyAt - this.clock.now();
     return remaining <= 0 ? 1 : 1 - remaining / cooldownMs;
   }
 
   drive(ix: number, iy: number, speedMult: number, wantDash: boolean, dashCooldownMs: number): void {
-    const now = this.scene.time.now;
+    const now = this.clock.now();
     const len = Math.hypot(ix, iy);
     const moving = len > 0.01;
     if (moving) {
@@ -72,7 +73,7 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
   }
 
   markHit(): void {
-    this.invulnUntil = this.scene.time.now + HIT_INVULN_MS;
+    this.invulnUntil = this.clock.now() + HIT_INVULN_MS;
   }
 
   halt(): void {

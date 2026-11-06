@@ -15,6 +15,8 @@ export interface PlayerStats {
   dashCooldownMs: number;
   /** Extra damage multiplier while Well-done or hotter. */
   hotDamageBonus: number;
+  /** Extra heat taken from drawbacks (Smoky Flavor); added after the MIN_HEAT_TAKEN floor so it always bites. */
+  heatTakenPenalty: number;
 }
 
 export const BASE_STATS: Readonly<PlayerStats> = {
@@ -29,6 +31,7 @@ export const BASE_STATS: Readonly<PlayerStats> = {
   crumbMult: 1,
   dashCooldownMs: 1500,
   hotDamageBonus: 0,
+  heatTakenPenalty: 0,
 };
 
 export const MIN_HEAT_TAKEN = 0.4;
@@ -40,7 +43,7 @@ export function computeStats(itemIds: readonly string[]): PlayerStats {
     const item = ITEMS[id];
     if (item) item.apply(s);
   }
-  s.heatTakenMult = Math.max(MIN_HEAT_TAKEN, s.heatTakenMult);
+  s.heatTakenMult = Math.max(MIN_HEAT_TAKEN, s.heatTakenMult) + s.heatTakenPenalty;
   s.dashCooldownMs = Math.max(MIN_DASH_COOLDOWN, s.dashCooldownMs);
   s.killCoolChance = Math.min(1, s.killCoolChance);
   return s;

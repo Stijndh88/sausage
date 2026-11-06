@@ -3,6 +3,7 @@ import { GAME_H, GAME_W } from '../art/textures';
 import { newRun } from '../state/run';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
+import { onKeyPress } from '../ui/input';
 
 export class MenuScene extends Phaser.Scene {
   private head!: Phaser.GameObjects.Image;
@@ -51,9 +52,14 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '18px', color: '#ffffff', align: 'center', lineSpacing: 6,
     }).setOrigin(0.5);
 
-    const start = () => this.scene.start('Game', { run: newRun() });
+    let leaving = false;
+    const start = () => {
+      if (leaving) return;
+      leaving = true;
+      this.scene.start('Game', { run: newRun() });
+    };
     new Button(this, GAME_W / 2, 630, 'START  (Enter)', { width: 280, height: 60, fontSize: 24 }, start);
-    this.input.keyboard!.once('keydown-ENTER', start);
-    this.input.keyboard!.once('keydown-SPACE', start);
+    onKeyPress(this.input.keyboard!, 'ENTER', start);
+    onKeyPress(this.input.keyboard!, 'SPACE', start);
   }
 }

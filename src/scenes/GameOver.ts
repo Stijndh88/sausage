@@ -4,6 +4,7 @@ import { TOTAL_WAVES } from '../data/waves';
 import { newRun, type RunState } from '../state/run';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
+import { onKeyPress } from '../ui/input';
 
 /** Shared layout for the end-of-run screens. */
 export function endScreen(scene: Phaser.Scene, run: RunState, title: string, subtitle: string, color: string, headTint: number): void {
@@ -28,10 +29,19 @@ export function endScreen(scene: Phaser.Scene, run: RunState, title: string, sub
     fontFamily: 'monospace', fontSize: '22px', color: '#ffffff', lineSpacing: 8,
   }).setOrigin(0.5);
 
-  const again = () => scene.scene.start('Game', { run: newRun() });
+  // One shared guard: a click and a key in the same frame must not start two scenes.
+  let leaving = false;
+  const go = (key: string, data?: object) => {
+    if (leaving) return;
+    leaving = true;
+    scene.scene.start(key, data);
+  };
+  // Ignore input briefly so a key held from the last fight doesn't skip the results.
+  const readyAt = scene.time.now + 400;
+  const again = () => go('Game', { run: newRun() });
   new Button(scene, GAME_W / 2 - 150, 600, 'Try again (Enter)', { width: 260, height: 56 }, again);
-  new Button(scene, GAME_W / 2 + 150, 600, 'Main menu', { width: 260, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => scene.scene.start('Menu'));
-  scene.input.keyboard!.once('keydown-ENTER', again);
+  new Button(scene, GAME_W / 2 + 150, 600, 'Main menu', { width: 260, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => go('Menu'));
+  onKeyPress(scene.input.keyboard!, 'ENTER', again, () => scene.time.now >= readyAt);
 }
 
 export class GameOverScene extends Phaser.Scene {

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
 
 const OFFSCREEN_MARGIN = 40;
+/** Enemy bullets die after this long even if still on screen (curving bullets can loop forever). */
+export const ENEMY_BULLET_LIFETIME_MS = 9000;
 
 export interface PlayerShot {
   x: number;
@@ -62,11 +64,12 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
     return this.lobTarget === null;
   }
 
-  update(time: number): void {
+  /** Called by the Game scene each unpaused frame with game time. */
+  update(time: number, delta: number): void {
     if (!this.active) return;
     if (this.lobTarget) {
       // Fake an arc by scaling up then down.
-      this.rotation += 0.25;
+      this.rotation += 15 * (delta / 1000);
       const total = Math.hypot(this.lobTarget.x - this.x, this.lobTarget.y - this.y);
       this.setScale(1 + Math.min(0.6, total / 400));
       if (total < 12 || time >= this.dieAt) {
@@ -88,13 +91,15 @@ export class EnemyBullet extends Phaser.Physics.Arcade.Image {
   /** Optional per-frame steering in radians/sec, for curving spiral bullets. */
   curve = 0;
   private speed = 0;
+  private dieAt = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
   }
 
-  fire(x: number, y: number, angle: number, speed: number, heat: number, texture: string, curve = 0): void {
+  fire(x: number, y: number, angle: number, speed: number, heat: number, texture: string, now: number, curve = 0): void {
     this.enableBody(true, x, y, true, true);
+    this.dieAt = now + ENEMY_BULLET_LIFETIME_MS;
     this.setTexture(texture);
     this.setDepth(7);
     // Hitbox a bit smaller than the sprite: fair dodging.
@@ -107,8 +112,13 @@ export class EnemyBullet extends Phaser.Physics.Arcade.Image {
     this.scene.physics.velocityFromRotation(angle, speed, (this.body as Phaser.Physics.Arcade.Body).velocity);
   }
 
-  update(_time: number, delta: number): void {
+  /** Called by the Game scene each unpaused frame with game time. */
+  update(time: number, delta: number): void {
     if (!this.active) return;
+    if (time >= this.dieAt) {
+      this.kill();
+      return;
+    }
     if (this.curve !== 0) {
       this.rotation += this.curve * (delta / 1000);
       this.scene.physics.velocityFromRotation(this.rotation, this.speed, (this.body as Phaser.Physics.Arcade.Body).velocity);
@@ -130,7 +140,6 @@ export function createPlayerBulletPool(scene: Phaser.Scene): Phaser.Physics.Arca
     classType: PlayerBullet,
     defaultKey: 'pb-toothpick',
     maxSize: 600,
-    runChildUpdate: true,
   });
 }
 
@@ -139,6 +148,5 @@ export function createEnemyBulletPool(scene: Phaser.Scene): Phaser.Physics.Arcad
     classType: EnemyBullet,
     defaultKey: 'eb-ketchup',
     maxSize: 900,
-    runChildUpdate: true,
   });
 }

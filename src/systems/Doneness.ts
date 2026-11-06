@@ -15,11 +15,12 @@ export interface DonenessTier {
 }
 
 export const TIERS: readonly DonenessTier[] = [
+  // Meter colours get brighter/hotter as heat rises, so the most dangerous state is the most visible.
   { name: 'Raw', min: 0, damageMult: 0.85, fireRateMult: 1.0, color: 0xf0a0a0 },
-  { name: 'Medium', min: 25, damageMult: 1.0, fireRateMult: 1.0, color: 0xe07a4f },
-  { name: 'Well-done', min: 60, damageMult: 1.3, fireRateMult: 1.2, color: 0xb5521f },
-  { name: 'Burnt', min: 90, damageMult: 1.5, fireRateMult: 1.2, color: 0x5c3218 },
-  { name: 'Charred', min: 100, damageMult: 0, fireRateMult: 0, color: 0x222222 },
+  { name: 'Medium', min: 25, damageMult: 1.0, fireRateMult: 1.0, color: 0xffb347 },
+  { name: 'Well-done', min: 60, damageMult: 1.3, fireRateMult: 1.2, color: 0xff7a1a },
+  { name: 'Burnt', min: 90, damageMult: 1.5, fireRateMult: 1.2, color: 0xff3b1f },
+  { name: 'Charred', min: 100, damageMult: 0, fireRateMult: 0, color: 0xff2a2a },
 ];
 
 export function tierFor(heat: number): DonenessTier {

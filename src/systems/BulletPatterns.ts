@@ -1,14 +1,18 @@
 import Phaser from 'phaser';
 import { EnemyBullet } from '../entities/BulletPool';
+import type { GameClock } from './clock';
 
 /** Bullet-hell pattern helpers. All angles in radians. */
 export class BulletPatterns {
-  constructor(private readonly pool: Phaser.Physics.Arcade.Group) {}
+  constructor(
+    private readonly pool: Phaser.Physics.Arcade.Group,
+    private readonly clock: GameClock,
+  ) {}
 
   shoot(x: number, y: number, angle: number, speed: number, heat: number, texture: string, curve = 0): void {
     const b = this.pool.get(x, y) as EnemyBullet | null;
     if (!b) return;
-    b.fire(x, y, angle, speed, heat, texture, curve);
+    b.fire(x, y, angle, speed, heat, texture, this.clock.now(), curve);
   }
 
   /** `count` bullets fanned around `angle`. */

@@ -159,7 +159,7 @@ describe('item stacking and stat caps', () => {
 
   // computeStats sums every item and clamps at the end, so once Thicker Casing has pushed heatTakenMult
   // below the 0.4 floor, Smoky Flavor's "+5% heat taken" drawback silently disappears.
-  it.fails("Smoky Flavor's +5% heat taken always costs something, even with a full Casing stack", () => {
+  it("Smoky Flavor's +5% heat taken always costs something, even with a full Casing stack", () => {
     const casings = Array(9).fill('casing');
     const without = computeStats(casings).heatTakenMult;
     const withSmoky = computeStats([...casings, 'smoky', 'smoky']).heatTakenMult;
@@ -270,11 +270,11 @@ describe('economy', () => {
 
   // generateOffers ignores the loadout. With six maxed links every weapon offer is unbuyable
   // ("No free links") and ~1.7% of shops are all weapons (seed 6, after wave 9 is one).
-  it.fails('a shop always has at least one buyable offer for a player with crumbs (six maxed links)', () => {
+  it('a shop always has at least one buyable offer for a player with crumbs (six maxed links)', () => {
     const maxed: WeaponSlot[] = ['toothpick', 'pickle', 'skewer', 'pepper', 'mustard', 'onion'].map((id) => ({ id: id as WeaponSlot['id'], tier: MAX_TIER }));
     for (let seed = 0; seed < 40; seed++) {
       for (let wave = 1; wave < TOTAL_WAVES; wave++) {
-        const offers = generateOffers(shopRng(seed, wave, 0), wave + 1);
+        const offers = generateOffers(shopRng(seed, wave, 0), wave + 1, [], SHOP_SIZE, maxed);
         expect(offers.some((o) => canBuy(o, 10_000, maxed).ok), `seed ${seed} wave ${wave}`).toBe(true);
       }
     }

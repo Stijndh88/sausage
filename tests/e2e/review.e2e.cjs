@@ -184,7 +184,8 @@ module.exports = {
         await setup(g, { heat: 70 });
         await g.wait(200);
         const color = await g.evaluate(() => window.__rv.scene().hud.tierText.style.color);
-        assert.match(color, /^rgba\(255,176,112,1\)$/);
+        // Same colour (255,176,112) in either CSS notation.
+        assert.match(color, /^(#ffb070|rgba\(255,176,112,1\))$/i);
       },
     },
     {
@@ -214,7 +215,6 @@ module.exports = {
     // ------------------------------------------------------------------ pause bugs
     {
       name: 'review: condiment packets do not expire while the game is paused',
-      knownBug: 'scene.time.now keeps running while paused; condiment lifetime counts paused time',
       timeoutMs: 30000,
       fn: async ({ g }) => {
         await setup(g);
@@ -233,7 +233,6 @@ module.exports = {
     },
     {
       name: 'review: post-hit invulnerability survives a pause',
-      knownBug: 'invulnUntil/dashUntil are absolute scene.time.now stamps; pausing burns them',
       timeoutMs: 30000,
       fn: async ({ g }) => {
         await setup(g);
@@ -253,7 +252,6 @@ module.exports = {
     },
     {
       name: 'review: a lobbed pickle does not explode (or kill) while the game is paused',
-      knownBug: 'PlayerBullet.update runs via the UpdateList while paused and compares against the still-running clock',
       timeoutMs: 30000,
       fn: async ({ g }) => {
         await setup(g);
@@ -278,7 +276,6 @@ module.exports = {
     },
     {
       name: 'review: killing the boss with a pickle while paused soft-locks the game (stuck on PAUSED)',
-      knownBug: 'pickle explodes during pause → win() sets ending → togglePause refuses to unpause and the Victory timer is paused forever',
       timeoutMs: 30000,
       fn: async ({ page, g }) => {
         await setup(g, { wave: 10 });
@@ -315,7 +312,6 @@ module.exports = {
     },
     {
       name: 'review: at low FPS enemies do not outpace the wave clock',
-      knownBug: 'Game.update clamps dt to 50ms (director, heat, pickups) but physics and time.now timers run unclamped',
       timeoutMs: 40000,
       fn: async ({ g }) => {
         await realtime(g);
@@ -346,7 +342,6 @@ module.exports = {
     // ------------------------------------------------------------------ death / boss
     {
       name: 'review: player bullets still in flight after charring cannot trigger win()',
-      knownBug: 'die() does not clear player bullets and win() only checks `ending`, not `dying`',
       timeoutMs: 30000,
       fn: async ({ g }) => {
         await setup(g, { wave: 10 });
@@ -375,7 +370,6 @@ module.exports = {
     },
     {
       name: 'review: boss delayed attacks stop when the sausage chars',
-      knownBug: "bossThink's delayedCall fans/spirals only check the boss's own `dead`, so they keep firing after die() cleared the bullets",
       timeoutMs: 30000,
       fn: async ({ g }) => {
         await setup(g, { wave: 10 });
@@ -396,13 +390,15 @@ module.exports = {
     },
     {
       name: 'review: curving boss bullets eventually leave play',
-      knownBug: 'EnemyBullet has no lifetime; a curve=0.5 ring bullet (turn radius 380px) can circle inside the screen forever',
       timeoutMs: 45000,
       fn: async ({ g }) => {
-        await setup(g, { wave: 10 });
+        // Wave 1 with spawning stopped, so the only enemy bullets are the ring below
+        // (in the boss wave the boss keeps firing fresh bullets).
+        await setup(g, { wave: 1 });
         // Exactly the boss's phase-2 "curving double ring" call, with the boss at (300, 330).
         await g.evaluate(() => {
           const s = window.__rv.scene();
+          s.director.stop();
           s.head.setPosition(640, 440);
           s.patterns.ring(300, 360, 24, 190, 10, 'eb-boss', 0, 0.5);
         });
@@ -415,7 +411,6 @@ module.exports = {
     // ------------------------------------------------------------------ shop
     {
       name: 'review: holding Space (dash) through the wave-clear transition does not skip the shop',
-      knownBug: "Shop binds keydown-SPACE to next(); Shop has no Key object so autorepeat keydowns aren't filtered",
       timeoutMs: 30000,
       fn: async ({ page, g }) => {
         await setup(g, { seed: 1 });
@@ -430,7 +425,6 @@ module.exports = {
     },
     {
       name: 'review: two "next wave" inputs in one frame advance exactly one wave',
-      knownBug: 'Shop.next() is not idempotent: run.wave++ runs for each input before the scene switch is processed',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await g.openShop({ run: { wave: 3 } });
@@ -449,7 +443,6 @@ module.exports = {
     // ------------------------------------------------------------------ misc gameplay
     {
       name: 'review: touching a Hot Sauce turret does not shove it around',
-      knownBug: 'head-contact shove() applies knockback to the stationary turret (hit() exempts it, shove() does not)',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await setup(g);
@@ -467,7 +460,6 @@ module.exports = {
     },
     {
       name: 'review: HUD crumb counter returns to normal size after a burst of pickups',
-      knownBug: 'each crumb change starts a yoyo scale tween from the current (mid-tween) scale, so the last one parks above 1',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await setup(g);
@@ -491,7 +483,6 @@ module.exports = {
     },
     {
       name: 'review: onion rings move continuously when the heat tier changes fire rate',
-      knownBug: 'ring angle = absolute time × speed × fireRateMult, so a fire-rate change teleports the rings',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await setup(g, { weapons: [{ id: 'onion', tier: 1 }], heat: 59 });
@@ -517,7 +508,6 @@ module.exports = {
     },
     {
       name: 'review: HUD does not re-render unchanged text every frame',
-      knownBug: 'perf: Hud.update calls Text.setColor every frame, and TextStyle.setColor always re-runs updateText (canvas redraw + texture upload)',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await setup(g, { heat: 70 });
@@ -538,7 +528,6 @@ module.exports = {
     },
     {
       name: 'review: spawn-mark blink tweens are released when the mark is gone',
-      knownBug: 'telegraph() starts a repeat:-1 tween on the mark and never removes it; destroyed marks keep ticking until scene shutdown',
       timeoutMs: 20000,
       fn: async ({ g }) => {
         await realtime(g);

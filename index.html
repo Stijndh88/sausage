@@ -6,7 +6,8 @@
     <title>Wurst Case Scenario</title>
     <style>
       html, body { margin: 0; height: 100%; background: #1a1210; overflow: hidden; }
-      #game { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+      /* Phaser's Scale.CENTER_BOTH does the centring; don't also flex-centre or it shifts off-centre. */
+      #game { width: 100%; height: 100%; }
       canvas { image-rendering: auto; }
     </style>
   </head>

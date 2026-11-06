@@ -191,7 +191,6 @@ module.exports = {
     },
     {
       name: 'ux: canvas is centred in the viewport (phone portrait and ultrawide)',
-      knownBug: 'index.html flex-centres #game AND Phaser CENTER_BOTH adds a margin: canvas sits 1/4 of the free space off-centre',
       fn: async ({ page }) => {
         for (const [w, h] of [[390, 844], [2560, 1080], [1920, 1200]]) {
           await resizeTo(page, w, h);
@@ -254,7 +253,6 @@ module.exports = {
     },
     {
       name: 'ux: boss health bar and name do not cover the playable arena',
-      knownBug: 'boss bar (y≈689–707) and its name (y≈673–687) are drawn at depth 51 inside the arena (y 78–704); the head, links and bullets slide underneath',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1, wave: 10 });
         await g.godMode();
@@ -263,9 +261,13 @@ module.exports = {
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           const n = s.hud.bossName.getBounds();
-          return { arena: { x: s.arena.x, y: s.arena.y, w: s.arena.width, h: s.arena.height }, name: { text: 'boss name', x: n.x, y: n.y, w: n.width, h: n.height } };
+          return {
+            arena: { x: s.arena.x, y: s.arena.y, w: s.arena.width, h: s.arena.height },
+            name: { text: 'boss name', x: n.x, y: n.y, w: n.width, h: n.height },
+            bar: { text: 'boss bar', ...s.hud.bossBarBounds },
+          };
         });
-        const bar = { text: 'boss bar', x: (GAME_W - 600) / 2 - 3, y: GAME_H - 28 - 3, w: 606, h: 18 };
+        const bar = r.bar;
         assert.ok(!overlaps(r.name, r.arena), `boss name ${JSON.stringify(r.name)} overlaps arena ${JSON.stringify(r.arena)}`);
         assert.ok(!overlaps(bar, r.arena), `boss bar ${JSON.stringify(bar)} overlaps arena ${JSON.stringify(r.arena)}`);
       },
@@ -346,7 +348,6 @@ module.exports = {
     },
     {
       name: 'ux: game auto-pauses when the window loses focus',
-      knownBug: 'no blur handler: alt-tabbing or clicking another window lets the bullet-hell keep running',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 2 });
         await g.wait(300);
@@ -360,7 +361,6 @@ module.exports = {
     },
     {
       name: 'ux: returning to a hidden tab shows the pause overlay instead of resuming mid-fight',
-      knownBug: 'Phaser only freezes the loop while hidden; on return the wave resumes instantly with no pause screen',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 2 });
         await g.wait(300);
@@ -381,7 +381,6 @@ module.exports = {
     // ----- Input safety -------------------------------------------------------
     {
       name: 'ux: Space (the dash key) does not instantly leave the shop',
-      knownBug: 'Shop binds Space to "Next wave" with no delay; a dash press (or a held, auto-repeating Space) as the shop opens skips it',
       fn: async ({ page, g }) => {
         await g.openShop({ seed: 3, run: { wave: 2, crumbs: 30 } });
         await page.keyboard.press('Space');
@@ -391,7 +390,6 @@ module.exports = {
     },
     {
       name: 'ux: disabled shop buttons do not show the hand cursor',
-      knownBug: 'Button always uses useHandCursor; unaffordable "Buy" buttons still show a pointer',
       fn: async ({ page, g }) => {
         await g.openShop({ seed: 11, run: { wave: 3, crumbs: 0 } });
         const b = (await buttonBounds(page, 'Shop')).find((x) => /^1\s+Buy/.test(x.text));
@@ -436,7 +434,6 @@ module.exports = {
     },
     {
       name: 'ux: shop key-hint line meets WCAG AA contrast (4.5:1)',
-      knownBug: 'the 13px hint (#8a7060) on the shop backdrop measures about 4.1:1',
       fn: async ({ page, g }) => {
         await g.openShop({ seed: 11, run: { wave: 3, crumbs: 10 } });
         const hint = (await textBounds(page, 'Shop')).find((t) => t.text.startsWith('1-4 buy'));
@@ -462,7 +459,6 @@ module.exports = {
     },
     {
       name: 'ux: Doneness meter fill stays visible when Burnt (95°), the most dangerous state',
-      knownBug: 'Burnt fill #5c3218 (pulsing to 50% alpha) on a near-black track measures under 2:1; at 100° the Charred fill #222 looks like an empty bar',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1 });
         await freezeWave(g, 95);
@@ -478,7 +474,6 @@ module.exports = {
     },
     {
       name: 'ux: the sausage head stays visible against the grill when Burnt',
-      knownBug: 'heat tint darkens the head to ~#5c2212 at 95°, about 1.4:1 against the grill, exactly when a hit is fatal',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1 });
         await freezeWave(g, 95);

@@ -10,6 +10,7 @@ import {
 } from '../systems/Economy';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
+import { onKeyPress } from '../ui/input';
 
 const CARD_W = 250;
 const CARD_H = 290;
@@ -20,6 +21,10 @@ export class ShopScene extends Phaser.Scene {
   private offers: (Offer | null)[] = [];
   private locked = new Set<number>();
   private ui: Phaser.GameObjects.GameObject[] = [];
+  /** Set once "next wave" is triggered so a second input in the same frame can't skip a wave. */
+  private leaving = false;
+  /** Ignore keys for a moment after opening, so keys held through the wave-clear don't act here. */
+  private inputReadyAt = 0;
 
   constructor() {
     super('Shop');
@@ -28,8 +33,9 @@ export class ShopScene extends Phaser.Scene {
   init(data: { run: RunState }): void {
     this.run = data.run;
     this.run.rerollCount = 0;
+    this.leaving = false;
     const lockedOffers = this.run.lockedOffers;
-    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers);
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers, undefined, this.run.weapons);
     this.locked = new Set(lockedOffers.map((_, i) => i));
     this.run.lockedOffers = [];
   }
@@ -38,14 +44,16 @@ export class ShopScene extends Phaser.Scene {
     this.add.image(0, 0, 'bg-grill').setOrigin(0).setAlpha(0.35);
     this.add.rectangle(0, 0, GAME_W, GAME_H, 0x140d0a, 0.6).setOrigin(0);
 
+    // Space is deliberately NOT bound: it's the dash key, and a held dash must never skip the shop.
+    this.inputReadyAt = this.time.now + 350;
     const kb = this.input.keyboard!;
-    kb.on('keydown-ONE', () => this.buy(0));
-    kb.on('keydown-TWO', () => this.buy(1));
-    kb.on('keydown-THREE', () => this.buy(2));
-    kb.on('keydown-FOUR', () => this.buy(3));
-    kb.on('keydown-R', () => this.reroll());
-    kb.on('keydown-ENTER', () => this.next());
-    kb.on('keydown-SPACE', () => this.next());
+    const ready = () => this.time.now >= this.inputReadyAt;
+    onKeyPress(kb, 'ONE', () => this.buy(0), ready);
+    onKeyPress(kb, 'TWO', () => this.buy(1), ready);
+    onKeyPress(kb, 'THREE', () => this.buy(2), ready);
+    onKeyPress(kb, 'FOUR', () => this.buy(3), ready);
+    onKeyPress(kb, 'R', () => this.reroll(), ready);
+    onKeyPress(kb, 'ENTER', () => this.next(), ready);
 
     this.render();
     (window as unknown as { __sausage?: unknown }).__sausage = this;
@@ -82,7 +90,7 @@ export class ShopScene extends Phaser.Scene {
     // Bottom row: reroll + next
     const cost = rerollCost(run.wave, run.rerollCount);
     add(new Button(this, GAME_W / 2 - 150, 490, `Reroll (R)  ${cost}`, { width: 240, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.reroll())
-      .setEnabled(run.crumbs >= cost));
+      .setEnabled(run.crumbs >= cost && this.canReroll()));
     add(new Button(this, GAME_W / 2 + 150, 490, 'Next wave  ▶', { width: 240, height: 52, fill: 0x3c8d3c, hover: 0x52b052 }, () => this.next()));
 
     // Loadout
@@ -96,12 +104,13 @@ export class ShopScene extends Phaser.Scene {
     add(this.add.text(780, 548, 'ITEMS', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
     const counts = new Map<string, number>();
     for (const id of run.items) counts.set(id, (counts.get(id) ?? 0) + 1);
-    const itemLines = [...counts].map(([id, n]) => `${ITEMS[id].name}${n > 1 ? ` ×${n}` : ''}`);
+    // Non-breaking spaces inside each entry so word-wrap never splits "Thicker Casing ×2".
+    const itemLines = [...counts].map(([id, n]) => `${ITEMS[id].name}${n > 1 ? ` ×${n}` : ''}`.replace(/ /g, '\u00a0'));
     add(this.add.text(780, 574, itemLines.length ? itemLines.join('   ') : 'None yet', {
       fontFamily: FONT, fontSize: '14px', color: '#ffffff', wordWrap: { width: 460 }, lineSpacing: 6,
     }));
     add(this.add.text(GAME_W / 2, GAME_H - 18, '1-4 buy · R reroll · Enter next wave · "Keep" holds an offer through rerolls and into the next shop', {
-      fontFamily: FONT, fontSize: '13px', color: '#8a7060',
+      fontFamily: FONT, fontSize: '14px', color: '#b09080',
     }).setOrigin(0.5));
   }
 
@@ -160,6 +169,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private buy(i: number): void {
+    if (this.leaving) return;
     const offer = this.offers[i];
     if (!offer || !canBuy(offer, this.run.crumbs, this.run.weapons).ok) return;
     this.run.crumbs -= offer.price;
@@ -181,18 +191,26 @@ export class ShopScene extends Phaser.Scene {
     this.render();
   }
 
+  /** Rerolling only makes sense if at least one slot isn't kept (sold slots get refilled). */
+  private canReroll(): boolean {
+    return this.offers.some((o, i) => !o || !this.locked.has(i));
+  }
+
   private reroll(): void {
+    if (this.leaving || !this.canReroll()) return;
     const cost = rerollCost(this.run.wave, this.run.rerollCount);
     if (this.run.crumbs < cost) return;
     this.run.crumbs -= cost;
     this.run.rerollCount++;
     const keep = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
-    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.run.rerollCount), this.run.wave + 1, keep);
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.run.rerollCount), this.run.wave + 1, keep, undefined, this.run.weapons);
     this.locked = new Set(keep.map((_, i) => i));
     this.render();
   }
 
   private next(): void {
+    if (this.leaving) return;
+    this.leaving = true;
     this.run.lockedOffers = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
     this.run.wave++;
     this.scene.start('Game', { run: this.run });

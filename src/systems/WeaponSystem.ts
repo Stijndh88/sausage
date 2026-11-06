@@ -6,9 +6,12 @@ import { PlayerBullet, type ExplodeHandler } from '../entities/BulletPool';
 import type { Enemy } from '../entities/Enemy';
 import type { LinkChain } from '../entities/LinkChain';
 import type { WeaponSlot } from '../state/run';
+import type { GameClock } from './clock';
 
 const DEG = Math.PI / 180;
 export const POISON_MS = 2500;
+/** A shot this late (at most ~one long frame) keeps its rhythm; later than that it restarts. */
+const MAX_CARRY_MS = 100;
 
 export interface WeaponHooks {
   enemies(): Enemy[];
@@ -20,6 +23,8 @@ export interface WeaponHooks {
 interface Ring {
   slot: number;
   sprites: Phaser.GameObjects.Image[];
+  /** Accumulated spin angle; integrated per frame so fire-rate changes don't make rings jump. */
+  phase: number;
 }
 
 /** Fires every link's weapon automatically at the nearest enemy in range. */
@@ -27,17 +32,20 @@ export class WeaponSystem {
   private weapons: WeaponSlot[] = [];
   private nextFire: number[] = [];
   private rings: Ring[] = [];
+  private lastRingUpdate = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly pool: Phaser.Physics.Arcade.Group,
     private readonly chain: LinkChain,
+    private readonly clock: GameClock,
     private readonly hooks: WeaponHooks,
   ) {}
 
   setWeapons(weapons: readonly WeaponSlot[]): void {
     this.weapons = weapons.map((w) => ({ ...w }));
-    const now = this.scene.time.now;
+    const now = this.clock.now();
+    this.lastRingUpdate = now;
     // Stagger first shots so links don't all fire on the same frame.
     this.nextFire = this.weapons.map((_, i) => now + 300 + i * 90);
     for (const r of this.rings) r.sprites.forEach((s) => s.destroy());
@@ -48,6 +56,7 @@ export class WeaponSystem {
       const n = tierProjectiles(def, w.tier);
       this.rings.push({
         slot,
+        phase: 0,
         sprites: Array.from({ length: n }, () => this.scene.add.image(0, 0, def.bulletTexture).setDepth(8)),
       });
     });
@@ -63,7 +72,11 @@ export class WeaponSystem {
       if (now < this.nextFire[slot]) continue;
       const target = nearest(enemies, pos.x, pos.y, def.range);
       if (!target) continue;
-      this.nextFire[slot] = now + tierCooldown(def, w.tier) / fireRateMult;
+      // Carry the frame-rounding leftover so fire rate doesn't depend on frame rate, but if the
+      // weapon sat idle (no target) restart from now instead of banking shots.
+      const late = now - this.nextFire[slot];
+      const base = late <= MAX_CARRY_MS ? this.nextFire[slot] : now;
+      this.nextFire[slot] = base + tierCooldown(def, w.tier) / fireRateMult;
       this.fire(def, w.tier, pos.x, pos.y, target, now, damageMult);
     }
     this.updateRings(now, enemies, damageMult, fireRateMult);
@@ -116,13 +129,16 @@ export class WeaponSystem {
   }
 
   private updateRings(now: number, enemies: Enemy[], damageMult: number, fireRateMult: number): void {
+    const dtSec = Math.max(0, now - this.lastRingUpdate) / 1000;
+    this.lastRingUpdate = now;
     for (const ring of this.rings) {
       const w = this.weapons[ring.slot];
       const def = WEAPONS[w.id];
       const pos = this.chain.positions[ring.slot];
       if (!pos) continue;
       const n = ring.sprites.length;
-      const spin = (now / 1000) * def.speed * fireRateMult;
+      ring.phase += dtSec * def.speed * fireRateMult;
+      const spin = ring.phase;
       const hitEvery = tierCooldown(def, w.tier) / fireRateMult;
       const damage = tierDamage(def, w.tier) * damageMult;
       for (let k = 0; k < n; k++) {

@@ -314,7 +314,6 @@ module.exports = {
     },
     {
       name: 'stress: spawn telegraphs do not leak looping tweens on destroyed marks',
-      knownBug: 'WaveDirector.telegraph adds a repeat:-1 tween per spawn mark and never removes it; one tween leaks per spawn',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
@@ -499,7 +498,6 @@ module.exports = {
     },
     {
       name: 'perf: HUD does not re-render its text textures every frame',
-      knownBug: 'Hud.update calls setColor() on tierText and timerText every frame; each call redraws the canvas and re-uploads the texture',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
@@ -526,7 +524,6 @@ module.exports = {
     // ------------------------------------------------------------------ frame gaps / pause / timers
     {
       name: 'timers: pausing for 10 s does not expire condiments, recharge the dash or end i-frames',
-      knownBug: 'gameplay timers use scene.time.now, which keeps advancing while paused (Clock.now = loop time)',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
@@ -554,7 +551,6 @@ module.exports = {
     },
     {
       name: 'timers: a 10 s hidden tab does not expire condiment packets',
-      knownBug: 'after a hidden tab the loop resumes with time.now jumped forward; time.now-based expiries (condiments, i-frames, bullets) all lapse',
       timeoutMs: 60000,
       fn: async ({ g, page }) => {
         await g.startRun({ seed: 2, wave: 1, heat: 30 });
@@ -583,7 +579,6 @@ module.exports = {
     },
     {
       name: 'timers: at 10 fps the wave timer still runs in real time',
-      knownBug: 'Game.update caps dt at 50 ms but physics and time.now do not, so below 20 fps waves, heat, cooling and poison slow down while enemies keep full speed',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
@@ -676,7 +671,6 @@ module.exports = {
     },
     {
       name: 'timers: the boss stops firing once the sausage is charred',
-      knownBug: 'Enemy.bossThink delayedCall volleys only check boss.dead, so they keep spraying for ~1.3 s after die() cleared the bullets',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
@@ -700,7 +694,6 @@ module.exports = {
     },
     {
       name: 'tweens: HUD crumb counter returns to normal size after rapid pickups',
-      knownBug: 'Hud.update starts a new yoyo scale tween per crumb change; overlapping tweens capture a mid-tween start scale so the text stays enlarged',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);

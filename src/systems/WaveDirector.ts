@@ -59,10 +59,39 @@ export class WaveDirector {
     }
   }
 
+  /**
+   * Boss summons go through the same rules as normal spawns: telegraphed, at least
+   * MIN_PLAYER_DIST from the sausage (near the summoner when possible) and within maxAlive.
+   */
+  summon(kind: EnemyKind, nearX: number, nearY: number): void {
+    if (this.stopped) return;
+    if (this.cfg.maxAlive - this.hooks.alive().total - this.marks.size <= 0) return;
+    const p = this.hooks.player();
+    const a = this.arena;
+    for (let tries = 0; tries < 16; tries++) {
+      const ang = this.rng() * Math.PI * 2;
+      const r = 60 + this.rng() * 160;
+      const x = nearX + Math.cos(ang) * r;
+      const y = nearY + Math.sin(ang) * r;
+      if (x < a.left + 30 || x > a.right - 30 || y < a.top + 30 || y > a.bottom - 30) continue;
+      if (Math.hypot(x - p.x, y - p.y) < MIN_PLAYER_DIST) continue;
+      this.telegraph(kind, x, y, TELEGRAPH_MS);
+      return;
+    }
+    const spot = this.pickSpot(MIN_PLAYER_DIST);
+    this.telegraph(kind, spot.x, spot.y, TELEGRAPH_MS);
+  }
+
   stop(): void {
     this.stopped = true;
-    for (const m of this.marks) m.destroy();
+    for (const m of this.marks) this.removeMark(m);
     this.marks.clear();
+  }
+
+  /** Destroy a spawn mark and its looping blink tween (Phaser doesn't kill tweens with their target). */
+  private removeMark(mark: Phaser.GameObjects.Image): void {
+    this.scene.tweens.killTweensOf(mark);
+    mark.destroy();
   }
 
   private pickSpot(minDist: number): { x: number; y: number } {
@@ -86,7 +115,7 @@ export class WaveDirector {
       if (kind === 'hotsauce') this.pendingTurrets--;
       if (!this.marks.has(mark)) return; // wave ended
       this.marks.delete(mark);
-      mark.destroy();
+      this.removeMark(mark);
       if (!this.stopped) this.hooks.spawn(kind, x, y);
     });
   }

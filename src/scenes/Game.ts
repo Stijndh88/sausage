@@ -16,6 +16,7 @@ import { mulberry32, randRange, type Rng } from '../systems/rng';
 import { WaveDirector } from '../systems/WaveDirector';
 import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
+import { onKeyPress } from '../ui/input';
 
 const GRILL_HEAT_PER_SEC = 5;
 const CONDIMENT_DROP_CHANCE = 0.06;
@@ -55,6 +56,16 @@ export class GameScene extends Phaser.Scene {
   private paused = false;
   private pauseText?: Phaser.GameObjects.Text;
   private onGrill = false;
+  /**
+   * Game time in ms. Advances only on unpaused frames, by the same capped delta physics uses,
+   * so every gameplay timer (cooldowns, invulnerability, lifetimes, enemy AI) pauses and
+   * slows down together. Never use scene.time.now for gameplay: it follows the wall clock.
+   */
+  private gameTime = 0;
+  /** Set from key-down events so a tap shorter than one frame still dashes/pauses. */
+  private dashQueued = false;
+  private pauseQueued = false;
+  readonly clock = { now: (): number => this.gameTime };
 
   constructor() {
     super('Game');
@@ -73,6 +84,12 @@ export class GameScene extends Phaser.Scene {
     this.ending = false;
     this.dying = false;
     this.paused = false;
+    this.pauseText = undefined;
+    this.onGrill = false;
+    this.gameTime = 0;
+    this.time.paused = false;
+    this.dashQueued = false;
+    this.pauseQueued = false;
   }
 
   create(): void {
@@ -80,17 +97,17 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(this.arena.x, this.arena.y, this.arena.width, this.arena.height);
     this.createHotTiles();
 
-    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40);
+    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock);
     this.chain = new LinkChain(this, this.head.x, this.head.y, 0);
     this.chain.setWeapons(this.run.weapons);
 
     this.enemies = this.physics.add.group();
     this.playerBullets = createPlayerBulletPool(this);
     this.enemyBullets = createEnemyBulletPool(this);
-    this.patterns = new BulletPatterns(this.enemyBullets);
-    this.pickups = new Pickups(this);
+    this.patterns = new BulletPatterns(this.enemyBullets, this.clock);
+    this.pickups = new Pickups(this, this.clock);
 
-    this.weapons = new WeaponSystem(this, this.playerBullets, this.chain, {
+    this.weapons = new WeaponSystem(this, this.playerBullets, this.chain, this.clock, {
       enemies: () => this.enemyList(),
       damage: (e, amount, fx, fy, kb) => this.damageEnemy(e, amount, fx, fy, kb),
       explode: (x, y, r, dmg) => this.explode(x, y, r, dmg),
@@ -101,7 +118,8 @@ export class GameScene extends Phaser.Scene {
       player: this.head,
       patterns: this.patterns,
       arena: this.arena,
-      spawnMinion: (kind, x, y) => this.spawnEnemy(kind, x, y),
+      spawnMinion: (kind, x, y) => this.director.summon(kind, x, y),
+      halted: () => this.dying || this.ending || !this.scene.isActive(),
     };
 
     this.director = new WaveDirector(this, this.cfg, this.rng, this.arena, {
@@ -132,7 +150,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.head, this.enemies, (a, b) => {
       const enemy = (a instanceof Enemy ? a : b) as Enemy;
       if (enemy.dead || this.dying || this.ending) return;
-      if (!enemy.isBoss) enemy.shove(this.head.x, this.head.y, 260);
+      enemy.shove(this.head.x, this.head.y, 260);
       if (this.head.invulnerable) return;
       this.takeHeat(enemy.def.contactHeat);
     });
@@ -161,31 +179,54 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,SHIFT,ESC,P') as Keys;
     kb.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
+    const queueDash = () => { if (!this.paused) this.dashQueued = true; };
+    const queuePause = () => { this.pauseQueued = true; };
+    onKeyPress(kb, 'SPACE', queueDash);
+    onKeyPress(kb, 'SHIFT', queueDash);
+    onKeyPress(kb, 'ESC', queuePause);
+    onKeyPress(kb, 'P', queuePause);
 
     this.banner(this.cfg.boss ? "THE GRILL MASTER'S TONGS" : `WAVE ${this.run.wave}`, this.cfg.boss ? 'Defeat the boss to escape the BBQ!' : 'Survive!');
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
+
+    // A bullet-hell must not keep running when the player looks away.
+    this.game.events.on(Phaser.Core.Events.BLUR, this.autoPause, this);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, this.autoPause, this);
 
     // Debug/testing hook (used by automated screenshots, harmless otherwise).
     (window as unknown as { __sausage?: unknown }).__sausage = this;
   }
 
-  update(time: number, deltaMs: number): void {
+  update(_time: number, deltaMs: number): void {
     const k = this.keys;
-    if (Phaser.Input.Keyboard.JustDown(k.ESC) || Phaser.Input.Keyboard.JustDown(k.P)) this.togglePause();
-    if (this.paused) return;
+    if (this.pauseQueued) {
+      this.pauseQueued = false;
+      this.togglePause();
+    }
+    if (this.paused) {
+      this.dashQueued = false;
+      return;
+    }
 
-    const dtMs = Math.min(deltaMs, 50);
+    // The engine already caps delta at 100ms (fps.min = 10 in main.ts); this is a safety net.
+    const dtMs = Math.min(deltaMs, 100);
     const dt = dtMs / 1000;
+    this.gameTime += dtMs;
+    const time = this.gameTime;
+
+    for (const b of this.playerBullets.getChildren() as PlayerBullet[]) if (b.active) b.update(time, dtMs);
+    for (const b of this.enemyBullets.getChildren() as EnemyBullet[]) if (b.active) b.update(time, dtMs);
 
     // --- Player ---
     if (!this.dying) {
       const ix = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
       const iy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-      const wantDash = Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.SHIFT);
+      const wantDash = this.dashQueued;
       this.head.drive(ix, iy, this.stats.speedMult, wantDash, this.stats.dashCooldownMs);
     } else {
       this.head.halt();
     }
+    this.dashQueued = false;
     const tint = heatTint(this.doneness.heat);
     this.head.setTint(this.dying ? 0x2a2a2a : tint);
     this.chain.update(this.head.x, this.head.y, this.dying ? 0x2a2a2a : tint, time);
@@ -249,7 +290,7 @@ export class GameScene extends Phaser.Scene {
     if (this.ending || this.dying) return;
     const e = new Enemy(this, x, y, kind, this.cfg.hpMult);
     this.enemies.add(e);
-    e.setup(this.time.now);
+    e.setup(this.gameTime);
     if (kind === 'tongs') {
       this.boss = e;
       this.cameras.main.shake(400, 0.01);
@@ -260,7 +301,7 @@ export class GameScene extends Phaser.Scene {
     const [bullet, enemy] = pair<PlayerBullet, Enemy>(a, b, PlayerBullet);
     if (!bullet || !enemy || !bullet.active || enemy.dead || bullet.hitSet.has(enemy)) return;
     bullet.hitSet.add(enemy);
-    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps, POISON_MS, this.time.now);
+    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps, POISON_MS, this.gameTime);
     const fromX = bullet.x - Math.cos(bullet.rotation) * 20;
     const fromY = bullet.y - Math.sin(bullet.rotation) * 20;
     this.damageEnemy(enemy, bullet.damage, fromX, fromY, bullet.knockback);
@@ -269,7 +310,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private damageEnemy(e: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void {
-    if (e.hit(amount, this.time.now, fromX, fromY, knockback)) this.killEnemy(e);
+    if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
   }
 
   private explode(x: number, y: number, radius: number, damage: number): void {
@@ -293,6 +334,7 @@ export class GameScene extends Phaser.Scene {
     if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
     if (this.stats.killCoolChance > 0 && Math.random() < this.stats.killCoolChance) this.doneness.cool(this.stats.killCoolAmount);
     e.disableBody(true, true);
+    this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
     if (e.isBoss) this.win();
   }
@@ -364,8 +406,14 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: g, alpha: 0.7, duration: 700, yoyo: true, repeat: -1 });
   }
 
+  private autoPause(): void {
+    if (!this.paused && this.scene.isActive()) this.togglePause();
+  }
+
   private togglePause(): void {
-    if (this.ending || this.dying) return;
+    // Never *enter* pause during the end-of-wave/death/victory transitions,
+    // but always allow leaving it (otherwise those transitions could soft-lock).
+    if (!this.paused && (this.ending || this.dying)) return;
     this.paused = !this.paused;
     if (this.paused) {
       this.physics.world.pause();
@@ -406,7 +454,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private win(): void {
-    if (this.ending) return;
+    if (this.ending || this.dying) return;
     this.ending = true;
     this.clearArena();
     this.cameras.main.shake(600, 0.015);
@@ -427,8 +475,7 @@ export class GameScene extends Phaser.Scene {
     if (this.dying || this.ending) return;
     this.dying = true;
     this.run.heat = this.doneness.heat;
-    this.director.stop();
-    this.patterns.clear();
+    this.clearArena();
     this.cameras.main.shake(500, 0.012);
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
@@ -437,6 +484,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    this.game.events.off(Phaser.Core.Events.BLUR, this.autoPause, this);
+    this.game.events.off(Phaser.Core.Events.HIDDEN, this.autoPause, this);
     this.weapons.destroy();
     this.chain.destroy();
   }
@@ -449,13 +498,17 @@ function pair<A, B>(a: unknown, b: unknown, typeA: abstract new (...args: never[
   return [null, null];
 }
 
-/** Raw sausages are pale; well-done ones are browned. */
+/**
+ * Raw sausages are pale; hot ones turn a toasted orange. The tint deliberately never gets
+ * dark: the head must stay at least 3:1 against the grill, because a hit is most dangerous
+ * when you're hottest. Heat is shown by the meter, sizzle smoke and the screen-edge glow.
+ */
 function heatTint(heat: number): number {
   const stops: [number, number][] = [
     [0, 0xffd6d6],
     [40, 0xffffff],
-    [70, 0xc88a64],
-    [100, 0x5a3a28],
+    [70, 0xffd2b0],
+    [100, 0xffb890],
   ];
   for (let i = 1; i < stops.length; i++) {
     if (heat <= stops[i][0]) {

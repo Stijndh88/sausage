@@ -94,7 +94,6 @@ module.exports = {
     },
     {
       name: 'onion rings keep moving smoothly when heat crosses into Well-done',
-      knownBug: 'ring angle = now * speed * fireRateMult, so the +20% fire rate at 60 heat teleports the rings (WeaponSystem.updateRings)',
       fn: async ({ g }) => {
         await g.startRun({ seed: 5, heat: 50, weapons: [{ id: 'onion', tier: 1 }] });
         await g.godMode();
@@ -124,7 +123,6 @@ module.exports = {
     },
     {
       name: 'boss minions respect the spawn rules (telegraph / 240 px from the sausage)',
-      knownBug: 'the boss summons forks at boss.x±60 instantly, without a telegraph and regardless of where the sausage is (Enemy.bossThink)',
       fn: async ({ g }) => {
         await g.startRun({ seed: 9, wave: 10 });
         await g.godMode();

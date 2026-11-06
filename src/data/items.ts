@@ -45,7 +45,7 @@ const list: ItemDef[] = [
   },
   {
     id: 'smoky', name: 'Smoky Flavor', desc: '+25% damage while Well-done or hotter, but +5% heat taken.', price: 13, color: 0x6b5a4e,
-    apply: (s) => { s.hotDamageBonus += 0.25; s.heatTakenMult += 0.05; },
+    apply: (s) => { s.hotDamageBonus += 0.25; s.heatTakenPenalty += 0.05; },
   },
   {
     id: 'oven_mitt', name: 'Oven Mitt', desc: '-20% dash cooldown.', price: 9, color: 0x3c6fd1,

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { GameClock } from '../systems/clock';
 
 export type PickupKind = 'crumb' | 'condiment';
 
@@ -20,7 +21,7 @@ export class Pickups {
   private drops: Drop[] = [];
   private pool: Phaser.GameObjects.Image[] = [];
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  constructor(private readonly scene: Phaser.Scene, private readonly clock: GameClock) {}
 
   spawnCrumbs(x: number, y: number, count: number): void {
     for (let i = 0; i < count; i++) {
@@ -31,11 +32,11 @@ export class Pickups {
   }
 
   spawnCondiment(x: number, y: number): void {
-    this.add('condiment', x, y, 0, -30, this.scene.time.now + CONDIMENT_LIFETIME_MS);
+    this.add('condiment', x, y, 0, -30, this.clock.now() + CONDIMENT_LIFETIME_MS);
   }
 
   update(dt: number, px: number, py: number, radius: number, collect: (kind: PickupKind) => void): void {
-    const now = this.scene.time.now;
+    const now = this.clock.now();
     for (let i = this.drops.length - 1; i >= 0; i--) {
       const d = this.drops[i];
       const dx = px - d.img.x;

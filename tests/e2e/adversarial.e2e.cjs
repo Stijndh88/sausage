@@ -311,9 +311,15 @@ tests.push({
     await page.keyboard.up('d');
     await page.keyboard.up('s');
     await g.evaluate(() => { window.removeEventListener('keyup', window.__swallow, true); window.dispatchEvent(new Event('focus')); });
+    await frames(page, 5);
+    // Losing focus auto-pauses the game; resume it, then nothing may still be "held".
+    assert.equal(await g.evaluate(() => window.__game.scene.getScene('Game').paused), true, 'blur should auto-pause');
+    await page.keyboard.down('Escape');
+    await frames(page, 2);
+    await page.keyboard.up('Escape');
     await frames(page, 10);
-    const st = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { D: s.keys.D.isDown, S: s.keys.S.isDown, vx: s.head.body.velocity.x, vy: s.head.body.velocity.y }; });
-    assert.deepEqual(st, { D: false, S: false, vx: 0, vy: 0 });
+    const st = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { paused: s.paused, D: s.keys.D.isDown, S: s.keys.S.isDown, vx: s.head.body.velocity.x, vy: s.head.body.velocity.y }; });
+    assert.deepEqual(st, { paused: false, D: false, S: false, vx: 0, vy: 0 });
   },
 });
 
@@ -466,13 +472,18 @@ tests.push({
   timeoutMs: 60000,
   fn: async ({ page, g }) => {
     const maxed = ['toothpick', 'mustard', 'pepper', 'skewer', 'pickle', 'onion'].map((id) => ({ id, tier: 4 }));
-    // Find a seed whose first shop has at least one weapon and one item.
-    let seed = 1;
-    for (; seed < 200; seed++) {
+    // A maxed-out loadout is never offered weapons it can't buy (they'd be dead shop slots).
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
       await g.openShop({ seed, run: { wave: 5, crumbs: 999, weapons: maxed.map((w) => ({ ...w })) } });
       const s = await shopState(g);
-      if (s.offers.some((o) => o.type === 'weapon') && s.offers.some((o) => o.type === 'item')) break;
+      assert.ok(s.offers.every((o) => o && o.type === 'item'), `seed ${seed}: offered an unbuyable weapon`);
     }
+    // A weapon offer can still be on the table (e.g. kept from an earlier shop): it must not be buyable.
+    await g.evaluate(() => {
+      const sh = window.__game.scene.getScene('Shop');
+      sh.offers[0] = { type: 'weapon', id: 'skewer', price: 20 };
+      sh.render();
+    });
     await frames(page, 3);
     const before = await shopState(g);
     for (let i = 0; i < 4; i++) { await page.keyboard.press(String(i + 1)); await click(page, SHOP.buy(i)); }
@@ -596,7 +607,6 @@ for (let wave = 1; wave <= 10; wave++) {
 
 tests.push({
   name: 'BUG shop: pressing Enter and Space together advances exactly one wave',
-  knownBug: 'Shop next() is not idempotent: two "next" key events in one frame skip waves',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -612,7 +622,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: mashing Enter/Enter/Space in one frame cannot jump past several waves',
-  knownBug: 'Phaser replays queued key events within a frame; Shop handlers run N times (wave 1 → 6 or even 15)',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -628,7 +637,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: one R and one 4 pressed together reroll once and buy once',
-  knownBug: 'Phaser keyboard queue replay re-runs reroll/buy handlers: R+4 → 2 rerolls + 2 purchases',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -647,7 +655,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: double-clicking "Next wave" (or click + Enter) advances exactly one wave',
-  knownBug: 'Shop next() has no guard; a second click/key before the scene switch skips a wave',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -670,7 +677,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: holding Space (dash) from the end of a wave does not skip the shop',
-  knownBug: 'Shop treats Space (the dash key, undocumented as "next wave") as Next wave and does not filter auto-repeat: a held Space skips the shop',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 91 });
@@ -698,7 +704,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: dash-mashing Space through the wave-clear banner does not skip the shop',
-  knownBug: 'Space is both "dash" and an undocumented "next wave" key, with no input grace period: a dash-masher skips the shop',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 92 });
@@ -720,7 +725,6 @@ tests.push({
 
 tests.push({
   name: 'BUG shop: reroll with all four offers kept should not charge crumbs',
-  knownBug: 'Reroll is enabled and charged even when every offer is kept (nothing changes)',
   timeoutMs: 60000,
   fn: async ({ page, g }) => {
     await g.openShop({ seed: 101, run: { wave: 3, crumbs: 50 } });
@@ -738,7 +742,6 @@ tests.push({
 
 tests.push({
   name: 'BUG pause: enemy attack timers, i-frames and dash cooldown are frozen while paused',
-  knownBug: 'Game timers use wall-clock time (time.now), which keeps running while paused: i-frames expire, dash recharges, all enemies volley on resume',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 7, wave: 4 });
@@ -777,7 +780,6 @@ tests.push({
 
 tests.push({
   name: 'BUG input: a quick Esc / Space tap (down+up within one frame) still pauses / dashes',
-  knownBug: 'Game reads Esc/P/Space/Shift with JustDown() once per frame; Key.onUp clears _justDown, so sub-frame taps are lost',
   timeoutMs: 60000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 2 });
@@ -797,7 +799,6 @@ tests.push({
 
 tests.push({
   name: 'BUG end of run: a charred sausage cannot also "escape" when an in-flight bullet kills the boss',
-  knownBug: 'win() does not check dying: CHARRED and YOU ESCAPED THE BBQ! both show, then GameOver',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 111, wave: 10, heat: 50 });
@@ -821,7 +822,6 @@ tests.push({
 
 tests.push({
   name: 'BUG end screen: clicking "Main menu" while pressing Enter starts only one scene',
-  knownBug: 'Both end-screen actions fire in one frame: Menu and Game run together; the hidden Menu then restarts the run on Space',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 121 });
@@ -840,7 +840,6 @@ tests.push({
 
 tests.push({
   name: 'BUG layout: canvas is centred in a wide (non-16:9) window',
-  knownBug: 'index.html flex-centres #game and Phaser autoCenter adds margins too: canvas sits off-centre',
   viewport: { width: 2000, height: 600 },
   timeoutMs: 60000,
   fn: async ({ g }) => {

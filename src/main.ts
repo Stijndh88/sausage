@@ -15,6 +15,10 @@ const game = new Phaser.Game({
   width: GAME_W,
   height: GAME_H,
   backgroundColor: '#1a1210',
+  // Cap the engine's frame delta at 100ms (10 fps). Physics, tweens, timers and the Game
+  // scene's clock all use this same delta, so on a struggling device they slow down together
+  // instead of drifting apart. (Arcade physics still sub-steps at a fixed 60Hz.)
+  fps: { min: 10 },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

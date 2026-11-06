@@ -33,7 +33,14 @@ export function basePrice(offer: Pick<Offer, 'type' | 'id'>): number {
  * Builds a shop: locked offers stay (at their old price), the rest are rolled fresh.
  * No duplicate ids within one shop.
  */
-export function generateOffers(rng: Rng, wave: number, locked: readonly Offer[] = [], count = SHOP_SIZE): Offer[] {
+export function generateOffers(
+  rng: Rng,
+  wave: number,
+  locked: readonly Offer[] = [],
+  count = SHOP_SIZE,
+  /** The player's links: weapons that couldn't be bought (all copies maxed, no free link) aren't offered. */
+  weapons?: readonly WeaponSlot[],
+): Offer[] {
   const offers: Offer[] = locked.slice(0, count).map((o) => ({ ...o }));
   const used = new Set(offers.map((o) => `${o.type}:${o.id}`));
   let guard = 0;
@@ -43,6 +50,7 @@ export function generateOffers(rng: Rng, wave: number, locked: readonly Offer[] 
     const id = pool[Math.floor(rng() * pool.length)];
     const key = `${type}:${id}`;
     if (used.has(key)) continue;
+    if (type === 'weapon' && weapons && applyWeaponPurchase(weapons, id as WeaponId) === null) continue;
     used.add(key);
     offers.push({ type, id, price: scalePrice(basePrice({ type, id }), wave) });
   }
@@ -71,7 +79,8 @@ export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId
 export function canBuy(offer: Offer, crumbs: number, weapons: readonly WeaponSlot[]): { ok: boolean; reason?: string } {
   if (crumbs < offer.price) return { ok: false, reason: 'Not enough crumbs' };
   if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId) === null) {
-    return { ok: false, reason: 'No free links' };
+    const owned = weapons.some((w) => w.id === offer.id);
+    return { ok: false, reason: owned ? 'Maxed out · no free links' : 'No free links' };
   }
   return { ok: true };
 }
