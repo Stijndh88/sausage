@@ -3,6 +3,9 @@
 Heat/Doneness is removed. Everything below is built in phases; each phase is committed and pushed
 on its own, with tests updated as it lands.
 
+**Status:** Phases 1–3 are done. Item rarities were built in Phase 1 (the item system had to be
+rewritten for HP anyway). Phase 4 (tests) is done for everything listed; "Later" is still open.
+
 ## Design decisions
 - **Health replaces heat.** A plain HP bar (readable at a glance, no explanation needed).
   Damage is reduced by **Armor**, restored by **Regen**, **Lifesteal** and condiment packets.

@@ -26,8 +26,8 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
     contactDamage: 14, bulletDamage: 0, crumbs: 2, texture: 'enemy-spatula', melee: true,
   },
   ketchup: {
-    kind: 'ketchup', name: 'Ketchup Bottle', hp: 18, speed: 75, radius: 15,
-    contactDamage: 8, bulletDamage: 7, crumbs: 2, texture: 'enemy-ketchup', melee: false,
+    kind: 'ketchup', name: 'Ketchup Bottle', hp: 15, speed: 75, radius: 15,
+    contactDamage: 8, bulletDamage: 6, crumbs: 2, texture: 'enemy-ketchup', melee: false,
   },
   hotsauce: {
     kind: 'hotsauce', name: 'Hot Sauce Turret', hp: 45, speed: 0, radius: 16,

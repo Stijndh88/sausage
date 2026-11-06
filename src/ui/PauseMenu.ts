@@ -25,6 +25,8 @@ export class PauseMenu {
   private list: MenuList | null = null;
   private armed: 'restart' | 'quit' | null = null;
   open = false;
+  /** The "PAUSED" heading while the menu is open (tests check it's visible and on top). */
+  title: Phaser.GameObjects.Text | null = null;
 
   constructor(private readonly scene: Phaser.Scene, private readonly actions: PauseActions) {}
 
@@ -39,7 +41,7 @@ export class PauseMenu {
       return o;
     };
     add(s.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.62).setOrigin(0).setInteractive());
-    add(s.add.text(GAME_W / 2, 96, 'PAUSED', {
+    this.title = add(s.add.text(GAME_W / 2, 96, 'PAUSED', {
       fontFamily: FONT, fontSize: '48px', fontStyle: 'bold', color: '#ffffff', stroke: '#000', strokeThickness: 6,
     }).setOrigin(0.5));
 
@@ -148,6 +150,7 @@ export class PauseMenu {
 
   hide(): void {
     this.open = false;
+    this.title = null;
     if (this.list) this.list.active = false;
     for (const o of this.objects) o.destroy();
     this.objects = [];

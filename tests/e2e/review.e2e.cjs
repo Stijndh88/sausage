@@ -307,10 +307,10 @@ module.exports = {
       fn: async ({ page, g }) => {
         await setup(g);
         await tap(page, 'Escape');
-        const p = await g.evaluate(() => { const s = window.__rv.scene(); return { paused: s.paused, clock: s.time.paused, world: s.physics.world.isPaused, text: !!(s.pauseText && s.pauseText.active) }; });
+        const p = await g.evaluate(() => { const s = window.__rv.scene(); return { paused: s.paused, clock: s.time.paused, world: s.physics.world.isPaused, text: s.pauseMenu.open }; });
         assert.deepEqual(p, { paused: true, clock: true, world: true, text: true });
         await tap(page, 'Escape');
-        const r = await g.evaluate(() => { const s = window.__rv.scene(); return { paused: s.paused, clock: s.time.paused, world: s.physics.world.isPaused, text: !!(s.pauseText && s.pauseText.active) }; });
+        const r = await g.evaluate(() => { const s = window.__rv.scene(); return { paused: s.paused, clock: s.time.paused, world: s.physics.world.isPaused, text: s.pauseMenu.open }; });
         assert.deepEqual(r, { paused: false, clock: false, world: false, text: false });
       },
     },

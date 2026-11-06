@@ -11,13 +11,13 @@ import type Phaser from 'phaser';
 export function onKeyPress(
   kb: Phaser.Input.Keyboard.KeyboardPlugin,
   key: string,
-  fn: () => void,
+  fn: (e: KeyboardEvent) => void,
   ready: () => boolean = () => true,
 ): void {
   const seen = new WeakSet<KeyboardEvent>();
   kb.on(`keydown-${key}`, (e: KeyboardEvent) => {
     if (e.repeat || seen.has(e)) return;
     seen.add(e);
-    if (ready()) fn();
+    if (ready()) fn(e);
   });
 }

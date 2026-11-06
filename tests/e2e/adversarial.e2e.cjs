@@ -223,6 +223,9 @@ tests.push({
     await frames(page, 5);
     assert.deepEqual(await g.activeScenes(), ['Menu']);
     await page.keyboard.press('Enter');
+    await g.waitForScene('Select', 30000);
+    await frames(page, 20);
+    await page.keyboard.press('Enter');
     await g.waitForScene('Game', 30000);
     assert.equal(await gameWave(g), 1);
   },
@@ -246,7 +249,7 @@ tests.push({
         elapsed: s.director.elapsedMs,
         enemies: s.enemyList().filter((e) => !e.dead).map((e) => [Math.round(e.x), Math.round(e.y)]),
         head: [s.head.x, s.head.y],
-        pauseText: !!(s.pauseText && s.pauseText.active && s.pauseText.visible),
+        pauseText: !!(s.pauseMenu.open && s.pauseMenu.title && s.pauseMenu.title.visible),
       };
     });
     await tap(page, 'Escape');

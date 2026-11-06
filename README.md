@@ -4,29 +4,38 @@ A roguelite bullet-hell where you play a sausage escaping a backyard BBQ.
 Survive 10 waves of angry utensils and condiments, spend crumbs between waves, and beat **The Grill Master's Tongs**.
 
 ## How to play
-| Key | Action |
-|---|---|
-| WASD / Arrow keys | Move |
-| Space / Shift | Dash (short invulnerability) |
-| Esc / P | Pause |
-| 1–4, R, Enter | Shop: buy, reroll, next wave |
+| Action | Keyboard | Gamepad | Touch |
+|---|---|---|---|
+| Move | WASD / arrows | Left stick / D-pad | Drag on the left half |
+| Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | DASH button |
+| Pause menu | Esc / P | Start | II button |
+| Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap |
 
-**Sausage Links.** Each weapon rides on its own link trailing behind your head, and they fire on their own at the nearest enemy.
-Buying a new weapon adds a link (max 6). Buying one you already own upgrades it (tiers I–IV).
+**Pick a sausage.** Five sausages with their own stats, starting weapons and one special rule each.
+The Classic Frank is unlocked from the start; the others unlock by reaching later waves or escaping.
+
+| Sausage | Strength | Weakness | Unlock |
+|---|---|---|---|
+| Classic Frank | Balanced, Toothpick | None | Always |
+| Bratwurst | +40 HP, +3 armor, Pepper Mill | -10% speed and damage | Reach wave 4 |
+| Chorizo | +20% damage, +10% crit, Mustard | -25 HP | Reach wave 7 |
+| Hot Dog | 7 links, faster, Toothpick + Skewer | -15 HP | Reach wave 10 |
+| Veggie Sausage | 1.5 HP/s regen, grill-proof, Onion Ring | -10% damage | Escape once |
+
+**Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
+preferring ranged enemies. Buying a new weapon adds a link; buying one you own upgrades it (tiers I–IV).
 Only your **head** can be hit; the white dot is your hitbox. Melee enemies bounce off your links.
 
-**Doneness replaces health.** Hits and standing on red-hot grill tiles add heat. You cool down slowly over time,
-and blue condiment packets cool you instantly. Running hot is risky but powerful:
+**Health.** Armor reduces every hit (diminishing returns), regen and lifesteal heal you, and blue condiment
+packets restore HP. Red-hot grill tiles burn you. You heal to full between waves.
 
-| Heat | State | Effect |
-|---|---|---|
-| 0–24 | Raw | 0.85× damage |
-| 25–59 | Medium | 1.0× |
-| 60–89 | Well-done | 1.3× damage, +20% fire rate |
-| 90–99 | Burnt | 1.5× damage, +20% fire rate |
-| 100 | Charred | Game over |
+**The shop.** Items come in four rarities (Common, Uncommon, Rare, Legendary); rarer ones show up in later
+waves and with more Luck. Every card shows exactly what it would change ("Damage 108% → 116%").
+"Keep" holds an offer through rerolls and into the next shop (re-priced for that wave).
+Crumbs left on the floor when a wave ends are swept up at half value.
 
-Heat is halved between waves. Grill tiles let you deliberately heat up for more damage.
+**Settings** (from the menu or the pause menu): volumes, screen shake, reduce flashing, reduce motion
+(defaults to your OS setting) and damage numbers. Settings, unlocks and best runs are saved in the browser.
 
 ## Running it
 Requires Node 20+.
@@ -57,6 +66,7 @@ fail; when the bug is fixed the runner flags it so the marker can be removed.
 | `stress` | full bullet pools, max enemies, 100+ scene cycles for leaks, frame cost per wave, lag spikes |
 | `balance` | economy, boss time-to-kill, weapon/item rules |
 | `ux` | layout at phone/tablet/ultrawide sizes, contrast, pause/blur behaviour |
+| `features` | settings, pause menu, sausage select and unlocks, tips, touch, gamepad, audio, shop controls |
 
 ### Timing rule
 All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on
@@ -67,20 +77,23 @@ it follows the wall clock and keeps running while paused.
 ```
 src/
   main.ts            Phaser config and scene list
-  scenes/            Boot, Menu, Game, Shop, GameOver, Victory
+  scenes/            Boot, Menu, Select, Game, Shop, GameOver, Victory
   entities/          SausageHead, LinkChain, Enemy, BulletPool, Pickup
-  systems/           Doneness, Economy, WaveDirector, WeaponSystem, BulletPatterns, Trail, rng
-  data/              weapons, items, enemies, waves   ← all balance numbers live here
-  state/             run state and player stats
-  art/textures.ts    placeholder art drawn in code
-  ui/                HUD and buttons
+  systems/           Health, Economy, WaveDirector, WeaponSystem, BulletPatterns, Trail, statText, rng
+  data/              weapons, items, rarity, sausages, enemies, waves   ← all balance numbers live here
+  state/             run state, player stats, save file, settings
+  audio/Audio.ts     synthesized sound effects and music (Web Audio, no files)
+  art/textures.ts    placeholder art and item pictograms drawn in code
+  ui/                HUD, buttons, pause menu, settings, tips, damage numbers, touch and gamepad input
 tests/               Vitest tests for the logic in systems/, data/ and state/
 ```
 
 ## Tuning the game
 Everything you'd want to tweak is plain data:
 - `src/data/waves.ts` sets wave length, spawn rate, enemy mix, turret cap and grill tile count.
-- `src/data/enemies.ts` sets HP, speed, contact and bullet heat, and crumb drops.
+- `src/data/enemies.ts` sets HP, speed, contact and bullet damage, and crumb drops.
+- `src/data/sausages.ts` defines the playable sausages and what unlocks them.
+- `src/data/rarity.ts` sets how rarity odds grow with waves and Luck.
 - `src/data/weapons.ts` sets damage, cooldown, range, projectiles and price.
 - `src/data/items.ts` holds the shop items and what each one does to your stats.
 
@@ -93,8 +106,6 @@ preload() { this.load.image('enemy-fork', 'sprites/fork.png'); }
 `generateTextures` skips any key that already exists, so no other code needs to change.
 Sprites face **right** for the sausage and **up** for enemies.
 
-## Ideas for next steps
-- More sausages to pick from (Bratwurst = tanky, Chorizo = starts hot, Hot Dog = fast)
-- Meta-progression unlocks between runs
-- Real pixel art, sound effects and music
-- Deploy to GitHub Pages / itch.io; package for Steam with Tauri or Electron
+## What's next
+See [docs/ROADMAP.md](docs/ROADMAP.md). Not done yet: mid-wave level-ups, elites and wave modifiers,
+meta-progression and a longer run, real pixel art.

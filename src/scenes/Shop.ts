@@ -61,15 +61,10 @@ export class ShopScene extends Phaser.Scene {
     this.inputReadyAt = this.time.now + 350;
     const kb = this.input.keyboard!;
     const ready = () => this.time.now >= this.inputReadyAt;
-    onKeyPress(kb, 'ONE', () => this.buy(0), ready);
-    onKeyPress(kb, 'TWO', () => this.buy(1), ready);
-    onKeyPress(kb, 'THREE', () => this.buy(2), ready);
-    onKeyPress(kb, 'FOUR', () => this.buy(3), ready);
-    // Shift+1-4 keeps (locks) an offer, so the whole shop works from the keyboard.
-    onKeyPress(kb, 'ONE', () => this.shiftKeep(0), ready);
-    onKeyPress(kb, 'TWO', () => this.shiftKeep(1), ready);
-    onKeyPress(kb, 'THREE', () => this.shiftKeep(2), ready);
-    onKeyPress(kb, 'FOUR', () => this.shiftKeep(3), ready);
+    // 1-4 buy; Shift+1-4 keeps (locks) that offer instead. Shift is read from the key event itself.
+    (['ONE', 'TWO', 'THREE', 'FOUR'] as const).forEach((key, i) => {
+      onKeyPress(kb, key, (e) => (e.shiftKey ? this.toggleLock(i) : this.buy(i)), ready);
+    });
     onKeyPress(kb, 'R', () => this.reroll(), ready);
     onKeyPress(kb, 'ENTER', () => this.next(), ready);
     onKeyPress(kb, 'LEFT', () => this.moveFocus(-1), ready);
@@ -210,17 +205,8 @@ export class ShopScene extends Phaser.Scene {
     }
   }
 
-  /** Number keys buy; with Shift held they keep instead. */
-  private shiftKeep(i: number): void {
-    if (this.shiftHeld()) this.toggleLock(i);
-  }
-
   private shopContext(): ShopContext {
     return { items: this.run.items, luck: runStats(this.run).luck, maxLinks: maxLinksFor(this.run) };
-  }
-
-  private shiftHeld(): boolean {
-    return !!this.input.keyboard?.addKey('SHIFT').isDown;
   }
 
   update(): void {
@@ -244,7 +230,7 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private buy(i: number): void {
-    if (this.leaving || this.shiftHeld()) return;
+    if (this.leaving) return;
     const offer = this.offers[i];
     if (!offer) return;
     if (!canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items, maxLinksFor(this.run)).ok) {

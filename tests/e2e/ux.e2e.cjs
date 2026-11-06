@@ -331,7 +331,7 @@ module.exports = {
         await page.keyboard.press('Escape');
         await until(page, () => window.__game.scene.getScene('Game').paused);
         const overlay = await g.evaluate(() => {
-          const t = window.__game.scene.getScene('Game').pauseText;
+          const t = window.__game.scene.getScene('Game').pauseMenu.title;
           const b = t.getBounds();
           return { text: t.text, visible: t.visible && t.alpha > 0, depth: t.depth, x: b.x, y: b.y, w: b.width, h: b.height };
         });
