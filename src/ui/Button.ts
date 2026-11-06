@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FONT } from './Hud';
+import { audio } from '../audio/Audio';
 
 export interface ButtonOpts {
   width: number;
@@ -15,9 +16,12 @@ export class Button extends Phaser.GameObjects.Container {
   readonly label: Phaser.GameObjects.Text;
   private enabled = true;
   private hovered = false;
+  private focused = false;
+  private readonly onClick: () => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number, text: string, private readonly opts: ButtonOpts, onClick: () => void) {
     super(scene, x, y);
+    this.onClick = onClick;
     this.bg = scene.add.graphics();
     this.label = scene.add
       .text(0, 0, text, { fontFamily: FONT, fontSize: `${opts.fontSize ?? 20}px`, fontStyle: 'bold', color: '#ffffff', align: 'center' })
@@ -27,7 +31,10 @@ export class Button extends Phaser.GameObjects.Container {
     this.setInteractive({ useHandCursor: true });
     this.on('pointerover', () => { this.hovered = true; this.draw(); });
     this.on('pointerout', () => { this.hovered = false; this.draw(); });
-    this.on('pointerdown', () => { if (this.enabled) onClick(); });
+    this.on('pointerdown', () => {
+      audio.play(this.enabled ? 'click' : 'deny');
+      if (this.enabled) onClick();
+    });
     scene.add.existing(this);
     this.draw();
   }
@@ -37,6 +44,23 @@ export class Button extends Phaser.GameObjects.Container {
     if (this.input) this.input.cursor = enabled ? 'pointer' : 'default';
     this.draw();
     return this;
+  }
+
+  /** Keyboard/gamepad focus ring. */
+  setFocused(focused: boolean): this {
+    this.focused = focused;
+    this.draw();
+    return this;
+  }
+
+  /** Activate as if clicked (keyboard/gamepad). */
+  press(): void {
+    audio.play(this.enabled ? 'click' : 'deny');
+    if (this.enabled) this.onClick();
+  }
+
+  get isEnabled(): boolean {
+    return this.enabled;
   }
 
   setText(text: string): this {
@@ -51,6 +75,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.bg.fillStyle(0x000000, 0.4).fillRoundedRect(-w / 2 + 3, -h / 2 + 4, w, h, 10);
     this.bg.fillStyle(fill, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10);
     this.bg.lineStyle(2, 0xffffff, this.enabled ? 0.25 : 0.08).strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+    if (this.focused) this.bg.lineStyle(3, 0xffd23f, 1).strokeRoundedRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 12);
     this.label.setAlpha(this.enabled ? 1 : 0.45);
   }
 }

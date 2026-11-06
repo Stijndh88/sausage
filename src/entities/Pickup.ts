@@ -70,6 +70,12 @@ export class Pickups {
     }
   }
 
+  /** Position of the oldest pickup of a kind still on the floor (for tutorial hints). */
+  firstOf(kind: PickupKind): { x: number; y: number } | null {
+    const d = this.drops.find((x) => x.kind === kind);
+    return d ? { x: d.img.x, y: d.img.y } : null;
+  }
+
   /** End of wave: everything left on the floor is yours. */
   collectAll(collect: (kind: PickupKind) => void): void {
     for (let i = this.drops.length - 1; i >= 0; i--) {

@@ -30,7 +30,115 @@ function eye(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, an
   }
 }
 
+
+/** Pictogram kinds for shop items; each is drawn in white and tinted with the item's colour. */
+export type ItemIcon =
+  | 'chili' | 'bolt' | 'boot' | 'shield' | 'heart' | 'heartplus' | 'drop' | 'magnet' | 'coin'
+  | 'wing' | 'star' | 'swirl' | 'burst' | 'clover' | 'spikes' | 'apron' | 'dots' | 'crown' | 'flask' | 'ring';
+
+const ICON_SIZE = 40;
+
+function star(g: Phaser.GameObjects.Graphics, cx: number, cy: number, r1: number, r2: number, n: number): void {
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < n * 2; i++) {
+    const r = i % 2 === 0 ? r1 : r2;
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
+    pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+  }
+  g.fillPoints(pts, true);
+}
+
+const ICON_DRAW: Record<ItemIcon, (g: Phaser.GameObjects.Graphics) => void> = {
+  chili: (g) => {
+    g.fillEllipse(20, 24, 14, 26);
+    g.fillTriangle(13, 30, 27, 30, 20, 38);
+    g.fillRect(18, 6, 4, 8);
+  },
+  bolt: (g) => g.fillPoints([{ x: 24, y: 3 }, { x: 10, y: 22 }, { x: 19, y: 22 }, { x: 15, y: 37 }, { x: 30, y: 16 }, { x: 21, y: 16 }], true),
+  boot: (g) => {
+    for (const x of [6, 17]) g.fillPoints([{ x, y: 8 }, { x: x + 12, y: 20 }, { x, y: 32 }, { x: x + 5, y: 20 }], true);
+  },
+  shield: (g) => g.fillPoints([{ x: 20, y: 4 }, { x: 34, y: 9 }, { x: 32, y: 24 }, { x: 20, y: 37 }, { x: 8, y: 24 }, { x: 6, y: 9 }], true),
+  heart: (g) => {
+    g.fillCircle(14, 15, 8).fillCircle(26, 15, 8);
+    g.fillTriangle(6.5, 18, 33.5, 18, 20, 35);
+  },
+  heartplus: (g) => {
+    ICON_DRAW.heart(g);
+    g.fillStyle(0x000000, 0.55).fillRect(18, 11, 4, 14).fillRect(13, 16, 14, 4);
+  },
+  drop: (g) => {
+    g.fillCircle(20, 25, 10);
+    g.fillTriangle(11, 21, 29, 21, 20, 4);
+  },
+  magnet: (g) => {
+    g.lineStyle(7, 0xffffff, 1).beginPath().arc(20, 18, 10, Math.PI, 0, false).strokePath();
+    g.fillRect(6.5, 18, 7, 14).fillRect(26.5, 18, 7, 14);
+  },
+  coin: (g) => {
+    g.fillCircle(20, 20, 15);
+    g.fillStyle(0x000000, 0.35).fillCircle(20, 20, 10);
+    g.fillStyle(0xffffff, 1).fillRect(18, 13, 4, 14);
+  },
+  wing: (g) => {
+    g.fillPoints([{ x: 4, y: 28 }, { x: 36, y: 8 }, { x: 30, y: 18 }, { x: 34, y: 20 }, { x: 24, y: 28 }, { x: 26, y: 31 }], true);
+  },
+  star: (g) => star(g, 20, 21, 16, 7, 5),
+  swirl: (g) => {
+    g.lineStyle(4, 0xffffff, 1);
+    g.beginPath().arc(20, 20, 14, 0.3, Math.PI * 1.5, false).strokePath();
+    g.beginPath().arc(20, 20, 7, Math.PI * 1.2, Math.PI * 2.8, false).strokePath();
+  },
+  burst: (g) => star(g, 20, 20, 18, 8, 8),
+  clover: (g) => {
+    g.fillCircle(14, 14, 7).fillCircle(26, 14, 7).fillCircle(14, 26, 7).fillCircle(26, 26, 7);
+    g.fillRect(19, 26, 3, 12);
+  },
+  spikes: (g) => {
+    g.fillCircle(20, 20, 9);
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      g.fillTriangle(20 + Math.cos(a - 0.3) * 8, 20 + Math.sin(a - 0.3) * 8, 20 + Math.cos(a + 0.3) * 8, 20 + Math.sin(a + 0.3) * 8, 20 + Math.cos(a) * 18, 20 + Math.sin(a) * 18);
+    }
+  },
+  apron: (g) => {
+    g.fillPoints([{ x: 12, y: 6 }, { x: 28, y: 6 }, { x: 28, y: 14 }, { x: 34, y: 18 }, { x: 31, y: 36 }, { x: 9, y: 36 }, { x: 6, y: 18 }, { x: 12, y: 14 }], true);
+    g.fillStyle(0x000000, 0.4).fillRect(14, 22, 12, 8);
+  },
+  dots: (g) => {
+    g.fillCircle(10, 26, 6).fillCircle(20, 14, 6).fillCircle(30, 26, 6);
+  },
+  crown: (g) => {
+    g.fillPoints([{ x: 5, y: 32 }, { x: 5, y: 12 }, { x: 13, y: 20 }, { x: 20, y: 6 }, { x: 27, y: 20 }, { x: 35, y: 12 }, { x: 35, y: 32 }], true);
+  },
+  flask: (g) => {
+    g.fillRect(16, 4, 8, 10);
+    g.fillPoints([{ x: 16, y: 14 }, { x: 24, y: 14 }, { x: 34, y: 34 }, { x: 6, y: 34 }], true);
+  },
+  ring: (g) => {
+    ICON_DRAW.heart(g);
+    g.lineStyle(3, 0xffffff, 1).strokeCircle(20, 20, 18);
+  },
+};
+
+export const ITEM_ICONS = Object.keys(ICON_DRAW) as ItemIcon[];
+
+function generateItemIcons(scene: Phaser.Scene): void {
+  for (const kind of ITEM_ICONS) {
+    make(scene, `icon-item-${kind}`, ICON_SIZE, ICON_SIZE, (g) => {
+      g.fillStyle(0xffffff, 1);
+      ICON_DRAW[kind](g);
+    });
+  }
+  make(scene, 'icon-lock', 20, 22, (g) => {
+    g.lineStyle(3, 0xffffff, 1).beginPath().arc(10, 9, 6, Math.PI, 0, false).strokePath();
+    g.fillStyle(0xffffff, 1).fillRoundedRect(2, 9, 16, 12, 3);
+    g.fillStyle(0x000000, 0.5).fillRect(9, 13, 2, 4);
+  });
+}
+
 export function generateTextures(scene: Phaser.Scene): void {
+  generateItemIcons(scene);
   // --- The sausage ---------------------------------------------------------
   // Head faces right (angle 0). White tints well, so the heat tint is applied at runtime.
   make(scene, 'sausage-head', 48, 30, (g) => {
@@ -85,13 +193,14 @@ export function generateTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xf0dfb0, 1).fillRect(0, 1, 18, 2);
     g.fillStyle(0xffffff, 1).fillRect(14, 1, 4, 2);
   });
-  make(scene, 'pb-mustard', 10, 10, (g) => {
-    g.fillStyle(0xf2c418, 1).fillCircle(5, 5, 5);
-    g.fillStyle(0xfff3a0, 1).fillCircle(4, 4, 2);
+  // Player shots are elongated and have no white core, so "round with a white core" always means danger.
+  make(scene, 'pb-mustard', 16, 8, (g) => {
+    g.fillStyle(0xf2c418, 0.9).fillEllipse(8, 4, 16, 7);
+    g.fillStyle(0xffe680, 0.9).fillEllipse(10, 3.5, 6, 3);
   });
-  make(scene, 'pb-pepper', 7, 7, (g) => {
-    g.fillStyle(0x2a2a2a, 1).fillCircle(3.5, 3.5, 3.5);
-    g.fillStyle(0x777777, 1).fillCircle(2.5, 2.5, 1.2);
+  make(scene, 'pb-pepper', 9, 9, (g) => {
+    g.fillStyle(0xd8d0c4, 1).fillCircle(4.5, 4.5, 4.5);
+    g.fillStyle(0x2a2a2a, 1).fillCircle(4.5, 4.5, 3.2);
   });
   make(scene, 'pb-skewer', 24, 6, (g) => {
     g.fillStyle(0xc0c8d0, 1).fillRect(0, 2, 18, 2);
@@ -109,12 +218,14 @@ export function generateTextures(scene: Phaser.Scene): void {
   // --- Enemy bullets: bright core + coloured rim for readability -----------
   const enemyBullet = (key: string, rim: number, size: number) =>
     make(scene, key, size, size, (g) => {
+      // A dark outline keeps enemy bullets visible over the bright grill bars.
       const r = size / 2;
-      g.fillStyle(rim, 1).fillCircle(r, r, r);
-      g.fillStyle(0xffffff, 1).fillCircle(r, r, r * 0.5);
+      g.fillStyle(0x1a0a05, 1).fillCircle(r, r, r);
+      g.fillStyle(rim, 1).fillCircle(r, r, r - 1.5);
+      g.fillStyle(0xffffff, 1).fillCircle(r, r, (r - 1.5) * 0.5);
     });
-  enemyBullet('eb-ketchup', 0xe0242c, 12);
-  enemyBullet('eb-hot', 0xff7a00, 12);
+  enemyBullet('eb-ketchup', 0xe0242c, 13);
+  enemyBullet('eb-hot', 0xff7a00, 13);
   enemyBullet('eb-boss', 0xb040ff, 14);
 
   // --- Enemies (drawn facing up; rotated toward the player at runtime) -----
@@ -128,7 +239,9 @@ export function generateTextures(scene: Phaser.Scene): void {
     eye(g, 19, 19, 3, true);
   });
   make(scene, 'enemy-spatula', 36, 50, (g) => {
-    g.fillStyle(0x2b2b2b, 1).fillRoundedRect(2, 0, 32, 26, 5);
+    // Light rim: a black spatula on a black grill was nearly invisible (1.25:1).
+    g.fillStyle(0xc9c2b8, 1).fillRoundedRect(0, 0, 36, 28, 6);
+    g.fillStyle(0x2b2b2b, 1).fillRoundedRect(2, 2, 32, 24, 5);
     g.fillStyle(0x444444, 1);
     g.fillRect(8, 5, 3, 14).fillRect(16, 5, 3, 14).fillRect(24, 5, 3, 14);
     g.fillStyle(0x8b5a2b, 1).fillRect(15, 26, 6, 24);
@@ -167,21 +280,27 @@ export function generateTextures(scene: Phaser.Scene): void {
   });
 
   // --- Pickups and FX -------------------------------------------------------
-  make(scene, 'crumb', 10, 10, (g) => {
-    g.fillStyle(0x9c6a2a, 1).fillPoints([
+  make(scene, 'crumb', 12, 12, (g) => {
+    g.fillStyle(0xf6e2b0, 1).fillCircle(6, 6, 6);
+    g.fillStyle(0x9c6a2a, 1).translateCanvas(1, 1).fillPoints([
       { x: 1, y: 4 }, { x: 4, y: 0 }, { x: 9, y: 2 }, { x: 10, y: 7 }, { x: 5, y: 10 }, { x: 0, y: 8 },
     ], true);
     g.fillStyle(0xe0b060, 1).fillCircle(5, 4, 2);
+    g.translateCanvas(-1, -1);
   });
   make(scene, 'condiment', 18, 14, (g) => {
     g.fillStyle(0x7fd3ff, 1).fillRoundedRect(0, 0, 18, 14, 3);
     g.fillStyle(0xffffff, 1).fillRect(3, 5, 12, 4);
     g.fillStyle(0x2a7fbf, 1).fillCircle(9, 7, 2);
   });
-  make(scene, 'spawn-mark', 24, 24, (g) => {
-    g.lineStyle(4, 0xff3a3a, 1);
-    g.lineBetween(3, 3, 21, 21);
-    g.lineBetween(21, 3, 3, 21);
+  make(scene, 'spawn-mark', 26, 26, (g) => {
+    // Dark outline + red + white core: readable on the grill, on hot tiles and for protanopes.
+    g.lineStyle(8, 0x1a0a05, 1);
+    g.lineBetween(4, 4, 22, 22).lineBetween(22, 4, 4, 22);
+    g.lineStyle(5, 0xff3a3a, 1);
+    g.lineBetween(4, 4, 22, 22).lineBetween(22, 4, 4, 22);
+    g.lineStyle(1.5, 0xffffff, 1);
+    g.lineBetween(5, 5, 21, 21).lineBetween(21, 5, 5, 21);
   });
   make(scene, 'spark', 6, 6, (g) => {
     g.fillStyle(0xffffff, 1).fillCircle(3, 3, 3);

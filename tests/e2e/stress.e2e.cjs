@@ -15,7 +15,7 @@ const FULL_KIT = [
   { id: 'onion', tier: 4 }, { id: 'onion', tier: 4 }, { id: 'pepper', tier: 4 },
   { id: 'mustard', tier: 4 }, { id: 'pickle', tier: 4 }, { id: 'skewer', tier: 4 },
 ];
-const KIT_ITEMS = ['paprika', 'paprika', 'espresso_mustard', 'espresso_mustard', 'big_bun', 'relish', 'ice_pack', 'smoky'];
+const KIT_ITEMS = ['paprika', 'paprika', 'espresso_mustard', 'espresso_mustard', 'big_bun', 'relish', 'cold_cuts', 'secret_sauce'];
 
 // Budgets for the fixed-60Hz simulated update (game logic + Arcade physics, no render).
 // Measured p95 is ~1-2 ms on a loaded 4-core CI box, so these only catch real regressions.
@@ -197,7 +197,7 @@ function deadTargetTweens(g) {
   return g.evaluate(() => {
     const s = window.__game.scene.getScene('Game');
     // A destroyed Phaser GameObject has scene === undefined.
-    return s.tweens.getTweens().filter((t) => t.targets.some((x) => x && typeof x === 'object' && 'renderFlags' in x && x.scene === undefined)).length;
+    return s.tweens.getTweens().filter((t) => (t.targets || []).some((x) => x && typeof x === 'object' && 'renderFlags' in x && x.scene === undefined)).length;
   });
 }
 

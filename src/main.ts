@@ -2,10 +2,12 @@ import Phaser from 'phaser';
 import { GAME_H, GAME_W } from './art/textures';
 import { waveConfig } from './data/waves';
 import { newRun } from './state/run';
+import { audio } from './audio/Audio';
 import { BootScene } from './scenes/Boot';
 import { GameScene } from './scenes/Game';
 import { GameOverScene } from './scenes/GameOver';
 import { MenuScene } from './scenes/Menu';
+import { SelectScene } from './scenes/Select';
 import { ShopScene } from './scenes/Shop';
 import { VictoryScene } from './scenes/Victory';
 
@@ -23,15 +25,22 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  input: { gamepad: true, activePointers: 3 },
   physics: {
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [BootScene, MenuScene, GameScene, ShopScene, GameOverScene, VictoryScene],
+  scene: [BootScene, MenuScene, SelectScene, GameScene, ShopScene, GameOverScene, VictoryScene],
 });
+
+// Browsers only allow sound after a user gesture: start audio on the first key, click or tap.
+for (const ev of ['keydown', 'pointerdown', 'touchstart'] as const) {
+  window.addEventListener(ev, () => audio.unlock(), { passive: true });
+}
 
 // Hooks for automated tests (tests/e2e). Harmless in normal play.
 Object.assign(window as unknown as Record<string, unknown>, {
   __game: game,
   __debug: { newRun, waveConfig },
+  __audio: audio,
 });

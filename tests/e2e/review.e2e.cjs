@@ -242,7 +242,7 @@ module.exports = {
         await setup(g);
         await g.evaluate(() => {
           const s = window.__rv.scene();
-          s.takeDamage(1, 'test'); // markHit → 750ms of i-frames
+          s.head.markHit(); // 750ms of i-frames
           s.togglePause();
         });
         await g.wait(1000);

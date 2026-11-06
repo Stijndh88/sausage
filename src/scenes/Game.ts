@@ -7,8 +7,9 @@ import { Enemy, type EnemyContext } from '../entities/Enemy';
 import { LINK_RADIUS, LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
 import { SausageHead } from '../entities/SausageHead';
-import type { RunState } from '../state/run';
-import { computeStats, type PlayerStats } from '../state/stats';
+import { SAUSAGES } from '../data/sausages';
+import { runStats, type RunState } from '../state/run';
+import type { PlayerStats } from '../state/stats';
 import { BulletPatterns } from '../systems/BulletPatterns';
 import { Health } from '../systems/Health';
 import { rollCrumbs } from '../systems/Economy';
@@ -17,6 +18,16 @@ import { WaveDirector } from '../systems/WaveDirector';
 import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
+import { PauseMenu } from '../ui/PauseMenu';
+import { SettingsPanel } from '../ui/SettingsPanel';
+import { Tutorial } from '../ui/Tutorial';
+import { DamageNumbers } from '../ui/DamageNumbers';
+import { PadPoller } from '../ui/pad';
+import { TouchControls, wantsTouchControls } from '../ui/TouchControls';
+import { loadSave, writeSave } from '../state/save';
+import { newRun } from '../state/run';
+import { audio } from '../audio/Audio';
+import { getSettings } from '../state/settings';
 
 /** HP per second lost while standing on a hot grill tile (armor doesn't help). */
 export const GRILL_DAMAGE_PER_SEC = 6;
@@ -63,7 +74,19 @@ export class GameScene extends Phaser.Scene {
   private ending = false;
   private dying = false;
   private paused = false;
-  private pauseText?: Phaser.GameObjects.Text;
+  private pauseMenu!: PauseMenu;
+  /** First-run tips; only during wave 1 until the player has seen them once. */
+  private tutorial: Tutorial | null = null;
+  private damageNumbers!: DamageNumbers;
+  private readonly pad = new PadPoller();
+  private touch: TouchControls | null = null;
+  /** Remaining hit-stop (brief slow-motion when you're hit), in ms of real frame time. */
+  private hitStopMs = 0;
+  private bossPhase2 = false;
+  private livePops = 0;
+  private movedPx = 0;
+  private lastHeadPos = { x: 0, y: 0 };
+  private settingsPanel!: SettingsPanel;
   private onGrill = false;
   /**
    * Game time in ms. Advances only on unpaused frames, by the same capped delta physics uses,
@@ -82,7 +105,7 @@ export class GameScene extends Phaser.Scene {
 
   init(data: { run: RunState }): void {
     this.run = data.run;
-    this.stats = computeStats(this.run.items);
+    this.stats = runStats(this.run);
     this.cfg = waveConfig(this.run.wave);
     this.rng = mulberry32((this.run.seed + this.run.wave * 31337) >>> 0);
     // You start every wave at full health.
@@ -93,11 +116,13 @@ export class GameScene extends Phaser.Scene {
     this.invincible = false;
     this.thornsReadyAt = new WeakMap();
     this.boss = null;
+    this.bossPhase2 = false;
+    this.hitStopMs = 0;
+    this.livePops = 0;
     this.graveyard = [];
     this.ending = false;
     this.dying = false;
     this.paused = false;
-    this.pauseText = undefined;
     this.onGrill = false;
     this.gameTime = 0;
     this.time.paused = false;
@@ -108,6 +133,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.add.image(0, 0, 'bg-grill').setOrigin(0).setDepth(0);
     this.physics.world.setBounds(this.arena.x, this.arena.y, this.arena.width, this.arena.height);
+    this.physics.world.timeScale = 1; // in case a hit-stop was cut short by a scene change
     this.createHotTiles();
 
     this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock);
@@ -190,6 +216,20 @@ export class GameScene extends Phaser.Scene {
     this.sizzle.startFollow(this.head);
 
     this.hud = new Hud(this, this.run.wave);
+    this.damageNumbers = new DamageNumbers(this);
+    this.touch = wantsTouchControls(this.game)
+      ? new TouchControls(this, () => { if (!this.paused) this.dashQueued = true; }, () => { this.pauseQueued = true; })
+      : null;
+    this.tutorial = this.run.wave === 1 && !loadSave().tutorialDone ? new Tutorial(this) : null;
+    this.movedPx = 0;
+    this.lastHeadPos = { x: this.head.x, y: this.head.y };
+    this.settingsPanel = new SettingsPanel(this, () => this.pauseMenu.setActive(true));
+    this.pauseMenu = new PauseMenu(this, {
+      resume: () => { if (this.paused) this.togglePause(); },
+      restart: () => this.leavePaused(() => this.scene.start('Game', { run: newRun(undefined, this.run.sausage) })),
+      settings: () => { this.pauseMenu.setActive(false); this.settingsPanel.show(); },
+      quit: () => this.leavePaused(() => this.scene.start('Menu')),
+    });
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,SHIFT,ESC,P') as Keys;
@@ -202,6 +242,8 @@ export class GameScene extends Phaser.Scene {
     onKeyPress(kb, 'P', queuePause);
 
     this.banner(this.cfg.boss ? "THE GRILL MASTER'S TONGS" : `WAVE ${this.run.wave}`, this.cfg.boss ? 'Defeat the boss to escape the BBQ!' : 'Survive!');
+    audio.setMood(this.cfg.boss ? 'boss' : 'fight');
+    audio.play('waveStart');
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
 
     // A bullet-hell must not keep running when the player looks away.
@@ -214,6 +256,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, deltaMs: number): void {
     const k = this.keys;
+    this.handlePad();
     if (this.pauseQueued) {
       this.pauseQueued = false;
       this.togglePause();
@@ -224,7 +267,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     // The engine already caps delta at 100ms (fps.min = 10 in main.ts); this is a safety net.
-    const dtMs = Math.min(deltaMs, 100);
+    let dtMs = Math.min(deltaMs, 100);
+    // Hit-stop: a few frames of heavy slow-motion when you get hit, so hits register.
+    if (this.hitStopMs > 0) {
+      this.hitStopMs -= dtMs;
+      dtMs *= 0.15;
+      this.physics.world.timeScale = this.hitStopMs > 0 ? 1 / 0.15 : 1;
+    }
     const dt = dtMs / 1000;
     this.gameTime += dtMs;
     const time = this.gameTime;
@@ -234,15 +283,22 @@ export class GameScene extends Phaser.Scene {
 
     // --- Player ---
     if (!this.dying) {
-      const ix = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
-      const iy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+      let ix = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
+      let iy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+      if (ix === 0 && iy === 0) {
+        // Analog input: gamepad stick, or the touch stick.
+        const m = this.touch?.vector ?? { x: 0, y: 0 };
+        const p = m.x || m.y ? m : this.pad.move(this);
+        ix = p.x;
+        iy = p.y;
+      }
       const wantDash = this.dashQueued;
-      this.head.drive(ix, iy, this.stats.speedMult, wantDash, this.stats.dashCooldownMs);
+      if (this.head.drive(ix, iy, this.stats.speedMult, wantDash, this.stats.dashCooldownMs)) audio.play('dash');
     } else {
       this.head.halt();
     }
     this.dashQueued = false;
-    const tint = this.dying ? 0x2a2a2a : 0xffffff;
+    const tint = this.dying ? 0x2a2a2a : SAUSAGES[this.run.sausage].tint;
     this.head.setTint(tint);
     this.chain.update(this.head.x, this.head.y, tint, time);
 
@@ -281,6 +337,20 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // --- First-run tips ---
+    if (this.tutorial && !this.dying && !this.ending) {
+      this.movedPx += Math.hypot(this.head.x - this.lastHeadPos.x, this.head.y - this.lastHeadPos.y);
+      this.lastHeadPos = { x: this.head.x, y: this.head.y };
+      this.tutorial.update({
+        head: this.head,
+        movedPx: this.movedPx,
+        kills: this.run.kills,
+        hotTiles: this.hotTiles,
+        firstPickup: (kind) => this.pickups.firstOf(kind),
+        timeMs: this.gameTime,
+      });
+    }
+
     // --- Pickups ---
     this.pickups.update(dt, this.head.x, this.head.y, this.stats.pickupRadius, (kind) => this.collect(kind));
 
@@ -289,6 +359,16 @@ export class GameScene extends Phaser.Scene {
 
     this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
+    this.damageNumbers.update(time);
+
+    // Boss phase 2: make the change of pace obvious.
+    if (this.boss && !this.boss.dead && !this.bossPhase2 && this.boss.hp < this.boss.maxHp * 0.5) {
+      this.bossPhase2 = true;
+      this.patterns.clear();
+      this.shake(350, 0.012);
+      audio.play('bossPhase');
+      this.banner('PHASE 2', 'The tongs are furious!', 900);
+    }
 
     if (!this.ending && !this.dying && this.director.timeUp) this.endWave();
   }
@@ -306,7 +386,8 @@ export class GameScene extends Phaser.Scene {
     e.setup(this.gameTime);
     if (kind === 'tongs') {
       this.boss = e;
-      this.cameras.main.shake(400, 0.01);
+      this.shake(400, 0.01);
+      audio.play('bossRoar');
     }
   }
 
@@ -331,6 +412,8 @@ export class GameScene extends Phaser.Scene {
       this.sparks.explode(4, e.x, e.y);
     }
     if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) this.health.heal(1);
+    audio.play(crit ? 'crit' : 'hit');
+    if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
   }
 
@@ -344,6 +427,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private explode(x: number, y: number, radius: number, damage: number): void {
+    audio.play('explode');
     const ring = this.add.image(x, y, 'ring').setDepth(12).setTint(0x8fe35a).setScale(0.2);
     this.tweens.add({ targets: ring, scale: (radius * 2) / 64, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
     this.sparks.setParticleTint(0x8fe35a);
@@ -356,12 +440,14 @@ export class GameScene extends Phaser.Scene {
 
   private killEnemy(e: Enemy): void {
     e.dead = true;
+    audio.play('kill');
     this.run.kills++;
     this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
     const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
     if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
+    this.killPop(e);
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
@@ -370,9 +456,11 @@ export class GameScene extends Phaser.Scene {
 
   private collect(kind: 'crumb' | 'condiment'): void {
     if (kind === 'crumb') {
+      audio.play('crumb');
       this.run.crumbs++;
       this.run.crumbsEarned++;
     } else {
+      audio.play('heal');
       const healed = this.health.heal(this.stats.condimentHeal);
       this.floatText(this.head.x, this.head.y - 24, `+${Math.round(healed)} HP`, '#7dff9a');
     }
@@ -383,12 +471,15 @@ export class GameScene extends Phaser.Scene {
     if (this.dying || this.ending || this.invincible) return;
     if (this.stats.dodge > 0 && Math.random() < this.stats.dodge) {
       this.head.markHit(DODGE_IFRAMES_MS);
+      audio.play('dodge');
       this.floatText(this.head.x, this.head.y - 24, 'DODGE', '#8fd3ff');
       return;
     }
     const dealt = this.health.takeDamage(amount);
     this.head.markHit();
-    this.cameras.main.shake(110, 0.005);
+    if (!getSettings().reducedMotion) this.hitStopMs = 70;
+    this.shake(110, 0.005);
+    audio.play('hurt');
     this.floatText(this.head.x, this.head.y - 24, `-${dealt}`, '#ff6a5a');
     if (this.health.dead) this.onLethal(source);
   }
@@ -398,7 +489,8 @@ export class GameScene extends Phaser.Scene {
       this.livesLeft--;
       this.health.hp = 1;
       this.head.markHit(1500);
-      this.cameras.main.flash(250, 255, 200, 160);
+      this.flash(250, 255, 200, 160);
+      audio.play('save');
       this.floatText(this.head.x, this.head.y - 40, 'SECOND SKIN!', '#ffd23f');
       return;
     }
@@ -454,11 +546,76 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: g, alpha: 0.7, duration: 700, yoyo: true, repeat: -1 });
   }
 
+  /** A white flash of the enemy that pops outward as it dies (skipped with reduced motion). */
+  private killPop(e: Enemy): void {
+    if (getSettings().reducedMotion || this.livePops >= 24) return;
+    this.livePops++;
+    const pop = this.add.image(e.x, e.y, e.texture.key).setRotation(e.rotation).setTintFill(0xffffff).setDepth(6);
+    this.tweens.add({
+      targets: pop, scale: e.isBoss ? 1.6 : 1.4, alpha: 0, duration: e.isBoss ? 400 : 130,
+      onComplete: () => { pop.destroy(); this.livePops--; },
+    });
+  }
+
+  /** Screen shake scaled by the player's setting (0 turns it off). */
+  private shake(ms: number, intensity: number): void {
+    const k = getSettings().screenShake;
+    if (k > 0) this.cameras.main.shake(ms, intensity * k);
+  }
+
+  /** Full-screen flashes are skipped when "reduce flashing" is on. */
+  private flash(ms: number, r: number, g: number, b: number): void {
+    if (!getSettings().reduceFlashing) this.cameras.main.flash(ms, r, g, b);
+  }
+
   private autoPause(): void {
     if (!this.paused && this.scene.isActive()) this.togglePause();
   }
 
+  /** Gamepad: Start pauses; in a fight A/bumpers dash; while paused the pad drives the menus. */
+  private handlePad(): void {
+    for (const b of this.pad.poll(this)) {
+      if (b === 'start') {
+        this.pauseQueued = true;
+        continue;
+      }
+      if (!this.paused) {
+        if (b === 'a' || b === 'rb' || b === 'lb') this.dashQueued = true;
+        continue;
+      }
+      if (this.settingsPanel.isOpen) {
+        if (b === 'up' || b === 'down') this.settingsPanel.navigate(b === 'up' ? -1 : 1);
+        else if (b === 'left' || b === 'right') this.settingsPanel.change(b === 'left' ? -1 : 1);
+        else if (b === 'a') this.settingsPanel.change(1);
+        else if (b === 'b') this.settingsPanel.hide();
+      } else if (b === 'up' || b === 'down') {
+        this.pauseMenu.navigate(b === 'up' ? -1 : 1);
+      } else if (b === 'a') {
+        this.pauseMenu.pressFocused();
+      } else if (b === 'b') {
+        this.pauseQueued = true;
+      }
+    }
+  }
+
+  /** Leave the paused state cleanly, then go somewhere else (restart / main menu). */
+  private leavePaused(go: () => void): void {
+    this.settingsPanel.hide();
+    this.pauseMenu.hide();
+    this.physics.world.resume();
+    this.tweens.resumeAll();
+    this.time.paused = false;
+    this.paused = false;
+    audio.duck(false);
+    go();
+  }
+
   private togglePause(): void {
+    // Esc while the settings overlay is open just closes it.
+    if (this.paused && this.settingsPanel.isOpen) {
+      this.settingsPanel.hide();
+      return;
+    }
     // Never *enter* pause during the end-of-wave/death/victory transitions,
     // but always allow leaving it (otherwise those transitions could soft-lock).
     if (!this.paused && (this.ending || this.dying)) return;
@@ -467,14 +624,14 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.pause();
       this.tweens.pauseAll();
       this.time.paused = true;
-      this.pauseText = this.add.text(GAME_W / 2, GAME_H / 2, 'PAUSED\n\nEsc / P to resume', {
-        fontFamily: FONT, fontSize: '40px', color: '#ffffff', align: 'center', stroke: '#000', strokeThickness: 6,
-      }).setOrigin(0.5).setDepth(100);
+      audio.duck(true);
+      this.pauseMenu.show(this.run, this.stats, this.health.hp);
     } else {
       this.physics.world.resume();
       this.tweens.resumeAll();
       this.time.paused = false;
-      this.pauseText?.destroy();
+      audio.duck(false);
+      this.pauseMenu.hide();
     }
   }
 
@@ -486,6 +643,10 @@ export class GameScene extends Phaser.Scene {
 
   private endWave(): void {
     this.ending = true;
+    if (this.tutorial) {
+      this.tutorial.hide();
+      writeSave({ ...loadSave(), tutorialDone: true });
+    }
     this.clearArena();
     for (const e of [...this.enemyList()]) {
       if (e.dead) continue;
@@ -501,6 +662,7 @@ export class GameScene extends Phaser.Scene {
     const banked = rollCrumbs(this.rng, floor, FLOOR_CRUMB_BANK);
     this.run.crumbs += banked;
     this.run.crumbsEarned += banked;
+    audio.play('waveClear');
     this.banner('WAVE CLEARED!', floor ? `Swept up ${banked} of ${floor} crumbs left on the floor` : 'Every crumb collected!');
     this.time.delayedCall(1700, () => this.scene.start('Shop', { run: this.run }));
   }
@@ -509,8 +671,10 @@ export class GameScene extends Phaser.Scene {
     if (this.ending || this.dying) return;
     this.ending = true;
     this.clearArena();
-    this.cameras.main.shake(600, 0.015);
-    this.cameras.main.flash(400, 255, 240, 200);
+    this.shake(600, 0.015);
+    this.flash(400, 255, 240, 200);
+    audio.setMood('off');
+    audio.play('victory');
     for (const e of [...this.enemyList()]) {
       if (!e.dead) {
         e.dead = true;
@@ -529,7 +693,9 @@ export class GameScene extends Phaser.Scene {
     this.health.hp = 0;
     this.run.causeOfDeath = source;
     this.clearArena();
-    this.cameras.main.shake(500, 0.012);
+    this.shake(500, 0.012);
+    audio.setMood('off');
+    audio.play('death');
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
     this.banner('SKEWERED!', `Done in by: ${source}`, 1500);

@@ -28,7 +28,7 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 module.exports = {
   tests: [
     {
-      name: 'crumbs left on the floor are banked when the wave timer ends',
+      name: 'half the crumbs left on the floor are banked when the wave timer ends',
       fn: async ({ g }) => {
         await g.startRun({ seed: 3, crumbs: 0 });
         await g.godMode();
@@ -42,7 +42,8 @@ module.exports = {
           window.__balStep(130);
           return { before, after: s.run.crumbs, scene: window.__game.scene.isActive('Shop') ? 'Shop' : 'Game' };
         });
-        assert.ok(r.after - r.before >= 10, `expected the 10 floor crumbs to be banked, got ${r.before} -> ${r.after}`);
+        // Half of what's left on the floor is swept up (FLOOR_CRUMB_BANK = 0.5).
+        assert.equal(r.after - r.before, 5, `expected half of the 10 floor crumbs to be banked, got ${r.before} -> ${r.after}`);
         assert.equal(r.scene, 'Shop');
       },
     },

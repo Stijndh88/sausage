@@ -6,6 +6,7 @@ import { PlayerBullet, type ExplodeHandler } from '../entities/BulletPool';
 import type { Enemy } from '../entities/Enemy';
 import type { LinkChain } from '../entities/LinkChain';
 import type { WeaponSlot } from '../state/run';
+import { audio } from '../audio/Audio';
 import type { GameClock } from './clock';
 
 const DEG = Math.PI / 180;
@@ -91,6 +92,7 @@ export class WeaponSystem {
     const spread = def.kind === 'cone' || def.kind === 'shotgun';
     const count = tierProjectiles(def, tier) + (spread ? this.hooks.mods().extraProjectiles : 0);
 
+    if (def.kind !== 'orbit') audio.play(`shoot_${def.kind}`);
     switch (def.kind) {
       case 'single':
       case 'pierce':

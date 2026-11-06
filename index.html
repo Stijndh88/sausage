@@ -9,10 +9,20 @@
       /* Phaser's Scale.CENTER_BOTH does the centring; don't also flex-centre or it shifts off-centre. */
       #game { width: 100%; height: 100%; }
       canvas { image-rendering: auto; }
+      /* Phones held upright: the game is landscape-only, so ask to rotate. */
+      #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #1a1210; color: #ffd9a0;
+        font: 600 20px/1.4 "Trebuchet MS", "Segoe UI", sans-serif; text-align: center;
+        flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px; }
+      #rotate .phone { width: 46px; height: 80px; border: 4px solid #ffd9a0; border-radius: 10px;
+        animation: turn 1.6s ease-in-out infinite; }
+      @keyframes turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+      @media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
+      @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate" role="alert"><div class="phone"></div>Turn your phone sideways to play</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

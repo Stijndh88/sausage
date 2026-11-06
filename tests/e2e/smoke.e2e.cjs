@@ -4,8 +4,11 @@ const { assert } = require('./harness.cjs');
 module.exports = {
   tests: [
     {
-      name: 'menu → game via Enter, wave 1 runs and weapons kill enemies',
+      name: 'menu → sausage select → game via Enter, wave 1 runs and weapons kill enemies',
       fn: async ({ page, g }) => {
+        await page.keyboard.press('Enter');
+        await g.waitForScene('Select');
+        await g.wait(400);
         await page.keyboard.press('Enter');
         await g.waitForScene('Game');
         await g.godMode();
@@ -52,6 +55,24 @@ module.exports = {
         }));
         await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
         await g.waitForScene('Victory', 6000);
+      },
+    },
+    {
+      name: 'every sausage type can start a run and fight',
+      fn: async ({ g }) => {
+        for (const sausage of ['frank', 'bratwurst', 'chorizo', 'hotdog', 'veggie']) {
+          await g.evaluate((id) => {
+            const game = window.__game;
+            for (const s of game.scene.getScenes(true)) game.scene.stop(s.scene.key);
+            game.scene.start('Game', { run: window.__debug.newRun(5, id) });
+          }, sausage);
+          await g.waitForScene('Game');
+          await g.godMode();
+          await g.waitGameMs(4000);
+          const s = await g.gameState();
+          assert.equal(s.wave, 1, sausage);
+          assert.ok(s.maxHp > 0, sausage);
+        }
       },
     },
   ],

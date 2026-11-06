@@ -18,7 +18,8 @@ interface LinkView {
  * Links can't be hurt; they're where your weapons fire from.
  */
 export class LinkChain {
-  readonly trail = new Trail(2, FIRST_LINK_GAP + LINK_GAP * MAX_LINKS + 40);
+  // Room for one more link than the usual limit (the Hot Dog has 7).
+  readonly trail = new Trail(2, FIRST_LINK_GAP + LINK_GAP * (MAX_LINKS + 1) + 40);
   readonly positions: TrailPoint[] = [];
   private views: LinkView[] = [];
 

@@ -135,7 +135,7 @@ async function resizeTo(page, width, height) {
 
 const W = (ids) => ids.map((id) => (typeof id === 'string' ? { id, tier: 1 } : id));
 const MANY_ITEMS = ['paprika', 'paprika', 'paprika', 'espresso_mustard', 'espresso_mustard', 'sesame', 'casing', 'casing',
-  'ice_pack', 'ice_pack', 'ketchup_kiss', 'big_bun', 'big_bun', 'relish', 'smoky', 'smoky', 'oven_mitt', 'oven_mitt'];
+  'cold_cuts', 'cold_cuts', 'ketchup_kiss', 'big_bun', 'big_bun', 'relish', 'four_leaf_relish', 'golden_sausage', 'oven_mitt', 'oven_mitt'];
 const FULL_LINKS = W([{ id: 'toothpick', tier: 4 }, { id: 'mustard', tier: 4 }, { id: 'pepper', tier: 4 }, { id: 'skewer', tier: 4 }, { id: 'pickle', tier: 4 }, { id: 'onion', tier: 4 }]);
 
 /** Put specific offers in the shop and redraw it (worst-case text lengths). */
@@ -149,10 +149,11 @@ function setOffers(g, offers, locked = []) {
 }
 
 const LONG_OFFERS = [
-  { type: 'item', id: 'smoky', price: 20 },
+  // Longest descriptions, most stat lines, synergy hint, an upgrade and a new link.
+  { type: 'item', id: 'golden_sausage', price: 120 },
   { type: 'weapon', id: 'onion', price: 21 },
-  { type: 'weapon', id: 'skewer', price: 23 },
-  { type: 'item', id: 'ketchup_kiss', price: 18 },
+  { type: 'item', id: 'pickle_juice', price: 23 },
+  { type: 'item', id: 'second_skin', price: 18 },
 ];
 
 async function checkShopLayout(page, label) {

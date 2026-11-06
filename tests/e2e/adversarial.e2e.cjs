@@ -16,12 +16,15 @@ const ARENA = { left: 22, top: 64 + 14, right: 1280 - 22, bottom: 64 + 14 + (720
 
 // Shop layout (src/scenes/Shop.ts): 4 cards 250 wide, 24 apart, centred, at y=290.
 const CARD_X = (i) => GAME_W / 2 - ((250 + 24) * 4 - 24) / 2 + 125 + i * 274;
+// Mirrors src/scenes/Shop.ts layout (CARD_Y 300, CARD_H 322, ROW_Y 500).
+const CARD_TOP = 300 - 322 / 2;
 const SHOP = {
-  buy: (i) => [CARD_X(i) - 38, 290 - 145 + 290 - 34],
-  keep: (i) => [CARD_X(i) + 82, 290 - 145 + 290 - 34],
-  reroll: [GAME_W / 2 - 150, 490],
-  next: [GAME_W / 2 + 150, 490],
+  buy: (i) => [CARD_X(i) - 38, CARD_TOP + 322 - 34],
+  keep: (i) => [CARD_X(i) + 82, CARD_TOP + 322 - 34],
+  reroll: [GAME_W / 2 - 150, 500],
+  next: [GAME_W / 2 + 150, 500],
 };
+const STARTING_CRUMBS = 8;
 const END = { again: [GAME_W / 2 - 150, 600], menu: [GAME_W / 2 + 150, 600] };
 
 // ---------------------------------------------------------------------------- helpers
@@ -98,7 +101,7 @@ const tests = [];
 // ======================= Transitions & key mashing (regression guards) =======================
 
 tests.push({
-  name: 'menu: mashing Enter/Space/click on START starts exactly one run at wave 1',
+  name: 'menu: mashing Enter/Space/click on START opens sausage select once; Enter there starts exactly one run',
   timeoutMs: 60000,
   fn: async ({ page, g }) => {
     const [sx, sy] = await toPage(page, [GAME_W / 2, 630]);
@@ -108,12 +111,17 @@ tests.push({
       page.keyboard.press('Enter'), page.keyboard.press('Space'),
     ]);
     await page.mouse.up();
+    await g.waitForScene('Select', 30000);
+    await frames(page, 10);
+    assert.deepEqual(await g.activeScenes(), ['Select'], 'the mashed keys must not also start a run');
+    await frames(page, 20);
+    await page.keyboard.press('Enter');
     await g.waitForScene('Game', 30000);
     await frames(page, 10);
     assert.deepEqual(await g.activeScenes(), ['Game']);
     const s = await g.gameState();
     assert.equal(s.wave, 1);
-    assert.equal(s.crumbs, 0);
+    assert.equal(s.crumbs, STARTING_CRUMBS);
     assert.ok(!s.ending && !s.dying);
   },
 });
@@ -148,7 +156,7 @@ tests.push({
 });
 
 tests.push({
-  name: 'death banner: mashing keys during CHARRED → GameOver, then Enter starts a clean run',
+  name: 'death banner: mashing keys during the death banner → GameOver, then Enter starts a clean run',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 4, wave: 5, crumbs: 77, weapons: STRONG, items: ['paprika'] });
@@ -167,7 +175,7 @@ tests.push({
     await frames(page, 5);
     const s = await g.gameState();
     assert.equal(s.wave, 1);
-    assert.equal(s.crumbs, 0);
+    assert.equal(s.crumbs, STARTING_CRUMBS);
     assert.equal(s.kills, 0);
     assert.ok(s.hp === s.maxHp && !s.dying && !s.ending);
     const loadout = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { w: s.run.weapons, i: s.run.items, paused: s.paused }; });
@@ -527,7 +535,7 @@ tests.push({
 });
 
 tests.push({
-  name: 'shop: Keep holds an offer through a reroll and into the next shop at its old price',
+  name: 'shop: Keep holds an offer through a reroll and into the next shop, re-priced for the new wave',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await waveClearToShop(g, { seed: 41, crumbs: 30 });
@@ -549,7 +557,8 @@ tests.push({
     await g.waitForScene('Shop', 40000);
     const s2 = await shopState(g);
     assert.equal(s2.wave, 2);
-    assert.deepEqual(s2.offers[0], s0.offers[2], 'kept offer is in the next shop at the old price');
+    assert.equal(`${s2.offers[0].type}:${s2.offers[0].id}`, `${s0.offers[2].type}:${s0.offers[2].id}`, 'kept offer is in the next shop');
+    assert.ok(s2.offers[0].price >= s0.offers[2].price, 'and re-priced for the new wave (prices only go up)');
     assert.deepEqual(s2.locked, [0]);
     assert.equal(s2.rerolls, 0, 'reroll price resets per shop');
   },

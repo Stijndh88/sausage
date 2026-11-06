@@ -41,7 +41,9 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
     return remaining <= 0 ? 1 : 1 - remaining / cooldownMs;
   }
 
-  drive(ix: number, iy: number, speedMult: number, wantDash: boolean, dashCooldownMs: number): void {
+  /** Moves the head. Returns true on the frame a dash starts. */
+  drive(ix: number, iy: number, speedMult: number, wantDash: boolean, dashCooldownMs: number): boolean {
+    let dashed = false;
     const now = this.clock.now();
     const len = Math.hypot(ix, iy);
     const moving = len > 0.01;
@@ -53,6 +55,7 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
       this.dashAngle = moving ? Math.atan2(iy, ix) : this.facing;
       this.dashUntil = now + DASH_MS;
       this.dashReadyAt = now + dashCooldownMs;
+      dashed = true;
     }
     const speed = BASE_SPEED * speedMult;
     if (now < this.dashUntil) {
@@ -70,6 +73,7 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
     const blinking = now < this.invulnUntil;
     this.setAlpha(blinking && Math.floor(now / 70) % 2 === 0 ? 0.4 : 1);
     this.dot.setPosition(this.x, this.y);
+    return dashed;
   }
 
   markHit(ms: number = HIT_INVULN_MS): void {

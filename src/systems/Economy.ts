@@ -37,6 +37,8 @@ export interface ShopContext {
   items?: readonly string[];
   /** Luck stat (%), improves rarity odds. */
   luck?: number;
+  /** Link limit for the chosen sausage. */
+  maxLinks?: number;
 }
 
 /** Item ids of one rarity that can still be offered. */
@@ -77,7 +79,7 @@ export function generateOffers(
     let id: string | null;
     if (type === 'weapon') {
       id = WEAPON_IDS[Math.floor(rng() * WEAPON_IDS.length)];
-      if (weapons && applyWeaponPurchase(weapons, id as WeaponId) === null) continue;
+      if (weapons && applyWeaponPurchase(weapons, id as WeaponId, ctx.maxLinks) === null) continue;
     } else {
       id = rollItem(rng, wave, ctx.luck ?? 0, owned, used);
       if (!id) continue;
@@ -94,7 +96,7 @@ export function generateOffers(
  * Buying a weapon you own upgrades your lowest-tier copy that isn't maxed.
  * Otherwise it adds a new link, if there's room. Returns null if it can't be bought.
  */
-export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId): WeaponSlot[] | null {
+export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId, maxLinks = MAX_LINKS): WeaponSlot[] | null {
   const next = weapons.map((w) => ({ ...w }));
   let target: WeaponSlot | undefined;
   for (const w of next) {
@@ -104,7 +106,7 @@ export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId
     target.tier++;
     return next;
   }
-  if (next.length >= MAX_LINKS) return null;
+  if (next.length >= maxLinks) return null;
   next.push({ id, tier: 1 });
   return next;
 }
@@ -114,10 +116,11 @@ export function canBuy(
   crumbs: number,
   weapons: readonly WeaponSlot[],
   items: readonly string[] = [],
+  maxLinks = MAX_LINKS,
 ): { ok: boolean; reason?: string } {
   if (offer.type === 'item' && isItemMaxed(items, offer.id)) return { ok: false, reason: 'Maxed out' };
   if (crumbs < offer.price) return { ok: false, reason: 'Not enough crumbs' };
-  if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId) === null) {
+  if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId, maxLinks) === null) {
     const owned = weapons.some((w) => w.id === offer.id);
     return { ok: false, reason: owned ? 'Maxed out · no free links' : 'No free links' };
   }

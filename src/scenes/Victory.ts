@@ -9,7 +9,7 @@ export class VictoryScene extends Phaser.Scene {
   }
 
   create(data: { run: RunState }): void {
-    endScreen(this, data.run, 'YOU ESCAPED!', 'The Grill Master will never find you now.', '#9cff7a', 0xffffff);
+    endScreen(this, data.run, 'YOU ESCAPED!', 'The Grill Master will never find you now.', '#9cff7a', 0xffffff, true);
     // Confetti made of crumbs.
     this.add.particles(0, -10, 'crumb', {
       x: { min: 0, max: GAME_W },

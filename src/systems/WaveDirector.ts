@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { EnemyKind } from '../data/enemies';
 import type { WaveConfig } from '../data/waves';
+import { audio } from '../audio/Audio';
 import { type Rng, pickWeighted, randRange } from './rng';
 
 const TELEGRAPH_MS = 750;
@@ -108,6 +109,7 @@ export class WaveDirector {
 
   private telegraph(kind: EnemyKind, x: number, y: number, ms: number): void {
     if (kind === 'hotsauce') this.pendingTurrets++;
+    audio.play('telegraph');
     const mark = this.scene.add.image(x, y, 'spawn-mark').setDepth(2).setScale(kind === 'tongs' ? 3 : 1);
     this.marks.add(mark);
     this.scene.tweens.add({ targets: mark, alpha: 0.25, duration: 120, yoyo: true, repeat: -1 });
