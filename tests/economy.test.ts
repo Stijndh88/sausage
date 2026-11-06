@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { ITEMS } from '../src/data/items';
+import { RARITY_ORDER, rarityWeights } from '../src/data/rarity';
 import { MAX_LINKS } from '../src/data/weapons';
-import { computeStats, MIN_HEAT_TAKEN } from '../src/state/stats';
+import { CAPS, computeStats } from '../src/state/stats';
 import type { WeaponSlot } from '../src/state/run';
 import {
   applyWeaponPurchase, canBuy, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
@@ -16,12 +18,12 @@ describe('shop offers', () => {
     expect(a).not.toEqual(c);
   });
 
-  it('fills 4 unique offers and keeps locked ones first', () => {
-    const locked = [{ type: 'item' as const, id: 'paprika', price: 99 }];
+  it('fills 4 unique offers and keeps locked ones first, re-priced for the new wave', () => {
+    const locked = [{ type: 'item' as const, id: 'paprika', price: 3 }];
     for (let seed = 0; seed < 50; seed++) {
       const offers = generateOffers(mulberry32(seed), 5, locked);
       expect(offers).toHaveLength(4);
-      expect(offers[0]).toEqual(locked[0]);
+      expect(offers[0]).toEqual({ type: 'item', id: 'paprika', price: scalePrice(ITEMS.paprika.price, 5) });
       const keys = offers.map((o) => `${o.type}:${o.id}`);
       expect(new Set(keys).size).toBe(4);
     }
@@ -29,7 +31,7 @@ describe('shop offers', () => {
 
   it('scales prices and reroll costs up', () => {
     expect(scalePrice(10, 1)).toBe(10);
-    expect(scalePrice(10, 5)).toBe(16);
+    expect(scalePrice(10, 5)).toBe(20);
     expect(rerollCost(1, 0)).toBeLessThan(rerollCost(1, 1));
     expect(rerollCost(1, 0)).toBeLessThan(rerollCost(8, 0));
   });
@@ -63,12 +65,12 @@ describe('weapon purchases', () => {
 });
 
 describe('stats from items', () => {
-  it('stacks items and clamps heat resistance', () => {
+  it('stacks items and clamps capped stats', () => {
     const s = computeStats(['paprika', 'paprika', 'sesame']);
-    expect(s.damageMult).toBeCloseTo(1.2);
-    expect(s.speedMult).toBeCloseTo(1.08);
-    const tank = computeStats(Array(20).fill('casing'));
-    expect(tank.heatTakenMult).toBe(MIN_HEAT_TAKEN);
+    expect(s.damageMult).toBeCloseTo(1.16);
+    expect(s.speedMult).toBeCloseTo(1.06);
+    expect(computeStats(Array(20).fill('casing')).armor).toBe(40);
+    expect(computeStats(Array(20).fill('slippery_oil')).dodge).toBe(CAPS.dodge);
   });
 
   it('rolls fractional crumbs to the right average', () => {
@@ -77,5 +79,43 @@ describe('stats from items', () => {
     for (let i = 0; i < 10000; i++) total += rollCrumbs(rng, 1, 1.5);
     expect(total / 10000).toBeGreaterThan(1.45);
     expect(total / 10000).toBeLessThan(1.55);
+  });
+});
+
+describe('rarities and maxed items', () => {
+  it('rares start at wave 3, legendaries at wave 5, and luck shifts odds away from common', () => {
+    expect(rarityWeights(2).rare).toBe(0);
+    expect(rarityWeights(3).rare).toBeGreaterThan(0);
+    expect(rarityWeights(4).legendary).toBe(0);
+    expect(rarityWeights(5).legendary).toBeGreaterThan(0);
+    const share = (w: Record<string, number>) => w.common / Object.values(w).reduce((a, b) => a + b, 0);
+    expect(share(rarityWeights(8, 100))).toBeLessThan(share(rarityWeights(8, 0)));
+    for (let w = 2; w <= 10; w++) expect(share(rarityWeights(w))).toBeLessThanOrEqual(share(rarityWeights(w - 1)));
+  });
+
+  it('never offers an item you have maxed out, and refuses to sell one', () => {
+    const owned = ['grill_apron', 'second_skin'];
+    for (let seed = 0; seed < 300; seed++) {
+      for (const o of generateOffers(mulberry32(seed), 9, [], 4, undefined, { items: owned, luck: 200 })) {
+        expect(owned).not.toContain(o.id);
+      }
+    }
+    expect(canBuy({ type: 'item', id: 'grill_apron', price: 1 }, 99, [], owned)).toEqual({ ok: false, reason: 'Maxed out' });
+  });
+
+  it('later waves offer better items on average', () => {
+    const avgRank = (wave: number) => {
+      let total = 0;
+      let n = 0;
+      for (let seed = 0; seed < 300; seed++) {
+        for (const o of generateOffers(mulberry32(seed), wave)) {
+          if (o.type !== 'item') continue;
+          total += RARITY_ORDER.indexOf(ITEMS[o.id].rarity);
+          n++;
+        }
+      }
+      return total / n;
+    };
+    expect(avgRank(9)).toBeGreaterThan(avgRank(2));
   });
 });

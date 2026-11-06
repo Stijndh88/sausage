@@ -14,6 +14,7 @@ export interface EnemyContext {
 type Mode = 'move' | 'windup' | 'charge' | 'recover' | 'idle' | 'spray';
 
 const UP_OFFSET = Math.PI / 2; // textures are drawn facing up
+export const MAX_POISON_STACKS = 3;
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   readonly def: EnemyDef;
@@ -25,8 +26,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private kbX = 0;
   private kbY = 0;
-  private poisonDps = 0;
-  private poisonUntil = 0;
+  /** Up to MAX_POISON_STACKS independent poison stacks, each with its own timer. */
+  private poisons: { dps: number; until: number }[] = [];
   private flashUntil = 0;
   private mode: Mode = 'move';
   private stateUntil = 0;
@@ -89,9 +90,25 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return false;
   }
 
+  /** Adds a poison stack; at the cap, the weakest (or oldest) stack is replaced. */
   poison(dps: number, durationMs: number, now: number): void {
-    this.poisonDps = Math.max(this.poisonDps, dps);
-    this.poisonUntil = now + durationMs;
+    this.poisons = this.poisons.filter((p) => p.until > now);
+    const stack = { dps, until: now + durationMs };
+    if (this.poisons.length < MAX_POISON_STACKS) {
+      this.poisons.push(stack);
+      return;
+    }
+    let weakest = 0;
+    for (let i = 1; i < this.poisons.length; i++) {
+      const p = this.poisons[i];
+      const w = this.poisons[weakest];
+      if (p.dps < w.dps || (p.dps === w.dps && p.until < w.until)) weakest = i;
+    }
+    this.poisons[weakest] = stack;
+  }
+
+  get poisonStacks(): number {
+    return this.poisons.length;
   }
 
   shove(fromX: number, fromY: number, strength: number): void {
@@ -106,14 +123,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   think(ctx: EnemyContext, now: number, dt: number): boolean {
     if (this.dead) return false;
     let poisonKill = false;
-    if (now < this.poisonUntil) {
-      this.hp -= this.poisonDps * dt;
+    if (this.poisons.length) {
+      let dps = 0;
+      for (const p of this.poisons) if (p.until > now) dps += p.dps;
+      if (dps === 0) this.poisons.length = 0;
+      this.hp -= dps * dt;
       if (this.hp <= 0) {
         this.dead = true;
         poisonKill = true;
       }
-    } else {
-      this.poisonDps = 0;
     }
 
     const dx = ctx.player.x - this.x;
@@ -163,8 +181,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           vy = (dx / dist) * speed * 0.7 * this.strafeDir;
         }
         if (now >= this.nextFireAt && !spawning) {
-          ctx.patterns.spread(this.x, this.y, toPlayer, 3, 0.5, 210, this.def.bulletHeat, 'eb-ketchup');
-          this.nextFireAt = now + 1800 + Math.random() * 400;
+          ctx.patterns.spread(this.x, this.y, toPlayer, 3, 0.5, 210, this.def.bulletDamage, 'eb-ketchup');
+          this.nextFireAt = now + 2400 + Math.random() * 600;
           if (Math.random() < 0.3) this.strafeDir *= -1;
         }
         break;
@@ -174,7 +192,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         if (this.mode === 'idle' && now >= this.stateUntil) this.setMode('spray', now, 1800);
         if (this.mode === 'spray') {
           if (now >= this.nextFireAt) {
-            ctx.patterns.spiral(this.x, this.y - 6, this.spiralAngle, 3, 150, this.def.bulletHeat, 'eb-hot');
+            ctx.patterns.spiral(this.x, this.y - 6, this.spiralAngle, 3, 150, this.def.bulletDamage, 'eb-hot');
             this.spiralAngle += 0.29;
             this.nextFireAt = now + 115;
           }
@@ -208,7 +226,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private bossThink(ctx: EnemyContext, now: number, dist: number, toPlayer: number, dx: number, dy: number): [number, number] {
     const phase2 = this.hp < this.maxHp * 0.5;
     const p = ctx.patterns;
-    const heat = this.def.bulletHeat;
+    const dmg = this.def.bulletDamage;
     let vx = 0;
     let vy = 0;
 
@@ -235,13 +253,13 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           // Three aimed fans.
           for (let k = 0; k < 3; k++) {
             this.scene.time.delayedCall(k * 220, () => {
-              if (!this.dead && !ctx.halted()) p.spread(this.x, this.y + 30, Math.atan2(ctx.player.y - this.y, ctx.player.x - this.x), 9, 1.1, 230, heat, 'eb-boss');
+              if (!this.dead && !ctx.halted()) p.spread(this.x, this.y + 30, Math.atan2(ctx.player.y - this.y, ctx.player.x - this.x), 9, 1.1, 230, dmg, 'eb-boss');
             });
           }
         } else {
-          p.ring(this.x, this.y + 30, 22, 170, heat, 'eb-boss', i * 0.15);
+          p.ring(this.x, this.y + 30, 22, 170, dmg, 'eb-boss', i * 0.15);
           this.scene.time.delayedCall(350, () => {
-            if (!this.dead && !ctx.halted()) p.ring(this.x, this.y + 30, 22, 170, heat, 'eb-boss', i * 0.15 + 0.14);
+            if (!this.dead && !ctx.halted()) p.ring(this.x, this.y + 30, 22, 170, dmg, 'eb-boss', i * 0.15 + 0.14);
           });
         }
         this.nextFireAt = now + 1700;
@@ -249,12 +267,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         const pick = i % 3;
         if (pick === 0) {
           // Curving double ring: pretty and nasty.
-          p.ring(this.x, this.y + 30, 24, 190, heat, 'eb-boss', 0, 0.5);
-          p.ring(this.x, this.y + 30, 24, 190, heat, 'eb-hot', 0.13, -0.5);
+          p.ring(this.x, this.y + 30, 24, 190, dmg, 'eb-boss', 0, 0.5);
+          p.ring(this.x, this.y + 30, 24, 190, dmg, 'eb-hot', 0.13, -0.5);
         } else if (pick === 1) {
           for (let k = 0; k < 14; k++) {
             this.scene.time.delayedCall(k * 90, () => {
-              if (!this.dead && !ctx.halted()) p.spiral(this.x, this.y + 30, this.spiralAngle += 0.33, 4, 180, heat, 'eb-hot');
+              if (!this.dead && !ctx.halted()) p.spiral(this.x, this.y + 30, this.spiralAngle += 0.33, 4, 180, dmg, 'eb-hot');
             });
           }
         } else {
@@ -282,7 +300,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.setTintFill(0xffffff);
     } else if (this.mode === 'windup') {
       this.setTint(Math.floor(now / 80) % 2 ? 0xff5040 : 0xffffff);
-    } else if (now < this.poisonUntil) {
+    } else if (this.poisons.length) {
       this.setTint(0xc8ff6a);
     } else {
       this.clearTint();

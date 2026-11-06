@@ -9,7 +9,7 @@ vi.mock('phaser', () => ({ default: {} }));
 import { waveConfig, TOTAL_WAVES, type WaveConfig } from '../src/data/waves';
 import { ITEM_IDS } from '../src/data/items';
 import { WEAPON_IDS } from '../src/data/weapons';
-import { Doneness, MAX_HEAT, tierFor } from '../src/systems/Doneness';
+import { Health } from '../src/systems/Health';
 import { generateOffers, scalePrice, basePrice, rollCrumbs, type Offer } from '../src/systems/Economy';
 import { mulberry32, pickWeighted, randInt } from '../src/systems/rng';
 import { Trail } from '../src/systems/Trail';
@@ -122,32 +122,19 @@ describe('review: WaveDirector', () => {
   });
 });
 
-describe('review: Doneness', () => {
-  it('carries at most just-under-half heat into the next wave', () => {
-    for (const h of [0, 20, 59.9, 99.4, 99.99, 100, 250]) {
-      const c = Doneness.carryOver(h);
-      expect(c).toBeLessThan(MAX_HEAT / 2);
-      expect(tierFor(c).name).not.toBe('Charred');
-    }
-  });
-
-  it('charred is terminal: no more heat applied, no cooling', () => {
-    const d = new Doneness(99);
-    expect(d.addHeat(5)).toBeCloseTo(1);
-    expect(d.isCharred).toBe(true);
-    expect(d.addHeat(5)).toBe(0);
-    d.cool(50);
-    d.tick(10);
-    expect(d.heat).toBe(MAX_HEAT);
-  });
-
-  it('heat stays within [0, 100] for negative / NaN-free inputs', () => {
-    const d = new Doneness(-50);
-    expect(d.heat).toBe(0);
-    d.addHeat(-10);
-    expect(d.heat).toBe(0);
-    d.heatTakenMult = 0;
-    expect(d.addHeat(1000)).toBe(0);
+describe('review: Health', () => {
+  it('damage, healing and regen never push HP outside [0, max] or to NaN', () => {
+    const h = new Health(100);
+    h.takeDamage(-10);
+    expect(h.hp).toBe(100);
+    h.heal(-10);
+    expect(h.hp).toBe(100);
+    h.regenPerSec = 5;
+    h.tick(1e9);
+    expect(h.hp).toBe(100);
+    h.takeDamage(1e9);
+    expect(h.hp).toBe(0);
+    expect(Number.isFinite(h.hp)).toBe(true);
   });
 });
 
@@ -167,7 +154,10 @@ describe('review: Economy', () => {
 
   it('every weapon and item can appear in a shop', () => {
     const seen = new Set<string>();
-    for (let seed = 0; seed < 400; seed++) for (const o of generateOffers(mulberry32(seed), 2)) seen.add(`${o.type}:${o.id}`);
+    // Rares appear from wave 3 and legendaries from wave 5, so sample the whole run.
+    for (let wave = 2; wave <= 10; wave++) {
+      for (let seed = 0; seed < 300; seed++) for (const o of generateOffers(mulberry32(seed), wave)) seen.add(`${o.type}:${o.id}`);
+    }
     for (const id of WEAPON_IDS) expect(seen.has(`weapon:${id}`)).toBe(true);
     for (const id of ITEM_IDS) expect(seen.has(`item:${id}`)).toBe(true);
   });

@@ -72,8 +72,8 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
     this.dot.setPosition(this.x, this.y);
   }
 
-  markHit(): void {
-    this.invulnUntil = this.clock.now() + HIT_INVULN_MS;
+  markHit(ms: number = HIT_INVULN_MS): void {
+    this.invulnUntil = Math.max(this.invulnUntil, this.clock.now() + ms);
   }
 
   halt(): void {

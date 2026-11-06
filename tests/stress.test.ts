@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FIRST_LINK_GAP, LINK_GAP } from '../src/entities/LinkChain';
 import { MAX_LINKS } from '../src/data/weapons';
 import { TOTAL_WAVES, waveConfig } from '../src/data/waves';
-import { Doneness, MAX_HEAT } from '../src/systems/Doneness';
+import { Health } from '../src/systems/Health';
 import { mulberry32 } from '../src/systems/rng';
 import { Trail } from '../src/systems/Trail';
 
@@ -57,17 +57,17 @@ describe('Trail under long sessions', () => {
   });
 });
 
-describe('Doneness with extreme frame times', () => {
-  it('clamps heat for huge or tiny dt and never goes NaN', () => {
-    const d = new Doneness(50);
-    d.tick(1e9);
-    expect(d.heat).toBe(0);
-    d.addHeat(1e9);
-    expect(d.heat).toBe(MAX_HEAT);
-    const e = new Doneness(50);
+describe('Health with extreme frame times', () => {
+  it('regen stays finite and clamped for huge or tiny dt', () => {
+    const h = new Health(100, 50);
+    h.regenPerSec = 3;
+    h.tick(1e9);
+    expect(h.hp).toBe(100);
+    const e = new Health(100, 50);
+    e.regenPerSec = 3;
     for (let i = 0; i < 1e5; i++) e.tick(1e-6);
-    expect(Number.isFinite(e.heat)).toBe(true);
-    expect(e.heat).toBeGreaterThan(49);
+    expect(Number.isFinite(e.hp)).toBe(true);
+    expect(e.hp).toBeGreaterThan(50);
   });
 });
 

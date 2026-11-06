@@ -4,7 +4,8 @@ import { ITEMS } from '../data/items';
 import { MAX_LINKS, WEAPONS, tierLabel, type WeaponId } from '../data/weapons';
 import { TOTAL_WAVES } from '../data/waves';
 import type { RunState } from '../state/run';
-import { tierFor } from '../systems/Doneness';
+import { RARITIES } from '../data/rarity';
+import { computeStats } from '../state/stats';
 import {
   applyWeaponPurchase, canBuy, generateOffers, rerollCost, shopRng, type Offer,
 } from '../systems/Economy';
@@ -35,7 +36,7 @@ export class ShopScene extends Phaser.Scene {
     this.run.rerollCount = 0;
     this.leaving = false;
     const lockedOffers = this.run.lockedOffers;
-    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers, undefined, this.run.weapons);
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers, undefined, this.run.weapons, this.shopContext());
     this.locked = new Set(lockedOffers.map((_, i) => i));
     this.run.lockedOffers = [];
   }
@@ -75,11 +76,12 @@ export class ShopScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '18px', color: '#c8a890',
     }).setOrigin(0.5));
 
-    // Crumbs + heat summary
+    // Crumbs + your key stats (you heal to full before every wave)
     add(this.add.image(GAME_W - 190, 46, 'crumb').setScale(2.4));
     add(this.add.text(GAME_W - 170, 46, String(run.crumbs), { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: '#f0c070' }).setOrigin(0, 0.5));
-    const tier = tierFor(run.heat);
-    add(this.add.text(40, 46, `${tier.name} · ${Math.floor(run.heat)}°`, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffb070' }).setOrigin(0, 0.5));
+    const st = computeStats(run.items);
+    const summary = `HP ${st.maxHp}  ·  Armor ${st.armor}${st.luck ? `  ·  Luck ${st.luck}` : ''}`;
+    add(this.add.text(40, 46, summary, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffb070' }).setOrigin(0, 0.5));
 
     // Offer cards
     const total = this.offers.length;
@@ -127,12 +129,14 @@ export class ShopScene extends Phaser.Scene {
     const def = isWeapon ? WEAPONS[offer.id as WeaponId] : null;
     const item = isWeapon ? null : ITEMS[offer.id];
     const color = def?.color ?? item!.color;
-    const check = canBuy(offer, this.run.crumbs, this.run.weapons);
+    const rarity = item ? RARITIES[item.rarity] : null;
+    const frame = rarity && item!.rarity !== 'common' ? rarity.color : color;
+    const check = canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items);
 
     g.fillStyle(0x000000, 0.4).fillRoundedRect(left + 4, top + 6, CARD_W, CARD_H, 14);
     g.fillStyle(0x2a1d16, 1).fillRoundedRect(left, top, CARD_W, CARD_H, 14);
     g.fillStyle(color, 0.25).fillRoundedRect(left, top, CARD_W, 80, { tl: 14, tr: 14, bl: 0, br: 0 });
-    g.lineStyle(3, this.locked.has(i) ? 0x8fd3ff : color, this.locked.has(i) ? 1 : 0.6).strokeRoundedRect(left, top, CARD_W, CARD_H, 14);
+    g.lineStyle(3, this.locked.has(i) ? 0x8fd3ff : frame, this.locked.has(i) || rarity ? 1 : 0.6).strokeRoundedRect(left, top, CARD_W, CARD_H, 14);
 
     if (def) {
       add(this.add.image(x, top + 42, 'sausage-link').setScale(2));
@@ -143,7 +147,7 @@ export class ShopScene extends Phaser.Scene {
       ig.lineStyle(3, 0xffffff, 0.5).strokeCircle(x, top + 42, 22);
     }
 
-    let subtitle = isWeapon ? 'WEAPON · new link' : 'ITEM';
+    let subtitle = isWeapon ? 'WEAPON · new link' : `${rarity!.label.toUpperCase()} ITEM`;
     if (isWeapon) {
       const after = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId);
       const upgraded = after && after.length === this.run.weapons.length;
@@ -153,7 +157,7 @@ export class ShopScene extends Phaser.Scene {
       }
     }
     add(this.add.text(x, top + 98, def?.name ?? item!.name, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5));
-    add(this.add.text(x, top + 124, subtitle, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#c8a890' }).setOrigin(0.5));
+    add(this.add.text(x, top + 124, subtitle, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: rarity ? rarity.css : '#c8a890' }).setOrigin(0.5));
     add(this.add.text(x, top + 150, def?.desc ?? item!.desc, {
       fontFamily: FONT, fontSize: '15px', color: '#e8d8c8', align: 'center', wordWrap: { width: CARD_W - 30 },
     }).setOrigin(0.5, 0));
@@ -168,10 +172,14 @@ export class ShopScene extends Phaser.Scene {
     }
   }
 
+  private shopContext(): { items: string[]; luck: number } {
+    return { items: this.run.items, luck: computeStats(this.run.items).luck };
+  }
+
   private buy(i: number): void {
     if (this.leaving) return;
     const offer = this.offers[i];
-    if (!offer || !canBuy(offer, this.run.crumbs, this.run.weapons).ok) return;
+    if (!offer || !canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items).ok) return;
     this.run.crumbs -= offer.price;
     if (offer.type === 'weapon') {
       this.run.weapons = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId)!;
@@ -203,7 +211,7 @@ export class ShopScene extends Phaser.Scene {
     this.run.crumbs -= cost;
     this.run.rerollCount++;
     const keep = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
-    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.run.rerollCount), this.run.wave + 1, keep, undefined, this.run.weapons);
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.run.rerollCount), this.run.wave + 1, keep, undefined, this.run.weapons, this.shopContext());
     this.locked = new Set(keep.map((_, i) => i));
     this.render();
   }

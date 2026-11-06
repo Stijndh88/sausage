@@ -31,14 +31,14 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   toothpick: {
     id: 'toothpick', name: 'Toothpick', kind: 'single',
     desc: 'Fast, precise single shots.',
-    price: 10, damage: 8, cooldownMs: 400, speed: 640, range: 440,
+    price: 10, damage: 7, cooldownMs: 400, speed: 640, range: 440,
     projectiles: 1, spreadDeg: 0, pierce: 0,
     bulletTexture: 'pb-toothpick', icon: 'icon-toothpick', color: 0xe8d3a0,
   },
   mustard: {
     id: 'mustard', name: 'Mustard Squirt', kind: 'cone',
-    desc: 'Short cone of mustard. Poisons enemies.',
-    price: 12, damage: 2, cooldownMs: 750, speed: 340, range: 210,
+    desc: 'Cone of mustard. Poison stacks up to 3 times.',
+    price: 12, damage: 2, cooldownMs: 750, speed: 360, range: 260,
     projectiles: 5, spreadDeg: 50, pierce: 0, poisonDps: 5,
     bulletTexture: 'pb-mustard', icon: 'icon-mustard', color: 0xf2c418,
   },
@@ -59,14 +59,14 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   pickle: {
     id: 'pickle', name: 'Pickle Launcher', kind: 'lob',
     desc: 'Lobs a pickle that explodes on landing.',
-    price: 16, damage: 18, cooldownMs: 1500, speed: 400, range: 380,
+    price: 18, damage: 18, cooldownMs: 1500, speed: 400, range: 380,
     projectiles: 1, spreadDeg: 0, pierce: 0, explodeRadius: 72,
     bulletTexture: 'pb-pickle', icon: 'icon-pickle', color: 0x5fae3a,
   },
   onion: {
     id: 'onion', name: 'Onion Ring', kind: 'orbit',
-    desc: 'Rings orbit this link and slice anything they touch.',
-    price: 14, damage: 7, cooldownMs: 450, speed: 3.2, range: 52,
+    desc: 'Rings orbit this link and slice anything they touch. Upgrades spin faster.',
+    price: 14, damage: 9, cooldownMs: 450, speed: 3.2, range: 64,
     projectiles: 2, spreadDeg: 0, pierce: 0,
     bulletTexture: 'onion-ring', icon: 'icon-onion', color: 0xf3ead2,
   },
@@ -79,7 +79,14 @@ export function tierDamage(def: WeaponDef, tier: number): number {
 }
 
 export function tierCooldown(def: WeaponDef, tier: number): number {
+  // Orbit rings hit once per pass, so a shorter re-hit cooldown does nothing; they spin faster instead.
+  if (def.kind === 'orbit') return def.cooldownMs;
   return def.cooldownMs * (1 - 0.1 * (tier - 1));
+}
+
+/** Orbit spin speed multiplier per tier. */
+export function tierSpin(def: WeaponDef, tier: number): number {
+  return def.kind === 'orbit' ? 1 + 0.2 * (tier - 1) : 1;
 }
 
 /** Extra projectiles / rings / pierce granted by higher tiers. */

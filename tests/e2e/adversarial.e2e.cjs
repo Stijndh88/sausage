@@ -151,8 +151,8 @@ tests.push({
   name: 'death banner: mashing keys during CHARRED → GameOver, then Enter starts a clean run',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
-    await g.startRun({ seed: 4, wave: 5, crumbs: 77, heat: 60, weapons: STRONG, items: ['paprika'] });
-    await g.evaluate(() => window.__game.scene.getScene('Game').takeHeat(500));
+    await g.startRun({ seed: 4, wave: 5, crumbs: 77, weapons: STRONG, items: ['paprika'] });
+    await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(500, 'test'));
     const keys = ['Escape', 'p', 'Space', '1', 'r', 'w', 'Shift', 'd'];
     let i = 0;
     while (!(await g.activeScenes()).includes('GameOver')) {
@@ -169,7 +169,7 @@ tests.push({
     assert.equal(s.wave, 1);
     assert.equal(s.crumbs, 0);
     assert.equal(s.kills, 0);
-    assert.ok(s.heat <= 20 && !s.dying && !s.ending);
+    assert.ok(s.hp === s.maxHp && !s.dying && !s.ending);
     const loadout = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { w: s.run.weapons, i: s.run.items, paused: s.paused }; });
     assert.deepEqual(loadout.w, [{ id: 'toothpick', tier: 1 }]);
     assert.deepEqual(loadout.i, []);
@@ -798,10 +798,10 @@ tests.push({
 });
 
 tests.push({
-  name: 'BUG end of run: a charred sausage cannot also "escape" when an in-flight bullet kills the boss',
+  name: 'BUG end of run: a dead sausage cannot also "escape" when an in-flight bullet kills the boss',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
-    await g.startRun({ seed: 111, wave: 10, heat: 50 });
+    await g.startRun({ seed: 111, wave: 10 });
     await waitForBoss(page);
     await g.evaluate(() => {
       const s = window.__game.scene.getScene('Game');
@@ -812,7 +812,7 @@ tests.push({
       const b = s.playerBullets.get(s.boss.x, s.boss.y + 70);
       b.fire({ x: s.boss.x, y: s.boss.y + 70, angle: -Math.PI / 2, speed: 640, damage: 10, texture: 'pb-toothpick', lifetimeMs: 3000 }, s.time.now);
       // …when the sausage chars.
-      s.takeHeat(500);
+      s.takeDamage(500, 'test');
     });
     await waitFor(page, () => window.__game.scene.isActive('GameOver') || window.__game.scene.isActive('Victory'), null, 60000);
     const banners = await g.evaluate(() => [...window.__banners]);
@@ -825,7 +825,7 @@ tests.push({
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
     await g.startRun({ seed: 121 });
-    await g.evaluate(() => window.__game.scene.getScene('Game').takeHeat(500));
+    await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(500, 'test'));
     await g.waitForScene('GameOver', 40000);
     await frames(page, 3);
     const [x, y] = await toPage(page, END.menu);

@@ -50,6 +50,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: { run: RunState }): void {
-    endScreen(this, data.run, 'CHARRED', 'Your sausage is extremely well done.', '#ff6a3a', 0x2a2a2a);
+    const cause = data.run.causeOfDeath ? `Done in by ${data.run.causeOfDeath} on wave ${data.run.wave}.` : 'That sausage is done.';
+    endScreen(this, data.run, 'SKEWERED', cause, '#ff6a3a', 0x6a6a6a);
   }
 }

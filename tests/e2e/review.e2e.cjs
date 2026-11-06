@@ -15,11 +15,11 @@ function installHelpers(g) {
     const scene = () => window.__game.scene.getScene('Game');
     window.__rv = {
       scene,
-      /** Stop natural spawns and make the sausage immune to heat. */
+      /** Stop natural spawns and make the sausage take no damage. */
       quiet() {
         const s = scene();
         s.director.stop();
-        s.doneness.heatTakenMult = 0;
+        s.invincible = true;
       },
       spawn(kind, x, y) {
         const s = scene();
@@ -178,14 +178,18 @@ module.exports = {
       },
     },
     {
-      name: 'review: HUD tier text gets a valid CSS colour',
+      name: 'review: HUD shows current and max HP',
       timeoutMs: 20000,
       fn: async ({ g }) => {
-        await setup(g, { heat: 70 });
-        await g.wait(200);
-        const color = await g.evaluate(() => window.__rv.scene().hud.tierText.style.color);
-        // Same colour (255,176,112) in either CSS notation.
-        assert.match(color, /^(#ffb070|rgba\(255,176,112,1\))$/i);
+        await setup(g, {});
+        const text = await g.evaluate(async () => {
+          const s = window.__rv.scene();
+          s.invincible = false;
+          s.takeDamage(10, 'test');
+          await window.__rv.frames(2);
+          return s.hud.hpText.text;
+        });
+        assert.equal(text, '90 / 100');
       },
     },
     {
@@ -197,7 +201,7 @@ module.exports = {
         await installHelpers(g);
         const r = await g.evaluate(async () => {
           const s = window.__rv.scene();
-          s.doneness.heatTakenMult = 0;
+          s.invincible = true;
           const d = s.director;
           d.telegraph('hotsauce', 300, 300, 750);
           d.telegraph('hotsauce', 900, 300, 750);
@@ -238,7 +242,7 @@ module.exports = {
         await setup(g);
         await g.evaluate(() => {
           const s = window.__rv.scene();
-          s.takeHeat(1); // markHit → 750ms of i-frames
+          s.takeDamage(1, 'test'); // markHit → 750ms of i-frames
           s.togglePause();
         });
         await g.wait(1000);
@@ -319,7 +323,7 @@ module.exports = {
         await installHelpers(g);
         const r = await g.evaluate(async () => {
           const s = window.__rv.scene();
-          s.doneness.heatTakenMult = 0;
+          s.invincible = true;
           s.director.nextSpawnMs = Infinity; // timer keeps running, nothing spawns
           s.head.setPosition(1150, 600);
           const fork = window.__rv.spawn('fork', 120, 160);
@@ -355,8 +359,8 @@ module.exports = {
         await g.evaluate(() => {
           const s = window.__rv.scene();
           window.__rv.fire({ x: s.head.x + 20, y: s.boss.y, angle: 0 }); // already on its way when we char
-          s.doneness.heatTakenMult = 1;
-          s.takeHeat(500); // charred
+          s.invincible = false;
+          s.takeDamage(500, 'test'); // dead
         });
         await gameMs(g, 600);
         const r = await g.evaluate(() => {
@@ -365,7 +369,7 @@ module.exports = {
         });
         assert.equal(r.dying, true);
         assert.ok(!r.texts.some((t) => t.includes('ESCAPED')), `victory banner shown over the death screen: ${JSON.stringify(r.texts)}`);
-        assert.equal(r.ending, false, 'win() ran after the sausage was charred');
+        assert.equal(r.ending, false, 'win() ran after the sausage died');
       },
     },
     {
@@ -380,8 +384,8 @@ module.exports = {
           boss.attackIndex = 1; // phase-2 spiral: 14 ticks, 90ms apart
           boss.nextFireAt = 0;
           boss.think(s.enemyCtx, s.time.now, 0.016);
-          s.doneness.heatTakenMult = 1;
-          s.takeHeat(500); // die() → patterns.clear()
+          s.invincible = false;
+          s.takeDamage(500, 'test'); // die() → patterns.clear()
         });
         await gameMs(g, 500);
         const n = (await g.gameState()).enemyBullets;
@@ -482,10 +486,10 @@ module.exports = {
       },
     },
     {
-      name: 'review: onion rings move continuously when the heat tier changes fire rate',
+      name: 'review: onion rings move continuously when fire rate changes mid-wave',
       timeoutMs: 20000,
       fn: async ({ g }) => {
-        await setup(g, { weapons: [{ id: 'onion', tier: 1 }], heat: 59 });
+        await setup(g, { weapons: [{ id: 'onion', tier: 1 }] });
         await g.wait(3000); // let absolute time grow a bit
         const maxStep = await g.evaluate(async () => {
           const s = window.__rv.scene();
@@ -493,7 +497,7 @@ module.exports = {
           const steps = [];
           let prev = spr.rotation;
           for (let i = 0; i < 20; i++) {
-            if (i === 10) s.doneness.heat = 61; // Medium → Well-done: fire rate ×1.2
+            if (i === 10) s.stats.fireRateMult = 1.2; // e.g. an item bought or a buff: fire rate ×1.2
             await window.__rv.frames(1);
             let d = Math.abs(spr.rotation - prev) % (Math.PI * 2);
             d = Math.min(d, Math.PI * 2 - d);
@@ -510,19 +514,19 @@ module.exports = {
       name: 'review: HUD does not re-render unchanged text every frame',
       timeoutMs: 20000,
       fn: async ({ g }) => {
-        await setup(g, { heat: 70 });
+        await setup(g, {});
         const calls = await g.evaluate(async () => {
           const s = window.__rv.scene();
-          s.doneness.coolPerSec = 0; // heat (and so the tier text) stays constant
+          s.health.regenPerSec = 0; // HP (and so the HP text) stays constant
           const counts = { tier: 0, timer: 0 };
-          for (const [k, t] of [['tier', s.hud.tierText], ['timer', s.hud.timerText]]) {
+          for (const [k, t] of [['tier', s.hud.hpText], ['timer', s.hud.timerText]]) {
             const orig = t.updateText.bind(t);
             t.updateText = () => { counts[k]++; return orig(); };
           }
           await window.__rv.frames(30);
           return counts;
         });
-        // The timer legitimately changes once a second; the tier text not at all.
+        // The timer legitimately changes once a second; the HP text not at all.
         assert.ok(calls.tier <= 2 && calls.timer <= 6, `updateText calls over 30 frames: ${JSON.stringify(calls)}`);
       },
     },
@@ -535,7 +539,7 @@ module.exports = {
         await installHelpers(g);
         const r = await g.evaluate(async () => {
           const s = window.__rv.scene();
-          s.doneness.heatTakenMult = 0;
+          s.invincible = true;
           const before = s.tweens.getTweens().length;
           for (let i = 0; i < 40; i++) s.director.telegraph('fork', 100 + i * 25, 200, 50);
           await window.__rv.gameMs(800);

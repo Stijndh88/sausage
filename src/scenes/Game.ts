@@ -10,7 +10,7 @@ import { SausageHead } from '../entities/SausageHead';
 import type { RunState } from '../state/run';
 import { computeStats, type PlayerStats } from '../state/stats';
 import { BulletPatterns } from '../systems/BulletPatterns';
-import { Doneness, tierFor } from '../systems/Doneness';
+import { Health } from '../systems/Health';
 import { rollCrumbs } from '../systems/Economy';
 import { mulberry32, randRange, type Rng } from '../systems/rng';
 import { WaveDirector } from '../systems/WaveDirector';
@@ -18,10 +18,14 @@ import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
 
-const GRILL_HEAT_PER_SEC = 5;
+/** HP per second lost while standing on a hot grill tile (armor doesn't help). */
+export const GRILL_DAMAGE_PER_SEC = 6;
 const CONDIMENT_DROP_CHANCE = 0.06;
-const CONDIMENT_COOL = 10;
+/** Share of the crumbs left on the floor that you keep when a wave ends. */
+export const FLOOR_CRUMB_BANK = 0.5;
 const TILE_SIZE = 110;
+const DODGE_IFRAMES_MS = 200;
+const THORNS_COOLDOWN_MS = 500;
 
 type Keys = Record<'W' | 'A' | 'S' | 'D' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'SPACE' | 'SHIFT' | 'ESC' | 'P', Phaser.Input.Keyboard.Key>;
 
@@ -30,7 +34,12 @@ export class GameScene extends Phaser.Scene {
   private stats!: PlayerStats;
   private cfg!: WaveConfig;
   private rng!: Rng;
-  private doneness!: Doneness;
+  private health!: Health;
+  /** Second Skin charges left this wave. */
+  private livesLeft = 0;
+  /** Test hook: when true the sausage takes no damage (set by tests/e2e harness godMode). */
+  invincible = false;
+  private thornsReadyAt = new WeakMap<Enemy, number>();
 
   private head!: SausageHead;
   private chain!: LinkChain;
@@ -76,9 +85,13 @@ export class GameScene extends Phaser.Scene {
     this.stats = computeStats(this.run.items);
     this.cfg = waveConfig(this.run.wave);
     this.rng = mulberry32((this.run.seed + this.run.wave * 31337) >>> 0);
-    this.doneness = new Doneness(this.run.heat);
-    this.doneness.heatTakenMult = this.stats.heatTakenMult;
-    this.doneness.coolPerSec = this.stats.coolPerSec;
+    // You start every wave at full health.
+    this.health = new Health(this.stats.maxHp);
+    this.health.armor = this.stats.armor;
+    this.health.regenPerSec = this.stats.regenPerSec;
+    this.livesLeft = this.stats.extraLives;
+    this.invincible = false;
+    this.thornsReadyAt = new WeakMap();
     this.boss = null;
     this.graveyard = [];
     this.ending = false;
@@ -109,6 +122,7 @@ export class GameScene extends Phaser.Scene {
 
     this.weapons = new WeaponSystem(this, this.playerBullets, this.chain, this.clock, {
       enemies: () => this.enemyList(),
+      mods: () => this.stats,
       damage: (e, amount, fx, fy, kb) => this.damageEnemy(e, amount, fx, fy, kb),
       explode: (x, y, r, dmg) => this.explode(x, y, r, dmg),
     });
@@ -145,14 +159,15 @@ export class GameScene extends Phaser.Scene {
       const bullet = (a instanceof EnemyBullet ? a : b) as EnemyBullet;
       if (!bullet.active || this.head.invulnerable || this.dying || this.ending) return;
       bullet.kill();
-      this.takeHeat(bullet.heat);
+      this.takeDamage(bullet.damage, bullet.source);
     });
     this.physics.add.overlap(this.head, this.enemies, (a, b) => {
       const enemy = (a instanceof Enemy ? a : b) as Enemy;
       if (enemy.dead || this.dying || this.ending) return;
       enemy.shove(this.head.x, this.head.y, 260);
+      this.applyThorns(enemy);
       if (this.head.invulnerable) return;
-      this.takeHeat(enemy.def.contactHeat);
+      this.takeDamage(enemy.def.contactDamage, enemy.def.name);
     });
     this.physics.add.collider(this.enemies, this.enemies);
 
@@ -227,28 +242,26 @@ export class GameScene extends Phaser.Scene {
       this.head.halt();
     }
     this.dashQueued = false;
-    const tint = heatTint(this.doneness.heat);
-    this.head.setTint(this.dying ? 0x2a2a2a : tint);
-    this.chain.update(this.head.x, this.head.y, this.dying ? 0x2a2a2a : tint, time);
+    const tint = this.dying ? 0x2a2a2a : 0xffffff;
+    this.head.setTint(tint);
+    this.chain.update(this.head.x, this.head.y, tint, time);
 
-    // --- Heat ---
+    // --- Health: grill burns, regen heals ---
+    this.onGrill = false;
     if (!this.dying && !this.ending) {
-      this.onGrill = this.hotTiles.some((r) => r.contains(this.head.x, this.head.y));
-      if (this.onGrill) {
-        this.doneness.addHeat(GRILL_HEAT_PER_SEC * dt);
-        if (this.doneness.isCharred) this.die();
-      } else {
-        this.doneness.tick(dt);
+      this.onGrill = !this.stats.grillImmune && this.hotTiles.some((r) => r.contains(this.head.x, this.head.y));
+      if (this.onGrill && !this.invincible) {
+        this.health.hp = Math.max(0, this.health.hp - GRILL_DAMAGE_PER_SEC * dt);
+        if (this.health.dead) this.onLethal('Grill tile');
       }
+      this.health.tick(dt);
     }
-    const tier = tierFor(this.doneness.heat);
-    this.sizzle.emitting = !this.dying && (tier.min >= 60 || this.onGrill);
-    this.sizzle.frequency = tier.min >= 90 ? 60 : 140;
+    this.sizzle.emitting = !this.dying && this.onGrill;
+    this.sizzle.frequency = 90;
 
     // --- Combat ---
     if (!this.dying && !this.ending) {
-      const hot = tier.min >= 60 ? 1 + this.stats.hotDamageBonus : 1;
-      this.weapons.update(time, this.stats.damageMult * tier.damageMult * hot, this.stats.fireRateMult * tier.fireRateMult);
+      this.weapons.update(time, this.stats.damageMult, this.stats.fireRateMult);
       this.director.update(dtMs);
       this.run.timeSurvivedSec += dt;
     }
@@ -274,7 +287,7 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.graveyard) e.destroy();
     this.graveyard.length = 0;
 
-    this.hud.update(this.doneness.heat, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
+    this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
 
     if (!this.ending && !this.dying && this.director.timeUp) this.endWave();
@@ -309,8 +322,25 @@ export class GameScene extends Phaser.Scene {
     else bullet.kill();
   }
 
+  /** Every source of player damage goes through here: crits and lifesteal apply to all of them. */
   private damageEnemy(e: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void {
+    const crit = this.stats.critChance > 0 && Math.random() < this.stats.critChance;
+    if (crit) {
+      amount *= 2;
+      this.sparks.setParticleTint(0xffd23f);
+      this.sparks.explode(4, e.x, e.y);
+    }
+    if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) this.health.heal(1);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
+  }
+
+  /** Spiky Bun: enemies touching you take damage (at most every THORNS_COOLDOWN_MS each). */
+  private applyThorns(e: Enemy): void {
+    if (this.stats.thorns <= 0 || e.dead) return;
+    const ready = this.thornsReadyAt.get(e) ?? 0;
+    if (this.gameTime < ready) return;
+    this.thornsReadyAt.set(e, this.gameTime + THORNS_COOLDOWN_MS);
+    this.damageEnemy(e, this.stats.thorns, this.head.x, this.head.y, 200);
   }
 
   private explode(x: number, y: number, radius: number, damage: number): void {
@@ -332,7 +362,6 @@ export class GameScene extends Phaser.Scene {
     const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
     if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
-    if (this.stats.killCoolChance > 0 && Math.random() < this.stats.killCoolChance) this.doneness.cool(this.stats.killCoolAmount);
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
@@ -344,17 +373,36 @@ export class GameScene extends Phaser.Scene {
       this.run.crumbs++;
       this.run.crumbsEarned++;
     } else {
-      this.doneness.cool(CONDIMENT_COOL);
-      this.floatText(this.head.x, this.head.y - 24, `-${CONDIMENT_COOL}°`, '#8fd3ff');
+      const healed = this.health.heal(this.stats.condimentHeal);
+      this.floatText(this.head.x, this.head.y - 24, `+${Math.round(healed)} HP`, '#7dff9a');
     }
   }
 
-  private takeHeat(amount: number): void {
-    const applied = this.doneness.addHeat(amount);
+  /** A hit on the sausage: dodge roll, armor, i-frames, then death or a Second Skin save. */
+  private takeDamage(amount: number, source: string): void {
+    if (this.dying || this.ending || this.invincible) return;
+    if (this.stats.dodge > 0 && Math.random() < this.stats.dodge) {
+      this.head.markHit(DODGE_IFRAMES_MS);
+      this.floatText(this.head.x, this.head.y - 24, 'DODGE', '#8fd3ff');
+      return;
+    }
+    const dealt = this.health.takeDamage(amount);
     this.head.markHit();
     this.cameras.main.shake(110, 0.005);
-    this.floatText(this.head.x, this.head.y - 24, `+${Math.round(applied)}°`, '#ff8a50');
-    if (this.doneness.isCharred) this.die();
+    this.floatText(this.head.x, this.head.y - 24, `-${dealt}`, '#ff6a5a');
+    if (this.health.dead) this.onLethal(source);
+  }
+
+  private onLethal(source: string): void {
+    if (this.livesLeft > 0) {
+      this.livesLeft--;
+      this.health.hp = 1;
+      this.head.markHit(1500);
+      this.cameras.main.flash(250, 255, 200, 160);
+      this.floatText(this.head.x, this.head.y - 40, 'SECOND SKIN!', '#ffd23f');
+      return;
+    }
+    this.die(source);
   }
 
   private floatText(x: number, y: number, text: string, color: string): void {
@@ -447,9 +495,13 @@ export class GameScene extends Phaser.Scene {
       e.disableBody(true, true);
       this.graveyard.push(e);
     }
-    this.pickups.collectAll((kind) => this.collect(kind));
-    this.run.heat = Doneness.carryOver(this.doneness.heat);
-    this.banner('WAVE CLEARED!', 'Heat cools by half between waves');
+    // Crumbs you didn't pick up are swept up at half value, so pickup radius and movement matter.
+    let floor = 0;
+    this.pickups.collectAll((kind) => { if (kind === 'crumb') floor++; });
+    const banked = rollCrumbs(this.rng, floor, FLOOR_CRUMB_BANK);
+    this.run.crumbs += banked;
+    this.run.crumbsEarned += banked;
+    this.banner('WAVE CLEARED!', floor ? `Swept up ${banked} of ${floor} crumbs left on the floor` : 'Every crumb collected!');
     this.time.delayedCall(1700, () => this.scene.start('Shop', { run: this.run }));
   }
 
@@ -471,15 +523,16 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(2600, () => this.scene.start('Victory', { run: this.run }));
   }
 
-  private die(): void {
+  private die(source = 'Unknown'): void {
     if (this.dying || this.ending) return;
     this.dying = true;
-    this.run.heat = this.doneness.heat;
+    this.health.hp = 0;
+    this.run.causeOfDeath = source;
     this.clearArena();
     this.cameras.main.shake(500, 0.012);
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
-    this.banner('CHARRED!', 'Well... that sausage is done.', 1500);
+    this.banner('SKEWERED!', `Done in by: ${source}`, 1500);
     this.time.delayedCall(2200, () => this.scene.start('GameOver', { run: this.run }));
   }
 
@@ -496,30 +549,4 @@ function pair<A, B>(a: unknown, b: unknown, typeA: abstract new (...args: never[
   if (a instanceof typeA) return [a as A, b as B];
   if (b instanceof typeA) return [b as A, a as B];
   return [null, null];
-}
-
-/**
- * Raw sausages are pale; hot ones turn a toasted orange. The tint deliberately never gets
- * dark: the head must stay at least 3:1 against the grill, because a hit is most dangerous
- * when you're hottest. Heat is shown by the meter, sizzle smoke and the screen-edge glow.
- */
-function heatTint(heat: number): number {
-  const stops: [number, number][] = [
-    [0, 0xffd6d6],
-    [40, 0xffffff],
-    [70, 0xffd2b0],
-    [100, 0xffb890],
-  ];
-  for (let i = 1; i < stops.length; i++) {
-    if (heat <= stops[i][0]) {
-      const [h0, c0] = stops[i - 1];
-      const [h1, c1] = stops[i];
-      const t = (heat - h0) / (h1 - h0);
-      const a = Phaser.Display.Color.IntegerToColor(c0);
-      const b = Phaser.Display.Color.IntegerToColor(c1);
-      const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, t * 100);
-      return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
-    }
-  }
-  return stops[stops.length - 1][1];
 }

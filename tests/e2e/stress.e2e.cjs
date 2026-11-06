@@ -114,7 +114,6 @@ async function simStart(g, opts = {}) {
     const game = window.__game;
     const run = window.__debug.newRun(o.seed ?? 12345);
     if (o.wave) run.wave = o.wave;
-    if (o.heat !== undefined) run.heat = o.heat;
     if (o.weapons) run.weapons = o.weapons;
     if (o.items) run.items = o.items;
     for (const s of game.scene.getScenes(true)) if (s.scene.key !== 'Game') game.scene.stop(s.scene.key);
@@ -122,7 +121,7 @@ async function simStart(g, opts = {}) {
     window.__sim.run(2);
     const s = game.scene.getScene('Game');
     if (!game.scene.isActive('Game') || !s.director) throw new Error('Game scene did not start');
-    if (o.god) s.doneness.heatTakenMult = 0;
+    if (o.god) s.invincible = true;
   }, opts);
 }
 
@@ -224,7 +223,7 @@ module.exports = {
       timeoutMs: 90000,
       fn: async ({ g, page }) => {
         await installSim(g);
-        await simStart(g, { seed: 3, wave: 3, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+        await simStart(g, { seed: 3, wave: 3, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
         const snaps = {};
         let heap20 = 0;
         for (let i = 1; i <= 100; i++) {
@@ -237,11 +236,10 @@ module.exports = {
           await g.evaluate(() => {
             const shop = window.__game.scene.getScene('Shop');
             shop.run.wave = 2; // next() increments: keep replaying wave 3 so snapshots are comparable
-            shop.run.heat = 30;
             shop.next();
           });
           await sim(g, 5, { until: 'Game' });
-          await g.evaluate(() => { window.__game.scene.getScene('Game').doneness.heatTakenMult = 0; });
+          await g.evaluate(() => { window.__game.scene.getScene('Game').invincible = true; });
         }
         const heap100 = await heapMB(page);
         report('cycles', { at10: snaps[10], at100: snaps[100], heap20, heap100 });
@@ -254,14 +252,14 @@ module.exports = {
       timeoutMs: 90000,
       fn: async ({ g, page }) => {
         await installSim(g);
-        await simStart(g, { seed: 3, wave: 3, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30 });
+        await simStart(g, { seed: 3, wave: 3, weapons: FULL_KIT, items: KIT_ITEMS });
         const snaps = {};
         let heap20 = 0;
         for (let i = 1; i <= 100; i++) {
           await sim(g, 120, { bot: true });
           if (i === 10 || i === 100) snaps[i] = await counts(g);
           if (i === 20) heap20 = await heapMB(page);
-          await g.evaluate(() => window.__game.scene.getScene('Game').takeHeat(500));
+          await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(500, 'test'));
           await sim(g, 300, { until: 'GameOver' });
           assert.equal(await g.scene(), 'GameOver', `cycle ${i}: did not reach GameOver`);
           await page.keyboard.press('Enter');
@@ -285,7 +283,7 @@ module.exports = {
           await sim(g, 5, { until: 'Game' });
           assert.equal(await g.scene(), 'Game', `cycle ${i}: Enter on menu did not start`);
           await sim(g, 60, { bot: true });
-          await g.evaluate(() => window.__game.scene.getScene('Game').takeHeat(500));
+          await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(500, 'test'));
           await sim(g, 300, { until: 'GameOver' });
           await g.evaluate(() => {
             const go = window.__game.scene.getScene('GameOver');
@@ -317,7 +315,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 5, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+        await simStart(g, { seed: 5, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
         await sim(g, 1800, { bot: true }); // 30 s of wave 9
         const spawned = await g.evaluate(() => window.__game.scene.getScene('Game').run.kills);
         const dead = await deadTargetTweens(g);
@@ -331,7 +329,7 @@ module.exports = {
       timeoutMs: 90000,
       fn: async ({ g, page }) => {
         await installSim(g);
-        await simStart(g, { seed: 5, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+        await simStart(g, { seed: 5, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
         await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           window.__peak = { alive: 0, eb: 0, pb: 0 };
@@ -373,7 +371,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 9, wave: 10, weapons: [{ id: 'toothpick', tier: 1 }], heat: 30, god: true });
+        await simStart(g, { seed: 9, wave: 10, weapons: [{ id: 'toothpick', tier: 1 }], god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();
@@ -404,7 +402,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 9, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+        await simStart(g, { seed: 9, wave: 9, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();
@@ -436,7 +434,7 @@ module.exports = {
         await installSim(g);
         const rows = {};
         for (const wave of [1, 5, 9, 10]) {
-          await simStart(g, { seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+          await simStart(g, { seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
           await sim(g, 300, { bot: true });
           rows[wave] = await sim(g, 1200, { bot: true }); // 20 s
           rows[wave].scene = await g.scene();
@@ -455,7 +453,7 @@ module.exports = {
         await installSim(g);
         const rows = {};
         for (const wave of [1, 5, 9, 10]) {
-          await simStart(g, { seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30, god: true });
+          await simStart(g, { seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
           const fill = await fillToMaxAlive(g, true);
           await sim(g, 120, { bot: true });
           rows[wave] = { ...fill, ...(await sim(g, 900, { bot: true })) };
@@ -481,7 +479,7 @@ module.exports = {
       fn: async ({ g }) => {
         const rows = {};
         for (const wave of [9, 10]) {
-          await g.startRun({ seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS, heat: 30 });
+          await g.startRun({ seed: 7, wave, weapons: FULL_KIT, items: KIT_ITEMS });
           await g.godMode();
           await g.installBot();
           await g.wait(5000);
@@ -501,13 +499,13 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 1, wave: 1, heat: 30, god: true });
+        await simStart(g, { seed: 1, wave: 1, god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();
-          s.doneness.coolPerSec = 0; // keep the readout constant
+          s.health.regenPerSec = 0; // keep the readout constant
           window.__sim.run(70); // let the banner finish
-          const proto = Object.getPrototypeOf(s.hud.tierText);
+          const proto = Object.getPrototypeOf(s.hud.hpText);
           const orig = proto.updateText;
           const by = {};
           proto.updateText = function () { by[this.text] = (by[this.text] || 0) + 1; return orig.call(this); };
@@ -527,7 +525,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 2, wave: 1, heat: 30, god: true });
+        await simStart(g, { seed: 2, wave: 1, god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();
@@ -553,7 +551,7 @@ module.exports = {
       name: 'timers: a 10 s hidden tab does not expire condiment packets',
       timeoutMs: 60000,
       fn: async ({ g, page }) => {
-        await g.startRun({ seed: 2, wave: 1, heat: 30 });
+        await g.startRun({ seed: 2, wave: 1 });
         await g.godMode();
         const before = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
@@ -582,7 +580,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 7, wave: 4, heat: 30, god: true });
+        await simStart(g, { seed: 7, wave: 4, god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           const e0 = s.director.elapsedMs;
@@ -598,7 +596,7 @@ module.exports = {
       name: 'lag: a 10 s main-thread stall causes no tunneling, nothing leaves the arena and play resumes',
       timeoutMs: 60000,
       fn: async ({ g, page }) => {
-        await g.startRun({ seed: 2, wave: 6, weapons: FULL_KIT, heat: 30 });
+        await g.startRun({ seed: 2, wave: 6, weapons: FULL_KIT });
         await g.godMode();
         await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
@@ -647,7 +645,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 4, wave: 10, heat: 30, god: true });
+        await simStart(g, { seed: 4, wave: 10, god: true });
         const r = await g.evaluate(() => {
           const game = window.__game;
           let s = game.scene.getScene('Game');
@@ -670,20 +668,20 @@ module.exports = {
       },
     },
     {
-      name: 'timers: the boss stops firing once the sausage is charred',
+      name: 'timers: the boss stops firing once the sausage dies',
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 4, wave: 10, heat: 30 });
+        await simStart(g, { seed: 4, wave: 10 });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
-          s.doneness.heatTakenMult = 0;
+          s.invincible = true;
           window.__sim.run(120);
           s.director.stop();
           Object.assign(s.boss, { hp: s.boss.maxHp * 0.4, attackIndex: 1, nextFireAt: 0, mode: 'move' });
           window.__sim.run(1);
-          s.doneness.heatTakenMult = 1;
-          s.takeHeat(500);
+          s.invincible = false;
+          s.takeDamage(500, 'test');
           window.__sim.run(90);
           return { dying: s.dying, enemyBullets: s.enemyBullets.countActive(true) };
         });
@@ -697,7 +695,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 1, wave: 1, heat: 30, god: true });
+        await simStart(g, { seed: 1, wave: 1, god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();

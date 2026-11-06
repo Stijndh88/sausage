@@ -105,15 +105,15 @@ function until(page, fn, arg, timeout = 15000) {
   return page.waitForFunction(fn, arg, { timeout, polling: 50 });
 }
 
-/** Freeze the wave in place: no spawns, no heat changes, no cooling. */
-function freezeWave(g, heat) {
+/** Freeze the wave in place: no spawns, no damage, no regen; optionally pin HP. */
+function freezeWave(g, hp) {
   return g.evaluate((h) => {
     const s = window.__game.scene.getScene('Game');
     s.director.stop();
-    s.doneness.heatTakenMult = 0;
-    s.doneness.coolPerSec = 0;
-    if (h !== undefined) s.doneness.heat = h;
-  }, heat);
+    s.invincible = true;
+    s.health.regenPerSec = 0;
+    if (h !== undefined) s.health.hp = h;
+  }, hp);
 }
 
 async function canvasRect(page) {
@@ -233,8 +233,8 @@ module.exports = {
     {
       name: 'ux: HUD text (normal wave and boss wave) is inside the canvas, inside the HUD strip and non-overlapping',
       fn: async ({ page, g }) => {
-        await g.startRun({ seed: 1, heat: 99, crumbs: 9999 });
-        await freezeWave(g, 99);
+        await g.startRun({ seed: 1, crumbs: 9999 });
+        await freezeWave(g, 7);
         await g.wait(300);
         let hud = await textBounds(page, 'Game', { minDepth: 51, maxDepth: 51 });
         assert.ok(hud.length >= 4, `expected ≥4 HUD texts, got ${hud.length}`);
@@ -242,7 +242,7 @@ module.exports = {
         assertNoOverlaps(hud, 'HUD');
         for (const t of hud) assert.ok(t.y + t.h <= 64 + 1, `HUD text "${t.text}" spills below the 64px HUD strip`);
 
-        await g.startRun({ seed: 1, wave: 10, heat: 95, crumbs: 999 });
+        await g.startRun({ seed: 1, wave: 10, crumbs: 999 });
         await g.godMode();
         await until(page, () => !!window.__game.scene.getScene('Game').boss);
         await g.wait(200);
@@ -423,7 +423,7 @@ module.exports = {
     {
       name: 'ux: HUD text meets WCAG AA contrast (4.5:1) against the HUD panel',
       fn: async ({ page, g }) => {
-        await g.startRun({ seed: 1, heat: 70 });
+        await g.startRun({ seed: 1 });
         await freezeWave(g, 70);
         await g.wait(200);
         const bg = await pixel(page, 960, 56);
@@ -444,39 +444,40 @@ module.exports = {
       },
     },
     {
-      name: 'ux: Doneness meter fill stands out from its empty track at Raw, Medium and Well-done (≥3:1)',
+      name: 'ux: HP bar fill stands out from its empty track (≥3:1) at high, mid and low HP',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1 });
-        for (const heat of [15, 45, 75]) {
-          await freezeWave(g, heat);
+        for (const hp of [75, 45, 15]) {
+          await freezeWave(g, hp);
           await g.wait(150);
-          const fill = await pixel(page, 20 + Math.round((heat / 100) * 340 / 2), 34);
+          // Sample the fill away from the centred "HP / max" label.
+          const fill = await pixel(page, 20 + Math.round((hp / 100) * 340 / 4), 34);
           const empty = await pixel(page, 352, 34);
           const c = contrast(fill, empty);
-          assert.ok(c >= 3, `heat ${heat}: fill ${fill} vs empty ${empty} = ${c.toFixed(2)}:1`);
+          assert.ok(c >= 3, `hp ${hp}: fill ${fill} vs empty ${empty} = ${c.toFixed(2)}:1`);
         }
       },
     },
     {
-      name: 'ux: Doneness meter fill stays visible when Burnt (95°), the most dangerous state',
+      name: 'ux: HP bar stays visible at low HP (the most dangerous state), even while it pulses',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1 });
-        await freezeWave(g, 95);
+        await freezeWave(g, 12);
         let worst = Infinity;
         for (let i = 0; i < 4; i++) {
           await g.wait(110);
-          const fill = await pixel(page, 190, 34);
+          const fill = await pixel(page, 26, 34);
           const empty = await pixel(page, 355, 34);
           worst = Math.min(worst, contrast(fill, empty));
         }
-        assert.ok(worst >= 3, `Burnt meter fill vs empty track: ${worst.toFixed(2)}:1`);
+        assert.ok(worst >= 3, `low-HP bar fill vs empty track: ${worst.toFixed(2)}:1`);
       },
     },
     {
-      name: 'ux: the sausage head stays visible against the grill when Burnt',
+      name: 'ux: the sausage head stays visible against the grill',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 1 });
-        await freezeWave(g, 95);
+        await freezeWave(g, 10);
         await g.wait(300);
         const probe = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');

@@ -44,9 +44,8 @@ export class MenuScene extends Phaser.Scene {
       'Your weapons ride on your sausage links and fire on their own.',
       'Only your head can be hit. The white dot is your hitbox.',
       '',
-      'DONENESS replaces health. Hits and grill tiles heat you up.',
-      'Hotter = more damage. Reach 100° and you are CHARRED.',
-      'Blue condiment packets cool you down.',
+      'Red-hot grill tiles burn you. Blue condiment packets heal you.',
+      'You heal to full between waves. Spend crumbs in the shop.',
     ];
     this.add.text(GAME_W / 2, 440, help.join('\n'), {
       fontFamily: FONT, fontSize: '18px', color: '#ffffff', align: 'center', lineSpacing: 6,

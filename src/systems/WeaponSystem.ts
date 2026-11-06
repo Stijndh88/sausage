@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {
-  WEAPONS, tierCooldown, tierDamage, tierPierce, tierProjectiles, type WeaponDef,
+  WEAPONS, tierCooldown, tierDamage, tierPierce, tierProjectiles, tierSpin, type WeaponDef,
 } from '../data/weapons';
 import { PlayerBullet, type ExplodeHandler } from '../entities/BulletPool';
 import type { Enemy } from '../entities/Enemy';
@@ -15,6 +15,8 @@ const MAX_CARRY_MS = 100;
 
 export interface WeaponHooks {
   enemies(): Enemy[];
+  /** Item effects that change how weapons fire. */
+  mods(): { explosionRadiusMult: number; extraProjectiles: number };
   /** Deal damage from a weapon. Returns nothing; the scene handles death. */
   damage(enemy: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void;
   explode: ExplodeHandler;
@@ -86,7 +88,8 @@ export class WeaponSystem {
     const angle = Math.atan2(target.y - y, target.x - x);
     const damage = tierDamage(def, tier) * damageMult;
     const lifetimeMs = (def.range / def.speed) * 1000 + 80;
-    const count = tierProjectiles(def, tier);
+    const spread = def.kind === 'cone' || def.kind === 'shotgun';
+    const count = tierProjectiles(def, tier) + (spread ? this.hooks.mods().extraProjectiles : 0);
 
     switch (def.kind) {
       case 'single':
@@ -113,7 +116,7 @@ export class WeaponSystem {
           x, y, angle, speed: def.speed, damage, texture: def.bulletTexture,
           lifetimeMs: (dist / def.speed) * 1000 + 50,
           lobTarget: { x: target.x, y: target.y },
-          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)),
+          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)) * this.hooks.mods().explosionRadiusMult,
           onExplode: this.hooks.explode,
         }, now);
         break;
@@ -137,7 +140,7 @@ export class WeaponSystem {
       const pos = this.chain.positions[ring.slot];
       if (!pos) continue;
       const n = ring.sprites.length;
-      ring.phase += dtSec * def.speed * fireRateMult;
+      ring.phase += dtSec * def.speed * tierSpin(def, w.tier) * fireRateMult;
       const spin = ring.phase;
       const hitEvery = tierCooldown(def, w.tier) / fireRateMult;
       const damage = tierDamage(def, w.tier) * damageMult;
@@ -167,14 +170,24 @@ export class WeaponSystem {
   }
 }
 
-function nearest(enemies: Enemy[], x: number, y: number, range: number): Enemy | null {
+/**
+ * Ranged enemies (ketchup, hot sauce) count as this much closer when picking a target, so
+ * links don't ignore the shooters behind a wall of forks. Squared, since we compare squared distances.
+ */
+export const RANGED_TARGET_BIAS = 0.65;
+const RANGED_BIAS_SQ = RANGED_TARGET_BIAS * RANGED_TARGET_BIAS;
+
+export function nearest(enemies: readonly Enemy[], x: number, y: number, range: number): Enemy | null {
   let best: Enemy | null = null;
-  let bestD = range * range;
+  let bestScore = Infinity;
+  const r2 = range * range;
   for (const e of enemies) {
     if (e.dead || !e.active) continue;
     const d = (e.x - x) ** 2 + (e.y - y) ** 2;
-    if (d < bestD) {
-      bestD = d;
+    if (d > r2) continue;
+    const score = e.def.melee || e.isBoss ? d : d * RANGED_BIAS_SQ;
+    if (score < bestScore) {
+      bestScore = score;
       best = e;
     }
   }

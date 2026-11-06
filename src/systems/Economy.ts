@@ -1,7 +1,8 @@
-import { ITEMS, ITEM_IDS } from '../data/items';
+import { ITEMS, ITEM_IDS, isItemMaxed } from '../data/items';
+import { RARITY_ORDER, rarityWeights, type Rarity } from '../data/rarity';
 import { MAX_LINKS, MAX_TIER, WEAPONS, WEAPON_IDS, type WeaponId } from '../data/weapons';
 import type { WeaponSlot } from '../state/run';
-import { type Rng, mulberry32 } from './rng';
+import { type Rng, mulberry32, pickWeighted } from './rng';
 
 export interface Offer {
   type: 'weapon' | 'item';
@@ -12,9 +13,11 @@ export interface Offer {
 export const SHOP_SIZE = 4;
 export const WEAPON_OFFER_CHANCE = 0.45;
 
-/** Prices rise 15% per wave. */
+/** Prices rise 25% (of the base price) per wave. */
+export const PRICE_GROWTH_PER_WAVE = 0.25;
+
 export function scalePrice(base: number, wave: number): number {
-  return Math.round(base * (1 + 0.15 * (wave - 1)));
+  return Math.round(base * (1 + PRICE_GROWTH_PER_WAVE * (wave - 1)));
 }
 
 export function rerollCost(wave: number, rerollCount: number): number {
@@ -29,9 +32,32 @@ export function basePrice(offer: Pick<Offer, 'type' | 'id'>): number {
   return offer.type === 'weapon' ? WEAPONS[offer.id as WeaponId].price : ITEMS[offer.id].price;
 }
 
+export interface ShopContext {
+  /** Owned items: maxed ones aren't offered. */
+  items?: readonly string[];
+  /** Luck stat (%), improves rarity odds. */
+  luck?: number;
+}
+
+/** Item ids of one rarity that can still be offered. */
+function itemPool(rarity: Rarity, owned: readonly string[]): string[] {
+  return ITEM_IDS.filter((id) => ITEMS[id].rarity === rarity && !isItemMaxed(owned, id));
+}
+
+/** Rolls a rarity (by wave and luck), falling back to lower rarities when a pool is empty. */
+function rollItem(rng: Rng, wave: number, luck: number, owned: readonly string[], used: Set<string>): string | null {
+  let rarity = pickWeighted(rng, rarityWeights(wave, luck));
+  for (let r = RARITY_ORDER.indexOf(rarity); r >= 0; r--) {
+    rarity = RARITY_ORDER[r];
+    const pool = itemPool(rarity, owned).filter((id) => !used.has(`item:${id}`));
+    if (pool.length) return pool[Math.floor(rng() * pool.length)];
+  }
+  return null;
+}
+
 /**
- * Builds a shop: locked offers stay (at their old price), the rest are rolled fresh.
- * No duplicate ids within one shop.
+ * Builds a shop. Kept offers stay but are re-priced for this wave; the rest are rolled fresh.
+ * No duplicate ids within one shop, no weapons you couldn't buy, no items you've maxed out.
  */
 export function generateOffers(
   rng: Rng,
@@ -40,17 +66,24 @@ export function generateOffers(
   count = SHOP_SIZE,
   /** The player's links: weapons that couldn't be bought (all copies maxed, no free link) aren't offered. */
   weapons?: readonly WeaponSlot[],
+  ctx: ShopContext = {},
 ): Offer[] {
-  const offers: Offer[] = locked.slice(0, count).map((o) => ({ ...o }));
+  const owned = ctx.items ?? [];
+  const offers: Offer[] = locked.slice(0, count).map((o) => ({ ...o, price: scalePrice(basePrice(o), wave) }));
   const used = new Set(offers.map((o) => `${o.type}:${o.id}`));
   let guard = 0;
   while (offers.length < count && guard++ < 200) {
     const type: Offer['type'] = rng() < WEAPON_OFFER_CHANCE ? 'weapon' : 'item';
-    const pool = type === 'weapon' ? WEAPON_IDS : ITEM_IDS;
-    const id = pool[Math.floor(rng() * pool.length)];
+    let id: string | null;
+    if (type === 'weapon') {
+      id = WEAPON_IDS[Math.floor(rng() * WEAPON_IDS.length)];
+      if (weapons && applyWeaponPurchase(weapons, id as WeaponId) === null) continue;
+    } else {
+      id = rollItem(rng, wave, ctx.luck ?? 0, owned, used);
+      if (!id) continue;
+    }
     const key = `${type}:${id}`;
     if (used.has(key)) continue;
-    if (type === 'weapon' && weapons && applyWeaponPurchase(weapons, id as WeaponId) === null) continue;
     used.add(key);
     offers.push({ type, id, price: scalePrice(basePrice({ type, id }), wave) });
   }
@@ -76,7 +109,13 @@ export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId
   return next;
 }
 
-export function canBuy(offer: Offer, crumbs: number, weapons: readonly WeaponSlot[]): { ok: boolean; reason?: string } {
+export function canBuy(
+  offer: Offer,
+  crumbs: number,
+  weapons: readonly WeaponSlot[],
+  items: readonly string[] = [],
+): { ok: boolean; reason?: string } {
+  if (offer.type === 'item' && isItemMaxed(items, offer.id)) return { ok: false, reason: 'Maxed out' };
   if (crumbs < offer.price) return { ok: false, reason: 'Not enough crumbs' };
   if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId) === null) {
     const owned = weapons.some((w) => w.id === offer.id);

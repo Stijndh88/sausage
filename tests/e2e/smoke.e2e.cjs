@@ -29,16 +29,16 @@ module.exports = {
       },
     },
     {
-      name: 'charring sends you to Game Over, Enter starts a new run',
+      name: 'dying sends you to Game Over, Enter starts a new run',
       fn: async ({ page, g }) => {
         await g.startRun();
-        await g.evaluate(() => window.__game.scene.getScene('Game').takeHeat(500));
+        await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(500, 'test'));
         await g.waitForScene('GameOver', 6000);
         await page.keyboard.press('Enter');
         await g.waitForScene('Game');
         const s = await g.gameState();
         assert.equal(s.wave, 1);
-        assert.ok(s.heat < 100);
+        assert.equal(s.hp, s.maxHp);
       },
     },
     {

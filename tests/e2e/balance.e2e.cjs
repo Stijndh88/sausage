@@ -47,21 +47,28 @@ module.exports = {
       },
     },
     {
-      name: 'heat is halved between waves (never carried into Well-done)',
+      name: 'you start every wave at full HP',
       fn: async ({ g }) => {
-        await g.startRun({ seed: 4, heat: 92 });
+        await g.startRun({ seed: 4 });
         await installStepper(g);
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
-          s.doneness.heatTakenMult = 0;
-          s.doneness.coolPerSec = 0;
+          s.director.stop();
+          s.takeDamage(60, 'test');
+          const hurt = s.health.hp;
           s.director.elapsedMs = 1e9;
           window.__balStep(130);
           const sh = window.__game.scene.getScene('Shop');
-          return { active: window.__game.scene.isActive('Shop'), heat: sh.run.heat };
+          const inShop = window.__game.scene.isActive('Shop');
+          sh.next();
+          window.__balStep(5);
+          const g2 = window.__game.scene.getScene('Game');
+          return { hurt, inShop, wave: g2.run.wave, hp: g2.health.hp, max: g2.health.maxHp };
         });
-        assert.ok(r.active, 'shop should open');
-        assert.ok(r.heat > 40 && r.heat < 60, `carried heat ${r.heat}`);
+        assert.ok(r.hurt < r.max, 'should have taken damage');
+        assert.ok(r.inShop, 'shop should open');
+        assert.equal(r.wave, 2);
+        assert.equal(r.hp, r.max);
       },
     },
     {
@@ -69,11 +76,11 @@ module.exports = {
       timeoutMs: 120000,
       fn: async ({ g }) => {
         const ttk = async (weapons, items) => {
-          await g.startRun({ seed: 7, wave: 10, heat: 40, weapons, items });
+          await g.startRun({ seed: 7, wave: 10, weapons, items });
           await installStepper(g);
           return g.evaluate(() => {
             const s = window.__game.scene.getScene('Game');
-            s.doneness.heatTakenMult = 0;
+            s.invincible = true;
             let frames = 0;
             while (frames < 60 * 300) {
               window.__balStep(60);
@@ -93,26 +100,26 @@ module.exports = {
       },
     },
     {
-      name: 'onion rings keep moving smoothly when heat crosses into Well-done',
+      name: 'onion rings keep moving smoothly when fire rate jumps mid-wave',
       fn: async ({ g }) => {
-        await g.startRun({ seed: 5, heat: 50, weapons: [{ id: 'onion', tier: 1 }] });
+        await g.startRun({ seed: 5, weapons: [{ id: 'onion', tier: 1 }] });
         await g.godMode();
         await installStepper(g);
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
-          const hold = (h) => () => { s.doneness.heat = h; };
+          const hold = (h) => () => { s.stats.fireRateMult = h; };
           const ring = () => s.weapons.rings[0].sprites[0].rotation;
           // Wait for a moment where the jump would be large (> 1 rad), so the test doesn't pass by luck.
           for (let i = 0; i < 2000; i++) {
             const j = ((window.__balNow() + 1000 / 60) / 1000) * 3.2 * 0.2;
             if (Math.abs(Math.atan2(Math.sin(j), Math.cos(j))) > 1) break;
-            window.__balStep(1, 1000 / 60, hold(50));
+            window.__balStep(1, 1000 / 60, hold(1));
           }
           const a0 = ring();
-          window.__balStep(1, 1000 / 60, hold(50));
+          window.__balStep(1, 1000 / 60, hold(1));
           const a1 = ring();
-          s.doneness.heat = 65;
-          window.__balStep(1, 1000 / 60, hold(65));
+          s.stats.fireRateMult = 1.2;
+          window.__balStep(1, 1000 / 60, hold(1.2));
           const a2 = ring();
           return { normal: a1 - a0, crossing: a2 - a1 };
         });

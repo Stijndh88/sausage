@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
-import { MAX_HEAT, TIERS, tierFor } from '../systems/Doneness';
 import { TOTAL_WAVES } from '../data/waves';
 
 export const HUD_H = 64;
@@ -23,16 +22,23 @@ function setColorIfChanged(t: Phaser.GameObjects.Text, color: string): void {
   if (t.style.color !== color) t.setColor(color);
 }
 
-/** Heat meter, crumbs, wave timer, dash charge, boss bar, and the "you're burning" vignette. */
+/** Below this fraction of max HP the bar pulses and the screen edge glows red. */
+export const LOW_HP_FRACTION = 0.3;
+const HP_COLOR = 0xe8484d;
+const HP_LOW_COLOR = 0xff2a2a;
+
+/** HP bar, crumbs, wave timer, dash charge, boss bar, and the low-HP vignette. */
 export class Hud {
   private readonly bar: Phaser.GameObjects.Graphics;
-  private readonly tierText: Phaser.GameObjects.Text;
+  private readonly hpText: Phaser.GameObjects.Text;
   private readonly crumbText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly vignette: Phaser.GameObjects.Graphics;
   private readonly bossBar: Phaser.GameObjects.Graphics;
   private readonly bossName: Phaser.GameObjects.Text;
   private shownCrumbs = -1;
+  private lastHp = -1;
+  private hurtFlashUntil = 0;
 
   constructor(private readonly scene: Phaser.Scene, wave: number) {
     const bg = scene.add.graphics().setDepth(50);
@@ -40,11 +46,13 @@ export class Hud {
     bg.fillStyle(0x3a2418, 1).fillRect(0, HUD_H - 3, GAME_W, 3);
 
     this.bar = scene.add.graphics().setDepth(51);
-    scene.add.text(BAR_X, 2, 'DONENESS', { fontFamily: FONT, fontSize: '12px', color: '#c8a890' }).setDepth(51);
-    this.tierText = scene.add
-      .text(BAR_X + BAR_W + 12, BAR_Y + BAR_H / 2, '', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffffff' })
-      .setOrigin(0, 0.5)
-      .setDepth(51);
+    scene.add.text(BAR_X, 2, 'HP', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#c8a890' }).setDepth(51);
+    this.hpText = scene.add
+      .text(BAR_X + BAR_W / 2, BAR_Y + BAR_H / 2, '', {
+        fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(52);
 
     scene.add.image(GAME_W - 150, HUD_H / 2, 'crumb').setScale(2).setDepth(51);
     this.crumbText = scene.add
@@ -75,35 +83,29 @@ export class Hud {
       .setVisible(false);
   }
 
-  update(heat: number, crumbs: number, timeLeftSec: number | null, dashCharge: number, now: number): void {
-    const tier = tierFor(heat);
+  update(hp: number, maxHp: number, crumbs: number, timeLeftSec: number | null, dashCharge: number, now: number): void {
+    const frac = Math.max(0, Math.min(1, hp / maxHp));
+    const low = frac <= LOW_HP_FRACTION;
+    if (this.lastHp >= 0 && hp < this.lastHp - 0.5) this.hurtFlashUntil = now + 180;
+    this.lastHp = hp;
+
     const g = this.bar;
     g.clear();
     g.fillStyle(0x000000, 0.6).fillRoundedRect(BAR_X - 2, BAR_Y - 2, BAR_W + 4, BAR_H + 4, 6);
-    // Tier zones as faint background bands.
-    for (let i = 0; i < TIERS.length - 1; i++) {
-      const from = TIERS[i].min / MAX_HEAT;
-      const to = TIERS[i + 1].min / MAX_HEAT;
-      g.fillStyle(TIERS[i].color, 0.18).fillRect(BAR_X + from * BAR_W, BAR_Y, (to - from) * BAR_W, BAR_H);
+    g.fillStyle(0x3a1a1a, 1).fillRoundedRect(BAR_X, BAR_Y, BAR_W, BAR_H, 4);
+    if (frac > 0) {
+      const w = Math.max(4, frac * BAR_W);
+      g.fillStyle(low ? HP_LOW_COLOR : HP_COLOR, 1).fillRoundedRect(BAR_X, BAR_Y, w, BAR_H, 4);
+      g.fillStyle(0xffffff, 0.2).fillRect(BAR_X + 2, BAR_Y + 3, Math.max(0, w - 4), 4);
+      if (low) g.fillStyle(0xffffff, 0.15 + Math.sin(now / 90) * 0.15).fillRoundedRect(BAR_X, BAR_Y, w, BAR_H, 4);
     }
-    const w = Math.max(4, (Math.min(heat, MAX_HEAT) / MAX_HEAT) * BAR_W);
-    g.fillStyle(tier.color, 1).fillRoundedRect(BAR_X, BAR_Y, w, BAR_H, 4);
-    g.fillStyle(0xffffff, 0.18).fillRect(BAR_X + 2, BAR_Y + 3, Math.max(0, w - 4), 4);
-    // When Burnt, pulse *brighter* (never fade the bar out).
-    if (tier.min >= 90) g.fillStyle(0xffffff, 0.18 + Math.sin(now / 70) * 0.18).fillRoundedRect(BAR_X, BAR_Y, w, BAR_H, 4);
-    g.lineStyle(1, 0xfff0e0, 0.9).strokeRoundedRect(BAR_X, BAR_Y, w, BAR_H, 4);
-    g.lineStyle(2, 0x000000, 0.7);
-    for (const t of TIERS.slice(1, -1)) {
-      const x = BAR_X + (t.min / MAX_HEAT) * BAR_W;
-      g.lineBetween(x, BAR_Y, x, BAR_Y + BAR_H);
-    }
+    if (now < this.hurtFlashUntil) g.lineStyle(2, 0xffffff, 1).strokeRoundedRect(BAR_X - 1, BAR_Y - 1, BAR_W + 2, BAR_H + 2, 5);
     // Dash charge strip.
     g.fillStyle(0x000000, 0.6).fillRect(BAR_X, BAR_Y + BAR_H + 6, 120, 5);
     g.fillStyle(dashCharge >= 1 ? 0x8fd3ff : 0x4a6a80, 1).fillRect(BAR_X, BAR_Y + BAR_H + 6, 120 * dashCharge, 5);
 
     // setText/setColor re-render the text texture, so only call them when something changed.
-    setTextIfChanged(this.tierText, `${tier.name.toUpperCase()}  ${Math.floor(heat)}°`);
-    setColorIfChanged(this.tierText, tier.min >= 60 ? '#ffb070' : '#ffffff');
+    setTextIfChanged(this.hpText, `${Math.ceil(hp)} / ${maxHp}`);
 
     if (crumbs !== this.shownCrumbs) {
       if (this.shownCrumbs >= 0 && crumbs > this.shownCrumbs) {
@@ -125,13 +127,11 @@ export class Hud {
       setColorIfChanged(this.timerText, s <= 5 ? '#ffd060' : '#ffffff');
     }
 
-    // Red edge glow when Burnt.
+    // Red edge glow when low on HP.
     this.vignette.clear();
-    if (heat >= 90) {
-      const a = 0.25 + Math.sin(now / 90) * 0.15;
-      this.vignette.lineStyle(26, 0xff2000, a).strokeRect(13, HUD_H + 13, GAME_W - 26, GAME_H - HUD_H - 26);
-    } else if (heat >= 60) {
-      this.vignette.lineStyle(14, 0xff6a00, 0.12).strokeRect(7, HUD_H + 7, GAME_W - 14, GAME_H - HUD_H - 14);
+    if (low && hp > 0) {
+      const a = 0.22 + Math.sin(now / 110) * 0.12;
+      this.vignette.lineStyle(24, 0xff2000, a).strokeRect(12, HUD_H + 12, GAME_W - 24, GAME_H - HUD_H - 24);
     }
   }
 

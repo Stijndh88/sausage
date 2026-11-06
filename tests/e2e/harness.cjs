@@ -91,7 +91,7 @@ class GameDriver {
 
   /**
    * Start a fresh run directly, skipping the menu.
-   * opts: { seed, wave, crumbs, heat, weapons: [{id, tier}], items: [ids] }
+   * opts: { seed, wave, crumbs, weapons: [{id, tier}], items: [ids] }
    */
   async startRun(opts = {}) {
     await this.page.evaluate((o) => {
@@ -99,7 +99,6 @@ class GameDriver {
       const run = window.__debug.newRun(o.seed ?? 12345);
       if (o.wave) run.wave = o.wave;
       if (o.crumbs !== undefined) run.crumbs = o.crumbs;
-      if (o.heat !== undefined) run.heat = o.heat;
       if (o.weapons) run.weapons = o.weapons;
       if (o.items) run.items = o.items;
       for (const s of game.scene.getScenes(true)) if (s.scene.key !== 'Game') game.scene.stop(s.scene.key);
@@ -132,7 +131,8 @@ class GameDriver {
       if (!s || !window.__game.scene.isActive('Game') || !s.director) return null;
       return {
         wave: s.run.wave,
-        heat: s.doneness.heat,
+        hp: s.health.hp,
+        maxHp: s.health.maxHp,
         crumbs: s.run.crumbs,
         kills: s.run.kills,
         elapsedSec: s.director.elapsedMs / 1000,
@@ -147,11 +147,10 @@ class GameDriver {
     });
   }
 
-  /** Make the sausage immune to heat in the current Game scene. */
+  /** Make the sausage take no damage in the current Game scene. */
   godMode() {
     return this.page.evaluate(() => {
-      const s = window.__game.scene.getScene('Game');
-      s.doneness.heatTakenMult = 0;
+      window.__game.scene.getScene('Game').invincible = true;
     });
   }
 

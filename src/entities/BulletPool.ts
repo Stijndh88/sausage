@@ -86,8 +86,14 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
   }
 }
 
+const BULLET_SOURCES: Record<string, string> = {
+  'eb-ketchup': 'Ketchup Bottle',
+  'eb-hot': 'Hot Sauce',
+  'eb-boss': "The Grill Master's Tongs",
+};
+
 export class EnemyBullet extends Phaser.Physics.Arcade.Image {
-  heat = 0;
+  damage = 0;
   /** Optional per-frame steering in radians/sec, for curving spiral bullets. */
   curve = 0;
   private speed = 0;
@@ -97,7 +103,7 @@ export class EnemyBullet extends Phaser.Physics.Arcade.Image {
     super(scene, x, y, texture);
   }
 
-  fire(x: number, y: number, angle: number, speed: number, heat: number, texture: string, now: number, curve = 0): void {
+  fire(x: number, y: number, angle: number, speed: number, damage: number, texture: string, now: number, curve = 0): void {
     this.enableBody(true, x, y, true, true);
     this.dieAt = now + ENEMY_BULLET_LIFETIME_MS;
     this.setTexture(texture);
@@ -106,7 +112,7 @@ export class EnemyBullet extends Phaser.Physics.Arcade.Image {
     const r = this.width * 0.32;
     (this.body as Phaser.Physics.Arcade.Body).setCircle(r, this.width / 2 - r, this.height / 2 - r);
     this.speed = speed;
-    this.heat = heat;
+    this.damage = damage;
     this.curve = curve;
     this.setRotation(angle);
     this.scene.physics.velocityFromRotation(angle, speed, (this.body as Phaser.Physics.Arcade.Body).velocity);
@@ -128,6 +134,11 @@ export class EnemyBullet extends Phaser.Physics.Arcade.Image {
 
   kill(): void {
     this.disableBody(true, true);
+  }
+
+  /** Who fired it, for the Game Over screen. */
+  get source(): string {
+    return BULLET_SOURCES[this.texture.key] ?? 'A stray bullet';
   }
 }
 

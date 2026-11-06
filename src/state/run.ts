@@ -1,5 +1,4 @@
 import type { WeaponId } from '../data/weapons';
-import { START_HEAT } from '../systems/Doneness';
 import type { Offer } from '../systems/Economy';
 
 export interface WeaponSlot {
@@ -12,7 +11,6 @@ export interface RunState {
   seed: number;
   wave: number;
   crumbs: number;
-  heat: number;
   weapons: WeaponSlot[];
   items: string[];
   lockedOffers: Offer[];
@@ -20,14 +18,18 @@ export interface RunState {
   kills: number;
   crumbsEarned: number;
   timeSurvivedSec: number;
+  /** What landed the final hit, shown on the Game Over screen. */
+  causeOfDeath?: string;
 }
+
+/** Enough for one cheap item in the first shop. */
+export const STARTING_CRUMBS = 8;
 
 export function newRun(seed: number = Date.now() >>> 0): RunState {
   return {
     seed,
     wave: 1,
-    crumbs: 0,
-    heat: START_HEAT,
+    crumbs: STARTING_CRUMBS,
     weapons: [{ id: 'toothpick', tier: 1 }],
     items: [],
     lockedOffers: [],
