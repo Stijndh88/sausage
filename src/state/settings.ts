@@ -18,6 +18,8 @@ export interface Settings {
   dashSide: 'right' | 'left';
   /** Keyboard bindings by physical key position (see state/controls.ts). */
   keyBindings: Bindings;
+  /** Send anonymous play data (run summaries, errors) to help improve the game. See state/playDataSync.ts. */
+  sharePlayData: boolean;
 }
 
 const KEY = 'wurst-case-scenario/settings';
@@ -43,6 +45,7 @@ export function defaultSettings(): Settings {
     vibration: true,
     dashSide: 'right',
     keyBindings: defaultBindings(),
+    sharePlayData: true,
   };
 }
 
@@ -97,6 +100,7 @@ export function sanitize(s: Settings): Settings {
     vibration: s.vibration !== false,
     dashSide: s.dashSide === 'left' ? 'left' : 'right',
     keyBindings: sanitizeBindings(s.keyBindings),
+    sharePlayData: s.sharePlayData !== false,
   };
 }
 

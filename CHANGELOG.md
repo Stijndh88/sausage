@@ -9,6 +9,8 @@ Versions follow [semantic versioning](https://semver.org). The main menu shows t
   the loadout lists your stacks.
 - **Run stats** screen after every run (S / (Y) on the results screen): totals, damage / DPS / kills per
   link, what hurt you, where the crumbs went, damage per wave.
+- **Share play data** (Settings, on by default): run summaries and errors are uploaded once each to the
+  game's Supabase project with a random player id. Tables and rules: `supabase/play_data.sql`.
 - **Play data** kept on the device: a summary of every run, errors, and runs that never finished
   (closed tab vs. probable crash). Settings → Play data downloads it as JSON. Nothing is sent anywhere yet.
 

@@ -8,7 +8,7 @@ import { onKeyPress } from './input';
 import { ControlsPanel } from './ControlsPanel';
 import { bindPrompt, getInputMode, hint } from './inputMode';
 import { moveLabel } from './keyboardLayout';
-import { downloadTelemetry, loadTelemetry } from '../state/telemetry';
+import { downloadTelemetry } from '../state/telemetry';
 
 type Row =
   | { kind: 'slider'; key: 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake'; label: string }
@@ -28,7 +28,7 @@ const ROWS: Row[] = [
   { kind: 'toggle', key: 'vibration', label: 'Vibration (controller / phone)' },
   { kind: 'dashSide', label: 'Touch: DASH button side' },
   { kind: 'controls', label: 'Keyboard controls' },
-  { kind: 'playData', label: 'Play data (on this device)' },
+  { kind: 'playData', label: 'Share play data' },
 ];
 
 const W = 560;
@@ -128,7 +128,11 @@ export class SettingsPanel {
         .setOrigin(row.kind === 'slider' ? 0.5 : 1, 0.5));
       this.valueTexts.push(value);
       if (row.kind === 'playData') {
-        add(new Button(s, left + W - 80, y, 'Download', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
+        // Download a copy of what's kept on this device; the main button turns sharing on/off.
+        add(new Button(s, left + W - 222, y, 'Save', { width: 64, height: 36, fill: 0x3a3028, hover: 0x5a4636, fontSize: 14 }, () => {
+          audio.play(downloadTelemetry() ? 'click' : 'deny');
+        }));
+        add(new Button(s, left + W - 78, y, 'Toggle', { width: 96, height: 40, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
       } else if (row.kind === 'controls') {
         add(new Button(s, left + W - 80, y, 'Change…', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
       } else if (row.kind === 'slider') {
@@ -173,10 +177,9 @@ export class SettingsPanel {
       return;
     }
     if (row.kind === 'playData') {
-      audio.play(downloadTelemetry() ? 'click' : 'deny');
-      return;
-    }
-    if (row.kind === 'dashSide') {
+      updateSettings({ sharePlayData: !s.sharePlayData });
+      audio.play('click');
+    } else if (row.kind === 'dashSide') {
       updateSettings({ dashSide: s.dashSide === 'left' ? 'right' : 'left' });
       audio.play('click');
     } else if (row.kind === 'slider') {
@@ -196,10 +199,7 @@ export class SettingsPanel {
       const t = this.valueTexts[i];
       if (!t) return;
       if (row.kind === 'controls') t.setText(`Move: ${moveLabel(s.keyBindings)}`);
-      else if (row.kind === 'playData') {
-        const d = loadTelemetry();
-        t.setText(`${d.runs.length} run${d.runs.length === 1 ? '' : 's'}`);
-      }
+      else if (row.kind === 'playData') t.setText(s.sharePlayData ? 'On' : 'Off');
       else if (row.kind === 'dashSide') t.setText(s.dashSide === 'left' ? 'Left' : 'Right');
       else t.setText(row.kind === 'slider' ? `${Math.round(s[row.key] * 100)}%` : s[row.key] ? 'On' : 'Off');
     });
