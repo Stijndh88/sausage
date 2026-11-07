@@ -285,8 +285,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         break;
       }
       case 'goblin': {
+        // Painted standing upright, seen from the front: stays upright and turns to face where it runs.
         [vx, vy] = this.flee(ctx, dt, dx, dy, dist, speed);
-        face = this.heading;
+        face = -UP_OFFSET;
+        if (Math.abs(vx) > 5) this.setFlipX(vx < 0);
         break;
       }
       case 'tongs': {

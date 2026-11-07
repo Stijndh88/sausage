@@ -250,5 +250,9 @@
   "portrait-kielbasa": [
     56,
     74
+  ],
+  "enemy-goblin": [
+    40,
+    55
   ]
 }

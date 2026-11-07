@@ -167,7 +167,8 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for old in OUT_DIR.glob('*.png'):
         old.unlink()
-    manifest = {}
+    # Keep sprites that came as their own PNG (not cut from this sheet), e.g. enemy-goblin.
+    manifest = {k: v for k, v in json.loads(MANIFEST.read_text()).items() if k not in BOXES} if MANIFEST.exists() else {}
     for key, (x0, y0, x1, y1) in BOXES.items():
         ids = [i for i in range(1, count + 1) if owner[i] == key]
         if not ids:

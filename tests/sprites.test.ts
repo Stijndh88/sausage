@@ -9,7 +9,7 @@ const pngFiles = Object.keys(import.meta.glob('../src/art/sprites/*.png'));
 const sheets = Object.keys(import.meta.glob('../art/source/*.png'));
 const sized = sizes as unknown as Record<string, [number, number]>;
 /** Textures still on their code-drawn placeholder while the painted art is on its way. */
-const AWAITING_ART = new Set(['enemy-goblin']);
+const AWAITING_ART = new Set<string>();
 
 describe('painted sprites', () => {
   it('every sprite has a PNG and every PNG has an in-game size', () => {
