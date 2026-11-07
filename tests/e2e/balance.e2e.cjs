@@ -100,6 +100,41 @@ module.exports = {
       },
     },
     {
+      // Stijn's 2026-11-07 playtest: 6x Skewer IV, +1133% damage, 94% crit one-shot the last bosses.
+      // The same shopping list must now take a real fight.
+      name: 'the playtest build that one-shot late bosses now needs a real fight for them',
+      timeoutMs: 180000,
+      fn: async ({ g }) => {
+        const counts = {
+          paprika: 16, espresso_mustard: 11, mustard_seed: 12, casing: 13, ketchup_kiss: 8, big_bun: 6, sesame: 8,
+          slippery_oil: 8, cold_cuts: 5, golden_sausage: 18, secret_sauce: 21, double_dip: 5, four_leaf_relish: 6,
+          hot_dog_cart: 2, vampire_ketchup: 3, sharp_cheddar: 3, spiky_bun: 3, extra_pellet: 2, grill_apron: 1,
+          second_skin: 1, hearty_meal: 5, smoked_ham: 1, oven_mitt: 1,
+        };
+        // The full list, uncut: more copies than the shop now sells, so only the stat caps hold it back.
+        const items = Object.entries(counts).flatMap(([id, n]) => Array(n).fill(id));
+        const ttk = async (wave) => {
+          await g.startRun({ seed: 11, wave, sausage: 'weisswurst', items, weapons: Array.from({ length: 6 }, () => ({ id: 'skewer', tier: 4 })) });
+          await installStepper(g);
+          return g.evaluate(() => {
+            const s = window.__game.scene.getScene('Game');
+            s.invincible = true;
+            let frames = 0;
+            while (frames < 60 * 240) {
+              window.__balStep(30);
+              frames += 30;
+              if (s.boss && s.boss.dead) break;
+            }
+            return { sec: frames / 60, dmg: s.stats.damageMult, crit: s.stats.critChance };
+          });
+        };
+        for (const wave of [19, 25]) {
+          const r = await ttk(wave);
+          assert.ok(r.sec >= 5, `wave ${wave} boss died in ${r.sec}s (damage x${r.dmg.toFixed(2)}, crit ${r.crit})`);
+        }
+      },
+    },
+    {
       name: 'onion ring: thrown out, hits on the way out and on the way back, then is caught by its link',
       timeoutMs: 120000,
       fn: async ({ g }) => {

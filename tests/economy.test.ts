@@ -31,7 +31,8 @@ describe('shop offers', () => {
 
   it('scales prices and reroll costs up', () => {
     expect(scalePrice(10, 1)).toBe(10);
-    expect(scalePrice(10, 5)).toBe(20);
+    expect(scalePrice(10, 5)).toBe(22);
+    expect(scalePrice(10, 13)).toBeGreaterThan(scalePrice(10, 7) * 2);
     expect(rerollCost(1, 0)).toBeLessThan(rerollCost(1, 1));
     expect(rerollCost(1, 0)).toBeLessThan(rerollCost(8, 0));
   });

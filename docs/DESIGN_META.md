@@ -97,14 +97,15 @@ after 5 points in that jar. Shelf 3 holds **keystones**: big rule-changers that 
 jar *and* a Cookbook recipe (section 3). **Refunds are free**, like Vampire Survivors' PowerUps, so you
 can try builds. Rank costs grow (15, 30, 55, 90, …). The first rank of every shelf-1 node costs 15,
 so every run buys something. The whole tree costs about 12,000 Spice: roughly 40–60 runs, with
-something new every run.
+something new every run. (Built: shelf-1 ranks start at 25 Spice, keystones cost 500, and the whole
+rack is about 15,500 Spice. Live numbers and how they were tuned: `docs/BALANCE.md`.)
 
 | Jar | Shelf 1 | Shelf 2 | Keystones (pick freely once unlocked) |
 |---|---|---|---|
 | 🧂 **Seasoning** (offense) | Sharp Seasoning +3% damage ×5 · Quick Hands +3% fire rate ×5 · Coarse Grind +2% crit ×5 | Spread the Flavour +5% explosion size ×3 · Marinade +15% poison ×3 · First Bite +20% damage to unhurt enemies ×2 | **Extra Spicy**: crits set enemies on fire · **Double Batch**: your starting weapon begins at tier II |
 | 🥩 **Casing** (defense) | Plump +5 max HP ×10 · Tough Skin +1 armor ×3 · Simmer +0.2 HP/s ×3 | Condiment Lover +15% healing ×3 · Grill Marks −20% hot-tile damage ×3 · Iron Stomach longer invulnerability after a hit ×2 | **Second Skin**: revive once per run at 40% HP · **Smoked**: a one-hit shield at the start of every wave |
-| 👟 **Hustle** (movement and shop) | Quick Feet +3% speed ×5 · Hot Pan −5% dash cooldown ×4 · Big Plate +10% pickup range ×3 | Tip Jar +3 starting crumbs ×3 · Free Refill +1 free reroll per shop ×2 · Regular Customer −5% shop prices ×3 | **Food Truck**: shop items are Uncommon or better · **Mise en Place**: start each run with a random common item |
-| 🎒 **Doggy Bag** (risk and reward) | Spice Hound +5% Spice ×5 · Tupperware +5% kept on death ×4 (25% → 45%) · Lucky Fork +3 luck ×5 | Lunchbox: bank 10% of the bag each time you push on ×2 · Treasure Nose +20% boss and event Spice ×3 · Greedy Gut +10% crumbs ×1 | **Takeout**: bailing out keeps 75% · **All You Can Eat**: each course you push on adds another +0.25 multiplier |
+| 👟 **Hustle** (movement and shop) | Quick Feet +3% speed ×5 · Hot Pan −5% dash cooldown ×4 · Big Plate +10% pickup range ×3 | Tip Jar +3 starting crumbs ×3 · Free Refill +1 free reroll per shop ×2 · Regular Customer −4% shop prices ×3 | **Food Truck**: shop items are Uncommon or better · **Mise en Place**: start each run with a random common item |
+| 🎒 **Doggy Bag** (risk and reward) | Spice Hound +5% Spice ×5 · Tupperware +5% kept on death ×4 (25% → 45%) · Lucky Fork +3 luck ×5 | Lunchbox: bank 10% of the bag each time you push on ×2 · Treasure Nose +20% boss and event Spice ×3 · Greedy Gut +6% crumbs ×3 | **Takeout**: bailing out keeps 75% · **All You Can Eat**: each course you push on adds another +0.25 multiplier |
 
 ---
 

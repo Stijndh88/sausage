@@ -51,17 +51,21 @@ const BACKYARD_ROWS = [0, 1, 2, 4, 6, 8];
 /** Later courses start where the Backyard got tough. */
 const LATER_ROWS = [4, 5, 6, 7, 8];
 
-/** Enemy HP multiplier of a course on top of its row: Kitchen x1.5, Smokehouse x2.1, Seconds +0.7 each. */
+/**
+ * Enemy HP multiplier of a course on top of its row: Kitchen x2, Smokehouse x4.5, then x1.6 per
+ * Seconds loop. Builds grow fast between courses (a full shop every wave), so later courses have
+ * to grow faster too, or late waves melt and late bosses die in seconds.
+ */
 export function courseHpScale(course: number): number {
   if (course <= 0) return 1;
-  if (course === 1) return 1.5;
-  if (course === 2) return 2.1;
-  return 2.1 + 0.7 * (course - 2);
+  if (course === 1) return 2;
+  if (course === 2) return 4.5;
+  return 4.5 * 1.6 ** Math.min(30, course - 2);
 }
 
-/** Boss HP multipliers. The Backyard boss is softer than the old wave-10 Tongs (fewer shops before it). */
+/** Boss HP multipliers (times the course scale for later bosses). */
 const BACKYARD_BOSS_HP = 1.9;
-const LATER_BOSS_HP = 2.8;
+const LATER_BOSS_HP = 3.6;
 
 export function waveConfig(wave: number): WaveConfig {
   const n = Math.max(1, Math.floor(Number.isFinite(wave) ? wave : 1));
@@ -83,7 +87,7 @@ export function waveConfig(wave: number): WaveConfig {
     maxAlive: Math.min(100, 40 + 6 * (loc.boss ? BOSS_ROW + 1 : rowIndex + 1) + 4 * c),
     hpMult: Math.round(hpMult * 100) / 100,
     bossHpMult: loc.boss ? Math.round(bossHpMult * 100) / 100 : 0,
-    crumbMult: 1 + 0.4 * c,
+    crumbMult: 1 + 0.25 * c,
     boss: loc.boss,
   };
 }

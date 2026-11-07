@@ -129,8 +129,8 @@ const list: TalentDef[] = [
     mods: (m, r) => { m.startCrumbs += 3 * r; } },
   { id: 'free_refill', jar: 'hustle', shelf: 2, name: 'Free Refill', desc: '+1 free reroll per shop', maxRank: 2,
     mods: (m, r) => { m.freeRerolls += r; } },
-  { id: 'regular_customer', jar: 'hustle', shelf: 2, name: 'Regular Customer', desc: '-5% shop prices', maxRank: 3,
-    mods: (m, r) => { m.shopDiscount += 0.05 * r; } },
+  { id: 'regular_customer', jar: 'hustle', shelf: 2, name: 'Regular Customer', desc: '-4% shop prices', maxRank: 3,
+    mods: (m, r) => { m.shopDiscount += 0.04 * r; } },
   { id: 'food_truck', jar: 'hustle', shelf: 3, name: 'Food Truck', desc: 'Shop items Uncommon or better', maxRank: 1,
     trophies: { grinder_blade: 1 }, mods: (m, r) => { m.betterShop += r; } },
   { id: 'mise_en_place', jar: 'hustle', shelf: 3, name: 'Mise en Place', desc: 'Start with a random common item', maxRank: 1,
@@ -147,21 +147,25 @@ const list: TalentDef[] = [
     recipe: 'big_push', mods: (m, r) => { m.pushBank += 0.1 * r; } },
   { id: 'treasure_nose', jar: 'doggybag', shelf: 2, name: 'Treasure Nose', desc: '+20% Spice from bosses and events', maxRank: 3,
     mods: (m, r) => { m.bossBonus += 0.2 * r; } },
-  { id: 'greedy_gut', jar: 'doggybag', shelf: 2, name: 'Greedy Gut', desc: '+10% crumbs from enemies', maxRank: 3,
-    stats: (s, r) => { s.crumbMult += 0.1 * r; } },
+  { id: 'greedy_gut', jar: 'doggybag', shelf: 2, name: 'Greedy Gut', desc: '+6% crumbs from enemies', maxRank: 3,
+    stats: (s, r) => { s.crumbMult += 0.06 * r; } },
   { id: 'takeout', jar: 'doggybag', shelf: 3, name: 'Takeout', desc: 'Bailing out keeps 75% of the bag', maxRank: 1,
     trophies: { grinder_blade: 1 }, mods: (m, r) => { if (r) m.bailKeep = 0.75; } },
-  { id: 'all_you_can_eat', jar: 'doggybag', shelf: 3, name: 'All You Can Eat', desc: '+0.5 Spice multiplier per push', maxRank: 1,
-    trophies: { smoked_brisket: 1 }, mods: (m, r) => { m.pushMultBonus += 0.5 * r; } },
+  { id: 'all_you_can_eat', jar: 'doggybag', shelf: 3, name: 'All You Can Eat', desc: '+0.25 Spice multiplier per push', maxRank: 1,
+    trophies: { smoked_brisket: 1 }, mods: (m, r) => { m.pushMultBonus += 0.25 * r; } },
 ];
 
 export const TALENTS: Record<string, TalentDef> = Object.fromEntries(list.map((t) => [t.id, t]));
 export const TALENT_IDS = list.map((t) => t.id);
 
-/** Spice cost of the next rank (rank = ranks already owned). */
+/**
+ * Spice cost of the next rank (rank = ranks already owned). The whole rack (about 16,000 Spice) is
+ * meant to take a few dozen good runs; the first ranks stay cheap so even a short run buys one.
+ */
+export const KEYSTONE_COST = 500;
 export function rankCost(t: TalentDef, rank: number): number {
-  if (t.shelf === 3) return 200;
-  const curve = [10, 25, 45, 70, 100, 135, 175, 220, 270, 325];
+  if (t.shelf === 3) return KEYSTONE_COST;
+  const curve = [25, 60, 110, 175, 250, 340, 440, 550, 675, 810];
   const base = curve[Math.min(rank, curve.length - 1)];
   return t.shelf === 2 ? Math.round(base * 1.6) : base;
 }

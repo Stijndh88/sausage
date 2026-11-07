@@ -3,6 +3,15 @@
 Versions follow [semantic versioning](https://semver.org). The main menu shows the running version.
 
 ## Unreleased
+- **Balance pass** after the 2026-11-07 playtest (late bosses were one-shot, one run filled the Spice Rack).
+  Details and numbers: `docs/BALANCE.md`.
+  - Every item has a stack limit (Golden Sausage 2, Secret Sauce 5, Paprika 10, Mustard Seed 6, ...).
+  - Stat caps: damage +300%, fire rate +200%, crit 60%, dodge 50%, lifesteal 30%.
+  - Shop prices climb much faster after the Backyard (wave 13 8.5x, wave 25 38x the base price).
+  - Kitchen, Smokehouse and Seconds enemies and bosses have a lot more HP; the Tongs are unchanged.
+  - Less Spice per run (course multipliers x1 / x1.5 / x2 / +0.5 per loop) and a Spice Rack that costs
+    about 2.5x as much (keystones 500), so it fills over a few dozen good runs.
+  - `tools/balance-sim.ts` simulates runs to check balance changes; `tests/progression.test.ts` pins the targets.
 - **Loot Goblin** (rare timed event, wave 2+): a jerky gremlin with a pot of gold runs from you for 12 s.
   It never hurts you, spills crumbs as you shoot it, and drops a pile of crumbs, bonus Spice, a condiment and
   sometimes an item when it dies. Ignore it and it vanishes with the loot. Uses a placeholder sprite for now.
