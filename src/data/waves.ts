@@ -24,7 +24,7 @@ export interface WaveConfig {
   /** Crumbs per kill are multiplied by this (later courses pay more, prices rise too). */
   crumbMult: number;
   hotTiles: number;
-  weights: Partial<Record<Exclude<EnemyKind, 'tongs'>, number>>;
+  weights: Partial<Record<Exclude<EnemyKind, 'tongs' | 'goblin'>, number>>;
   boss: boolean;
 }
 

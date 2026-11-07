@@ -3,6 +3,9 @@
 Versions follow [semantic versioning](https://semver.org). The main menu shows the running version.
 
 ## Unreleased
+- **Loot Goblin** (rare timed event, wave 2+): a jerky gremlin with a pot of gold runs from you for 12 s.
+  It never hurts you, spills crumbs as you shoot it, and drops a pile of crumbs, bonus Spice, a condiment and
+  sometimes an item when it dies. Ignore it and it vanishes with the loot. Uses a placeholder sprite for now.
 - **Stack the same weapon**: any link can hold any weapon (3× Onion Ring, even 6×). Buying a weapon you own
   adds a new link by default; the card's New link / Upgrade switch (▲▼, D-pad or tap) upgrades a copy instead.
 - **Stack bonuses** at 2, 4 and 6 copies of one weapon boost every copy. Shop cards show the next bonus and

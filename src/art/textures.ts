@@ -183,6 +183,11 @@ function generateEventTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xffd23f, 1).fillRoundedRect(3, 7, 12, 5, 2.5);
     g.fillStyle(0xffffff, 0.8).fillRect(5, 8, 6, 1);
   });
+  icon('goblin', (g) => {
+    g.fillStyle(0xb0622a, 1).fillCircle(9, 10.5, 5.5);
+    g.fillStyle(0xffd23f, 1).fillEllipse(9, 6.5, 10, 4.5);
+    g.fillStyle(0xfff2a8, 1).fillCircle(7, 5.5, 1.2).fillCircle(11.5, 6, 1);
+  });
   icon('happy', (g) => {
     g.fillStyle(0xffb030, 1).fillRect(4, 6, 8, 9);
     g.lineStyle(1.5, 0xffb030, 1).strokeRect(12, 8, 3, 4);
@@ -345,6 +350,19 @@ export function generateTextures(scene: Phaser.Scene): void {
     g.fillStyle(0xff5a00, 1).fillTriangle(17, 25, 14, 33, 20, 33);
     eye(g, 11, 15, 3.5, true);
     eye(g, 23, 15, 3.5, true);
+  });
+  // Placeholder until the painted loot goblin arrives: a hunched jerky gremlin hugging a pot of gold.
+  make(scene, 'enemy-goblin', 40, 40, (g) => {
+    g.fillStyle(0x2a120a, 1).fillEllipse(20, 25, 34, 28); // outline
+    g.fillStyle(0x8a3b26, 1).fillEllipse(20, 25, 30, 24); // jerky back
+    g.fillStyle(0xb85a36, 1).fillEllipse(17, 22, 16, 10);
+    g.fillStyle(0x8a3b26, 1).fillCircle(7, 14, 4).fillCircle(33, 14, 4); // knees
+    g.fillStyle(0x2a120a, 1).fillCircle(20, 9, 9); // pot
+    g.fillStyle(0xb0622a, 1).fillCircle(20, 9, 7.5);
+    g.fillStyle(0xffd23f, 1).fillEllipse(20, 6, 12, 6); // gold in the pot
+    g.fillStyle(0xfff2a8, 1).fillCircle(17, 5, 1.5).fillCircle(23, 6, 1.2);
+    eye(g, 14, 21, 3.5);
+    eye(g, 26, 21, 3.5);
   });
   make(scene, 'enemy-tongs', 120, 130, (g) => {
     // Two arms meeting at a hinge, with a scary face.

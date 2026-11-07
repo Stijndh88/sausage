@@ -1,4 +1,4 @@
-export type EnemyKind = 'fork' | 'spatula' | 'ketchup' | 'hotsauce' | 'tongs';
+export type EnemyKind = 'fork' | 'spatula' | 'ketchup' | 'hotsauce' | 'tongs' | 'goblin';
 
 export interface EnemyDef {
   kind: EnemyKind;
@@ -32,6 +32,11 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   hotsauce: {
     kind: 'hotsauce', name: 'Hot Sauce Turret', hp: 45, speed: 0, radius: 16,
     contactDamage: 8, bulletDamage: 8, crumbs: 3, texture: 'enemy-hotsauce', melee: false,
+  },
+  // Only appears in the Loot Goblin event: runs from you, never hurts you, pays out when killed.
+  goblin: {
+    kind: 'goblin', name: 'Loot Goblin', hp: 55, speed: 175, radius: 15,
+    contactDamage: 0, bulletDamage: 0, crumbs: 0, texture: 'enemy-goblin', melee: false,
   },
   tongs: {
     kind: 'tongs', name: "The Grill Master's Tongs", hp: 4000, speed: 55, radius: 46,

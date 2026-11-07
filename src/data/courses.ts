@@ -35,7 +35,7 @@ export interface BossStyle {
   /** Multiplies the time between attacks (lower = attacks more often). */
   fireMult: number;
   /** What it summons. */
-  minion: Exclude<EnemyKind, 'tongs'>;
+  minion: Exclude<EnemyKind, 'tongs' | 'goblin'>;
   /** Adds a spiral burst after its normal attacks. */
   extraAttack: boolean;
 }

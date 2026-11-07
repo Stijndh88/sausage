@@ -58,6 +58,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private nextSummonAt = 0;
   private strafeDir = 1;
   private born = 0;
+  /** Loot goblin: the direction it's running in. */
+  private heading = Math.random() * Math.PI * 2;
 
   constructor(scene: Phaser.Scene, x: number, y: number, kind: EnemyKind, hpMult: number, elite?: { hpMult: number; scale: number }) {
     const def = ENEMIES[kind];
@@ -282,6 +284,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         }
         break;
       }
+      case 'goblin': {
+        [vx, vy] = this.flee(ctx, dt, dx, dy, dist, speed);
+        face = this.heading;
+        break;
+      }
       case 'tongs': {
         face = -UP_OFFSET;
         [vx, vy] = this.bossThink(ctx, now, dist, toPlayer, dx, dy);
@@ -307,6 +314,28 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.aura.setAlpha(0.55 + 0.3 * Math.sin(now / 120));
     }
     return poisonKill;
+  }
+
+  /**
+   * Loot goblin: runs away from the sausage when it's close and wanders otherwise. Walls push it
+   * back toward the middle so it can't sit in a corner, and the jitter makes it hard to predict.
+   */
+  private flee(ctx: EnemyContext, dt: number, dx: number, dy: number, dist: number, speed: number): [number, number] {
+    let fx = Math.cos(this.heading) * 0.6;
+    let fy = Math.sin(this.heading) * 0.6;
+    if (dist < 340) {
+      fx -= (dx / dist) * 1.4;
+      fy -= (dy / dist) * 1.4;
+    }
+    const a = ctx.arena;
+    const wall = 150;
+    if (this.x - a.left < wall) fx += 2 * (1 - (this.x - a.left) / wall);
+    if (a.right - this.x < wall) fx -= 2 * (1 - (a.right - this.x) / wall);
+    if (this.y - a.top < wall) fy += 2 * (1 - (this.y - a.top) / wall);
+    if (a.bottom - this.y < wall) fy -= 2 * (1 - (a.bottom - this.y) / wall);
+    this.heading = Phaser.Math.Angle.RotateTo(this.heading, Math.atan2(fy, fx), 4 * dt);
+    this.heading += (Math.random() - 0.5) * 0.3;
+    return [Math.cos(this.heading) * speed, Math.sin(this.heading) * speed];
   }
 
   private bossThink(ctx: EnemyContext, now: number, dist: number, toPlayer: number, dx: number, dy: number): [number, number] {
