@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
+import type { SourceKey } from '../state/runLog';
 
 const OFFSCREEN_MARGIN = 40;
 /** Enemy bullets die after this long even if still on screen (curving bullets can loop forever). */
@@ -20,6 +21,8 @@ export interface PlayerShot {
   explodeRadius?: number;
   onExplode?: ExplodeHandler;
   knockback?: number;
+  /** Who fired it, for the run stats (see state/runLog.ts). */
+  src?: SourceKey;
   /** Boomerang: fly out for `outMs`, then home back to `home()`; pierces everything, and can hit each enemy again on the way back. */
   boomerang?: { outMs: number; home: () => { x: number; y: number } };
 }
@@ -30,7 +33,7 @@ const BOOMERANG_RETURN_SPEED = 1.25;
 /** A returning boomerang this close to its link is caught. */
 const BOOMERANG_CATCH_PX = 22;
 
-export type ExplodeHandler = (x: number, y: number, radius: number, damage: number) => void;
+export type ExplodeHandler = (x: number, y: number, radius: number, damage: number, src: SourceKey) => void;
 
 export class PlayerBullet extends Phaser.Physics.Arcade.Image {
   damage = 0;
@@ -40,6 +43,7 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
   explodeRadius = 0;
   lobTarget: { x: number; y: number } | null = null;
   onExplode: ExplodeHandler | null = null;
+  src: SourceKey = 'other';
   readonly hitSet = new Set<Phaser.GameObjects.GameObject>();
   private dieAt = 0;
   private speed = 0;
@@ -68,6 +72,7 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
     this.explodeRadius = shot.explodeRadius ?? 0;
     this.lobTarget = shot.lobTarget ?? null;
     this.onExplode = shot.onExplode ?? null;
+    this.src = shot.src ?? 'other';
     this.hitSet.clear();
     this.dieAt = now + shot.lifetimeMs;
     this.setScale(1);
@@ -93,7 +98,7 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
       const total = Math.hypot(this.lobTarget.x - this.x, this.lobTarget.y - this.y);
       this.setScale(1 + Math.min(0.6, total / 400));
       if (total < 12 || time >= this.dieAt) {
-        this.onExplode?.(this.x, this.y, this.explodeRadius, this.damage);
+        this.onExplode?.(this.x, this.y, this.explodeRadius, this.damage, this.src);
         this.kill();
       }
       return;

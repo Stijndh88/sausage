@@ -13,6 +13,9 @@ import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
 import { fitCamera } from '../ui/view';
 import { startRun } from './startRun';
+import { RunStatsPanel } from '../ui/RunStatsPanel';
+import { recordRunEnd } from '../state/telemetry';
+import { getInputMode } from '../ui/inputMode';
 
 export interface EndData {
   run: RunState;
@@ -28,6 +31,7 @@ function settleOnce(run: RunState, outcome: Outcome, hp: number): Settlement {
   if (!s) {
     s = settleRun(run, outcome, hp);
     settled.set(run, s);
+    recordRunEnd(run, outcome, getInputMode());
   }
   return s;
 }
@@ -174,26 +178,37 @@ export function endScreen(scene: Phaser.Scene, data: EndData, title: string, sub
   };
   // Ignore input briefly so a key held from the last fight doesn't skip the results.
   const readyAt = scene.time.now + 600;
+  const statsPanel = new RunStatsPanel(scene, run);
   const again = () => go(() => startRun(scene, run.sausage));
   const rack = () => go(() => scene.scene.start('SpiceRack', { back: 'Select' }));
   const menu = () => go(() => scene.scene.start('Menu'));
-  const againBtn = new Button(scene, GAME_W / 2 - 300, 650, '', { width: 280, height: 58, fontSize: 21, fill: 0x3c8d3c, hover: 0x52b052 }, again);
+  const stats = () => { if (!leaving) statsPanel.toggle(); };
+  const againBtn = new Button(scene, GAME_W / 2 - 390, 650, '', { width: 270, height: 58, fontSize: 21, fill: 0x3c8d3c, hover: 0x52b052 }, again);
   againBtn.setFocused(true);
   bindPrompt(againBtn, () => `One more run${hint('Enter', 'A')}`);
-  bindPrompt(new Button(scene, GAME_W / 2, 650, '', { width: 240, height: 58, fill: 0x8a6a1a, hover: 0xa88228 }, rack), () => `Spice Rack${hint('Tab', 'X')}`);
-  bindPrompt(new Button(scene, GAME_W / 2 + 280, 650, '', { width: 220, height: 58, fill: 0x5a4a3a, hover: 0x7a6650 }, menu), () => `Main menu${hint('Esc', 'B')}`);
+  bindPrompt(new Button(scene, GAME_W / 2 - 125, 650, '', { width: 230, height: 58, fill: 0x2a5a7a, hover: 0x3a7aa0 }, stats), () => `Run stats${hint('S', 'Y')}`);
+  bindPrompt(new Button(scene, GAME_W / 2 + 125, 650, '', { width: 240, height: 58, fill: 0x8a6a1a, hover: 0xa88228 }, rack), () => `Spice Rack${hint('Tab', 'X')}`);
+  bindPrompt(new Button(scene, GAME_W / 2 + 375, 650, '', { width: 230, height: 58, fill: 0x5a4a3a, hover: 0x7a6650 }, menu), () => `Main menu${hint('Esc', 'B')}`);
   const kb = scene.input.keyboard!;
   const ready = () => scene.time.now >= readyAt;
-  onKeyPress(kb, 'ENTER', again, ready);
-  onKeyPress(kb, 'TAB', rack, ready);
-  onKeyPress(kb, 'ESC', menu, ready);
+  // While the stats are open, Esc / Enter close them instead.
+  const orClose = (fn: () => void) => () => (statsPanel.open ? statsPanel.hide() : fn());
+  onKeyPress(kb, 'ENTER', orClose(again), ready);
+  onKeyPress(kb, 'TAB', () => { if (!statsPanel.open) rack(); }, ready);
+  onKeyPress(kb, 'ESC', orClose(menu), ready);
+  onKeyPress(kb, 'S', stats, ready);
   kb.addCapture('TAB');
-  // Gamepad: A / Start = one more run, X = Spice Rack, B = main menu.
+  // Gamepad: A / Start = one more run, Y = run stats, X = Spice Rack, B = main menu.
   const pad = new PadPoller();
   const onUpdate = () => {
     for (const b of pad.poll(scene)) {
-      if (!ready()) continue;
+      if (scene.time.now < readyAt) continue;
+      if (statsPanel.open) {
+        if (b === 'b' || b === 'y' || b === 'a') statsPanel.hide();
+        continue;
+      }
       if (b === 'a' || b === 'start') again();
+      else if (b === 'y') stats();
       else if (b === 'x') rack();
       else if (b === 'b') menu();
     }
@@ -201,6 +216,7 @@ export function endScreen(scene: Phaser.Scene, data: EndData, title: string, sub
   scene.events.on(Phaser.Scenes.Events.UPDATE, onUpdate);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.events.off(Phaser.Scenes.Events.UPDATE, onUpdate));
   (window as unknown as { __results?: unknown }).__results = s;
+  (window as unknown as { __runStats?: RunStatsPanel }).__runStats = statsPanel;
 }
 
 export class GameOverScene extends Phaser.Scene {

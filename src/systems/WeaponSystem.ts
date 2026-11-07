@@ -6,6 +6,7 @@ import { PlayerBullet, type ExplodeHandler } from '../entities/BulletPool';
 import type { Enemy } from '../entities/Enemy';
 import type { LinkChain } from '../entities/LinkChain';
 import type { WeaponSlot } from '../state/run';
+import { linkSource } from '../state/runLog';
 import { stackBonus, stackCounts, type StackBonus } from '../data/stacks';
 import { audio } from '../audio/Audio';
 import type { GameClock } from './clock';
@@ -31,6 +32,8 @@ export interface WeaponHooks {
 export class WeaponSystem {
   private weapons: WeaponSlot[] = [];
   private nextFire: number[] = [];
+  /** The link whose shots are being made right now (tags them for the run stats). */
+  private firing = 0;
   /** Each link's stack bonus (from how many links hold the same weapon). */
   private bonus: StackBonus[] = [];
 
@@ -71,6 +74,7 @@ export class WeaponSystem {
   }
 
   private fire(def: WeaponDef, tier: number, slot: number, x: number, y: number, target: Enemy, now: number, damageMult: number, bonus: StackBonus): void {
+    this.firing = slot;
     const angle = Math.atan2(target.y - y, target.x - x);
     const damage = tierDamage(def, tier) * damageMult;
     const range = def.range * bonus.rangeMult;
@@ -132,7 +136,7 @@ export class WeaponSystem {
 
   private shot(s: Parameters<PlayerBullet['fire']>[0], now: number): void {
     const b = this.pool.get(s.x, s.y) as PlayerBullet | null;
-    if (b) b.fire(s, now);
+    if (b) b.fire({ ...s, src: linkSource(this.firing) }, now);
   }
 
   destroy(): void {

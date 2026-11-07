@@ -9,6 +9,7 @@ import type { Offer } from '../systems/Economy';
 import { mulberry32 } from '../systems/rng';
 import type { MenuId } from '../data/menus';
 import type { EventKind } from '../data/events';
+import { newRunLog, type RunLog } from './runLog';
 
 export interface WeaponSlot {
   id: WeaponId;
@@ -55,6 +56,8 @@ export interface RunState {
   reviveUsed: boolean;
   /** Cookbook counters gathered this run. */
   tally: Counters;
+  /** Run statistics: damage per link, damage taken, crumbs, waves (see state/runLog.ts). */
+  log: RunLog;
 }
 
 /** Enough for one cheap item in the first shop. */
@@ -98,6 +101,7 @@ export function newRun(seed: number = Date.now() >>> 0, sausage: SausageId = 'fr
     reviveUsed: false,
     tally: {},
     eventsWon: {},
+    log: newRunLog(weapons),
   };
 }
 

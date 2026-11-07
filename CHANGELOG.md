@@ -12,6 +12,10 @@ Versions follow [semantic versioning](https://semver.org). The main menu shows t
 - Tooltips: hover or tap a link or item in the pause menu or the shop to see what it does, its numbers,
   its stack bonuses and what the next tier adds. With keys or a controller: ←→ in the pause menu, Tab (LB/RB) in the shop.
 - The Pick Your Sausage cards no longer show a number before each name (the number keys still work).
+- **Run stats** screen after every run (S / (Y) on the results screen): totals, damage / DPS / kills per
+  link, what hurt you, where the crumbs went, damage per wave.
+- **Play data** kept on the device: a summary of every run, errors, and runs that never finished
+  (closed tab vs. probable crash). Settings → Play data downloads it as JSON. Nothing is sent anywhere yet.
 
 ## 0.2.0
 - New rare item **Sharp Cheddar**: straight shots (Toothpick, Mustard Squirt, Pepper Mill, Skewer) pierce

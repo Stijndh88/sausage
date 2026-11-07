@@ -8,12 +8,14 @@ import { onKeyPress } from './input';
 import { ControlsPanel } from './ControlsPanel';
 import { bindPrompt, getInputMode, hint } from './inputMode';
 import { moveLabel } from './keyboardLayout';
+import { downloadTelemetry, loadTelemetry } from '../state/telemetry';
 
 type Row =
   | { kind: 'slider'; key: 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake'; label: string }
   | { kind: 'toggle'; key: 'reduceFlashing' | 'reducedMotion' | 'damageNumbers' | 'vibration'; label: string }
   | { kind: 'dashSide'; label: string }
-  | { kind: 'controls'; label: string };
+  | { kind: 'controls'; label: string }
+  | { kind: 'playData'; label: string };
 
 const ROWS: Row[] = [
   { kind: 'slider', key: 'masterVolume', label: 'Master volume' },
@@ -26,6 +28,7 @@ const ROWS: Row[] = [
   { kind: 'toggle', key: 'vibration', label: 'Vibration (controller / phone)' },
   { kind: 'dashSide', label: 'Touch: DASH button side' },
   { kind: 'controls', label: 'Keyboard controls' },
+  { kind: 'playData', label: 'Play data (on this device)' },
 ];
 
 const W = 560;
@@ -124,7 +127,9 @@ export class SettingsPanel {
       const value = add(s.add.text(row.kind === 'slider' ? left + W - 150 : left + W - 138, y, '', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#ffd23f' })
         .setOrigin(row.kind === 'slider' ? 0.5 : 1, 0.5));
       this.valueTexts.push(value);
-      if (row.kind === 'controls') {
+      if (row.kind === 'playData') {
+        add(new Button(s, left + W - 80, y, 'Download', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
+      } else if (row.kind === 'controls') {
         add(new Button(s, left + W - 80, y, 'Change…', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
       } else if (row.kind === 'slider') {
         add(new Button(s, left + W - 222, y, '−', { width: 56, height: 40, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 24 }, () => this.adjust(row, -1)));
@@ -167,6 +172,10 @@ export class SettingsPanel {
       this.controls.show();
       return;
     }
+    if (row.kind === 'playData') {
+      audio.play(downloadTelemetry() ? 'click' : 'deny');
+      return;
+    }
     if (row.kind === 'dashSide') {
       updateSettings({ dashSide: s.dashSide === 'left' ? 'right' : 'left' });
       audio.play('click');
@@ -187,6 +196,10 @@ export class SettingsPanel {
       const t = this.valueTexts[i];
       if (!t) return;
       if (row.kind === 'controls') t.setText(`Move: ${moveLabel(s.keyBindings)}`);
+      else if (row.kind === 'playData') {
+        const d = loadTelemetry();
+        t.setText(`${d.runs.length} run${d.runs.length === 1 ? '' : 's'}`);
+      }
       else if (row.kind === 'dashSide') t.setText(s.dashSide === 'left' ? 'Left' : 'Right');
       else t.setText(row.kind === 'slider' ? `${Math.round(s[row.key] * 100)}%` : s[row.key] ? 'On' : 'Off');
     });
