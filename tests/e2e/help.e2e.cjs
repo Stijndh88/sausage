@@ -56,7 +56,7 @@ module.exports = {
         await frames(g, 2);
         t = await tooltip(g, 'Game', 'pause');
         assert.equal(t.title, 'Paprika');
-        assert.ok(t.lines.includes('You have 2'), JSON.stringify(t.lines));
+        assert.ok(t.lines.includes('You have 2 of max 10'), JSON.stringify(t.lines));
         await shot(page, 'pause-tooltip');
         // Mouse hover on the second link.
         await page.mouse.move(470 + 46 + 92, 160 + 200 + 50);
