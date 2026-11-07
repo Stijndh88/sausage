@@ -18,6 +18,7 @@ import { settleRun } from './state/meta';
 import { RENDER_SCALE } from './ui/view';
 import { setInputMode, trackInputMode } from './ui/inputMode';
 import { clearTelemetry, exportTelemetry, installErrorCapture, loadTelemetry, resetTelemetryCache, startSession } from './state/telemetry';
+import { startPlayDataSync, syncPlayData } from './state/playDataSync';
 
 // Play data (kept on this device): count the visit, note a run the last visit never finished,
 // and catch errors from here on. See state/telemetry.ts.
@@ -28,6 +29,8 @@ installErrorCapture(() => {
   const run = (g?.scene.getScene('Game') as unknown as { run?: { wave: number } } | undefined)?.run;
   return { scene: scenes.join(','), ...(run ? { wave: run.wave } : {}) };
 });
+// ...and upload it, unless the player turned "Share play data" off (see state/playDataSync.ts).
+startPlayDataSync();
 
 // Every scene.add.text renders at the render scale, so text stays sharp on big / high-DPI screens.
 type TextFactory = (x: number, y: number, text: string | string[], style?: Phaser.Types.GameObjects.Text.TextStyle) => Phaser.GameObjects.Text;
@@ -108,7 +111,7 @@ window.addEventListener('gamepaddisconnected', () => toast('🎮 Controller disc
 // Hooks for automated tests (tests/e2e). Harmless in normal play.
 Object.assign(window as unknown as Record<string, unknown>, {
   __game: game,
-  __debug: { newRun, waveConfig, loadSave, writeSave, resetSaveCache, settleRun, loadTelemetry, resetTelemetryCache, clearTelemetry, exportTelemetry },
+  __debug: { newRun, waveConfig, loadSave, writeSave, resetSaveCache, settleRun, loadTelemetry, resetTelemetryCache, clearTelemetry, exportTelemetry, syncPlayData },
   __audio: audio,
   __renderScale: RENDER_SCALE,
 });

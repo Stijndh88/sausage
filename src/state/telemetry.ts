@@ -4,10 +4,11 @@ import { damageRows, totalDealt, totalTaken, type WaveLog } from './runLog';
 import { VERSION, COMMIT } from '../version';
 
 /**
- * Play data, kept on this device only (nothing is sent anywhere yet): a summary of every finished
+ * Play data, kept on this device: a summary of every finished
  * run, the errors the game hit, and runs that never finished (closed tab or crash). It exists so
  * balance problems, bugs and crashes can be spotted from real play. Settings → Play data downloads
- * it as a JSON file; `window.__telemetry` shows it in the console.
+ * it as a JSON file; `window.__telemetry` shows it in the console. Unless the player turns
+ * "Share play data" off, state/playDataSync.ts also uploads each record once.
  *
  * Storage can be missing or throw (private mode, blocked site data): every access is guarded and
  * the game never depends on it.
@@ -21,6 +22,10 @@ export const TELEMETRY_VERSION = 1;
 export type RunEnd = 'death' | 'home' | 'bail' | 'restart' | 'quit' | 'abandoned' | 'crashed';
 
 export interface RunRecord {
+  /** Random id, so an upload that's retried is stored only once. */
+  id: string;
+  /** Uploaded already (see playDataSync.ts). */
+  sent?: boolean;
   /** When the run ended (ISO time). */
   at: string;
   build: string;
@@ -49,6 +54,8 @@ export interface RunRecord {
 }
 
 export interface ErrorRecord {
+  id: string;
+  sent?: boolean;
   at: string;
   build: string;
   message: string;
@@ -97,6 +104,31 @@ function fresh(): TelemetryData {
 }
 
 let cache: TelemetryData | null = null;
+const listeners = new Set<() => void>();
+
+/** Called after a run or an error is recorded (the uploader listens). */
+export function onTelemetryRecord(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function notify(): void {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Marks records as uploaded (by id) and saves. */
+export function markSent(ids: readonly string[]): void {
+  const set = new Set(ids);
+  const data = loadTelemetry();
+  for (const r of [...data.runs, ...data.errors]) if (set.has(r.id)) r.sent = true;
+  persist(data);
+}
 
 export function loadTelemetry(): TelemetryData {
   if (cache) return cache;
@@ -113,6 +145,8 @@ export function loadTelemetry(): TelemetryData {
           runs: Array.isArray(parsed.runs) ? parsed.runs : [],
           errors: Array.isArray(parsed.errors) ? parsed.errors : [],
         };
+        // Records from before ids existed get one now.
+        for (const r of [...data.runs, ...data.errors]) if (!r.id) r.id = randomId();
       }
     }
   } catch {
@@ -152,6 +186,7 @@ export function runRecord(run: RunState, outcome: RunEnd, input?: string): RunRe
   const log = run.log;
   const rows = damageRows(log, run.timeSurvivedSec).filter((r) => r.link > 0);
   return {
+    id: randomId(),
     at: now(),
     build: build(),
     seed: run.seed,
@@ -196,6 +231,7 @@ export function recordRunEnd(run: RunState, outcome: RunEnd, input?: string): vo
   data.runs = [...data.runs, runRecord(run, outcome, input)].slice(-MAX_RUNS);
   delete data.active;
   persist(data);
+  notify();
 }
 
 /** Notes the run in progress (call at every wave start). */
@@ -247,9 +283,10 @@ export function recordError(message: string, stack?: string, ctx: { scene?: stri
     same.count++;
     same.at = now();
   } else {
-    data.errors = [...data.errors, { at: now(), build: build(), message: msg, ...(st ? { stack: st } : {}), ...ctx, count: 1 }].slice(-MAX_ERRORS);
+    data.errors = [...data.errors, { id: randomId(), at: now(), build: build(), message: msg, ...(st ? { stack: st } : {}), ...ctx, count: 1 }].slice(-MAX_ERRORS);
   }
   persist(data);
+  notify();
 }
 
 /** Catches uncaught errors and promise rejections into the play data. */
