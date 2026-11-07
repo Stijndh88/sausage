@@ -1,4 +1,4 @@
-import { tierCooldown, tierDamage, tierProjectiles, tierSpin, type WeaponDef } from '../data/weapons';
+import { tierCooldown, tierDamage, tierProjectiles, type WeaponDef } from '../data/weapons';
 import type { PlayerStats } from '../state/stats';
 
 type Format = 'int' | 'pct' | 'mult' | 'sec' | 'perSec' | 'bool' | 'plus';
@@ -55,13 +55,9 @@ export function weaponStatLine(def: WeaponDef, tier: number, fromTier?: number):
   const parts: string[] = [];
   const pair = (a: string, b: string) => (fromTier !== undefined && a !== b ? `${a} → ${b}` : b);
   parts.push(`DMG ${pair(dmg(fromTier ?? tier), dmg(tier))}`);
-  if (def.kind === 'orbit') {
-    parts.push(`${pair(String(proj(fromTier ?? tier)), String(proj(tier)))} rings`);
-    if (fromTier !== undefined && tierSpin(def, tier) !== tierSpin(def, fromTier)) parts.push('spins faster');
-  } else {
-    parts.push(`every ${pair(cd(fromTier ?? tier), cd(tier))}`);
-    if (proj(tier) > 1) parts.push(`${pair(String(proj(fromTier ?? tier)), String(proj(tier)))} shots`);
-  }
+  parts.push(`every ${pair(cd(fromTier ?? tier), cd(tier))}`);
+  const noun = def.kind === 'boomerang' ? 'rings' : 'shots';
+  if (proj(tier) > 1) parts.push(`${pair(String(proj(fromTier ?? tier)), String(proj(tier)))} ${noun}`);
   return parts.join(' · ');
 }
 

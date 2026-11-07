@@ -90,6 +90,6 @@ describe('shop stat text', () => {
     expect(weaponStatLine(WEAPONS.toothpick, 1)).toBe('DMG 7 · every 0.40s');
     expect(weaponStatLine(WEAPONS.toothpick, 2, 1)).toBe('DMG 7 → 10.5 · every 0.40s → 0.36s');
     expect(weaponStatLine(WEAPONS.pepper, 2, 1)).toContain('6 → 7 shots');
-    expect(weaponStatLine(WEAPONS.onion, 3, 2)).toContain('spins faster');
+    expect(weaponStatLine(WEAPONS.onion, 3, 2)).toContain('1 → 2 rings');
   });
 });

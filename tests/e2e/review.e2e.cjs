@@ -486,31 +486,6 @@ module.exports = {
       },
     },
     {
-      name: 'review: onion rings move continuously when fire rate changes mid-wave',
-      timeoutMs: 20000,
-      fn: async ({ g }) => {
-        await setup(g, { weapons: [{ id: 'onion', tier: 1 }] });
-        await g.wait(3000); // let absolute time grow a bit
-        const maxStep = await g.evaluate(async () => {
-          const s = window.__rv.scene();
-          const spr = s.weapons.rings[0].sprites[0];
-          const steps = [];
-          let prev = spr.rotation;
-          for (let i = 0; i < 20; i++) {
-            if (i === 10) s.stats.fireRateMult = 1.2; // e.g. an item bought or a buff: fire rate ×1.2
-            await window.__rv.frames(1);
-            let d = Math.abs(spr.rotation - prev) % (Math.PI * 2);
-            d = Math.min(d, Math.PI * 2 - d);
-            steps.push(d);
-            prev = spr.rotation;
-          }
-          return Math.max(...steps);
-        });
-        // 3.2 rad/s × 1.2 at ≤50ms per frame ≈ 0.19 rad/frame max.
-        assert.ok(maxStep < 0.3, `rings jumped ${maxStep.toFixed(2)} rad in one frame`);
-      },
-    },
-    {
       name: 'review: HUD does not re-render unchanged text every frame',
       timeoutMs: 20000,
       fn: async ({ g }) => {

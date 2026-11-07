@@ -23,7 +23,6 @@ function installStepper(g) {
   });
 }
 
-const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 module.exports = {
   tests: [
@@ -101,32 +100,50 @@ module.exports = {
       },
     },
     {
-      name: 'onion rings keep moving smoothly when fire rate jumps mid-wave',
+      name: 'onion ring: thrown out, hits on the way out and on the way back, then is caught by its link',
+      timeoutMs: 120000,
       fn: async ({ g }) => {
-        await g.startRun({ seed: 5, weapons: [{ id: 'onion', tier: 1 }] });
+        await g.startRun({ seed: 5, wave: 2, weapons: [{ id: 'onion', tier: 1 }] });
         await g.godMode();
-        await installStepper(g);
-        const r = await g.evaluate(() => {
+        await g.installBot();
+        await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
-          const hold = (h) => () => { s.stats.fireRateMult = h; };
-          const ring = () => s.weapons.rings[0].sprites[0].rotation;
-          // Wait for a moment where the jump would be large (> 1 rad), so the test doesn't pass by luck.
-          for (let i = 0; i < 2000; i++) {
-            const j = ((window.__balNow() + 1000 / 60) / 1000) * 3.2 * 0.2;
-            if (Math.abs(Math.atan2(Math.sin(j), Math.cos(j))) > 1) break;
-            window.__balStep(1, 1000 / 60, hold(1));
-          }
-          const a0 = ring();
-          window.__balStep(1, 1000 / 60, hold(1));
-          const a1 = ring();
-          s.stats.fireRateMult = 1.2;
-          window.__balStep(1, 1000 / 60, hold(1.2));
-          const a2 = ring();
-          return { normal: a1 - a0, crossing: a2 - a1 };
+          const log = (window.__boom = { out: 0, back: 0, both: 0, caught: 0, expired: 0 });
+          const legs = new Map();
+          let ids = 0;
+          const orig = s.onBulletHit.bind(s);
+          s.onBulletHit = (a, b) => {
+            const ring = [a, b].find((o) => o.texture && o.texture.key === 'onion-ring');
+            if (ring && ring.active) {
+              const enemy = ring === a ? b : a;
+              enemy.__id = enemy.__id || ++ids;
+              if (!ring.hitSet.has(enemy)) {
+                const key = `${ring.firedAt}:${enemy.__id}`;
+                const seen = legs.get(key) || new Set();
+                seen.add(ring.returning ? 'back' : 'out');
+                legs.set(key, seen);
+                if (ring.returning) log.back++; else log.out++;
+                if (seen.size === 2) log.both++;
+              }
+            }
+            orig(a, b);
+          };
+          const proto = Object.getPrototypeOf(s.playerBullets.getFirstAlive() || s.playerBullets.get(-999, -999));
+          const kill = proto.kill;
+          proto.kill = function () {
+            if (this.active && this.texture.key === 'onion-ring') {
+              if (this.returning && s.gameTime < this.dieAt - 50) log.caught++;
+              else log.expired++;
+            }
+            return kill.call(this);
+          };
+          window.__unboom = () => { proto.kill = kill; };
         });
-        const normal = Math.abs(wrap(r.normal));
-        const crossing = Math.abs(wrap(r.crossing));
-        assert.ok(crossing < Math.max(0.3, normal * 3), `ring moved ${crossing.toFixed(2)} rad in one frame (normal ${normal.toFixed(3)})`);
+        await g.waitGameMs(15000, 110000);
+        const r = await g.evaluate(() => { window.__unboom(); return window.__boom; });
+        assert.ok(r.out > 0 && r.back > 0, `hits out ${r.out}, back ${r.back}`);
+        assert.ok(r.both > 0, `no enemy was hit by the same throw on both legs: ${JSON.stringify(r)}`);
+        assert.ok(r.caught > 0 && r.caught >= r.expired * 3, `rings should come home, not time out: ${JSON.stringify(r)}`);
       },
     },
     {

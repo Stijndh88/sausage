@@ -27,11 +27,8 @@ import { mulberry32 } from '../src/systems/rng';
 function nominalDps(def: WeaponDef, tier: number): number {
   const dmg = tierDamage(def, tier);
   const cdSec = tierCooldown(def, tier) / 1000;
-  if (def.kind === 'orbit') {
-    // One hit per ring per revolution (see the orbit test below).
-    const revSec = (2 * Math.PI) / def.speed;
-    return (tierProjectiles(def, tier) * dmg) / revSec;
-  }
+  // A boomerang hits on the way out and again on the way back.
+  if (def.kind === 'boomerang') return (2 * tierProjectiles(def, tier) * dmg) / cdSec;
   let dps = (tierProjectiles(def, tier) * dmg) / cdSec;
   if (def.poisonDps) dps += def.poisonDps * (1 + 0.5 * (tier - 1));
   return dps;
@@ -99,7 +96,7 @@ describe('weapon tiers', () => {
   });
 
   it('single-target projectile weapons are within 3x of each other per crumb at tier I', () => {
-    const ids = WEAPON_IDS.filter((id) => WEAPONS[id].kind !== 'orbit' && WEAPONS[id].kind !== 'lob');
+    const ids = WEAPON_IDS.filter((id) => WEAPONS[id].kind !== 'boomerang' && WEAPONS[id].kind !== 'lob');
     const perCrumb = ids.map((id) => nominalDps(WEAPONS[id], 1) / WEAPONS[id].price);
     expect(Math.max(...perCrumb) / Math.min(...perCrumb)).toBeLessThan(3);
   });

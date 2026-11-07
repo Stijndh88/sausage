@@ -21,8 +21,6 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   hp: number;
   readonly maxHp: number;
   dead = false;
-  /** Last time each orbiting weapon (by slot) hit this enemy. */
-  readonly orbitHits = new Map<number, number>();
 
   private kbX = 0;
   private kbY = 0;

@@ -6,7 +6,7 @@ import { getSettings, onSettingsChange, type Settings } from '../state/settings'
  * Browsers only allow audio after a user gesture, so `unlock()` is called on the first key/tap.
  */
 export type SfxName =
-  | 'shoot_single' | 'shoot_cone' | 'shoot_shotgun' | 'shoot_pierce' | 'shoot_lob'
+  | 'shoot_single' | 'shoot_cone' | 'shoot_shotgun' | 'shoot_pierce' | 'shoot_lob' | 'shoot_boomerang'
   | 'explode' | 'hit' | 'crit' | 'kill' | 'hurt' | 'dodge' | 'dash' | 'crumb' | 'heal'
   | 'telegraph' | 'enemyShoot' | 'waveStart' | 'waveClear' | 'buy' | 'reroll' | 'deny' | 'click'
   | 'bossRoar' | 'bossPhase' | 'death' | 'victory' | 'unlock' | 'save';
@@ -15,7 +15,7 @@ export type Mood = 'off' | 'menu' | 'fight' | 'boss';
 
 /** Minimum gap between two plays of the same effect, so 300 bullets don't make 300 sounds. */
 const THROTTLE_MS: Partial<Record<SfxName, number>> = {
-  shoot_single: 45, shoot_cone: 60, shoot_shotgun: 60, shoot_pierce: 60, shoot_lob: 80,
+  shoot_single: 45, shoot_cone: 60, shoot_shotgun: 60, shoot_pierce: 60, shoot_lob: 80, shoot_boomerang: 120,
   hit: 35, crit: 50, kill: 30, crumb: 22, telegraph: 140, enemyShoot: 70, explode: 60, dodge: 120,
 };
 
@@ -100,6 +100,7 @@ class AudioEngine {
       case 'shoot_shotgun': this.noise(t, 0.07, 0.07, 'bandpass', 3200, 1400); break;
       case 'shoot_pierce': this.tone(t, 420, 1300, 0.08, 'sawtooth', 0.035); break;
       case 'shoot_lob': this.tone(t, 240, 110, 0.13, 'sine', 0.09); break;
+      case 'shoot_boomerang': this.noise(t, 0.16, 0.035, 'bandpass', 900, 2400); break;
       case 'explode': this.noise(t, 0.35, 0.22, 'lowpass', 900, 150); this.tone(t, 90, 38, 0.3, 'sine', 0.18); break;
       case 'hit': this.tone(t, r(200, 260), 150, 0.03, 'square', 0.025); break;
       case 'crit': this.tone(t, 1400, 1900, 0.06, 'triangle', 0.05); break;

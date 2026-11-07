@@ -149,8 +149,9 @@ export class GameScene extends Phaser.Scene {
     this.patterns = new BulletPatterns(this.enemyBullets, this.clock);
     this.pickups = new Pickups(this, this.clock);
 
-    this.weapons = new WeaponSystem(this, this.playerBullets, this.chain, this.clock, {
+    this.weapons = new WeaponSystem(this.playerBullets, this.chain, this.clock, {
       enemies: () => this.enemyList(),
+      head: () => this.head,
       mods: () => this.stats,
       damage: (e, amount, fx, fy, kb) => this.damageEnemy(e, amount, fx, fy, kb),
       explode: (x, y, r, dmg) => this.explode(x, y, r, dmg),
@@ -397,8 +398,11 @@ export class GameScene extends Phaser.Scene {
     if (!bullet || !enemy || !bullet.active || enemy.dead || bullet.hitSet.has(enemy)) return;
     bullet.hitSet.add(enemy);
     if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps, POISON_MS, this.gameTime);
-    const fromX = bullet.x - Math.cos(bullet.rotation) * 20;
-    const fromY = bullet.y - Math.sin(bullet.rotation) * 20;
+    // Push away from where the shot came from (its velocity: spinning shots' rotation means nothing).
+    const v = (bullet.body as Phaser.Physics.Arcade.Body).velocity;
+    const heading = v.lengthSq() > 1 ? Math.atan2(v.y, v.x) : bullet.rotation;
+    const fromX = bullet.x - Math.cos(heading) * 20;
+    const fromY = bullet.y - Math.sin(heading) * 20;
     this.damageEnemy(enemy, bullet.damage, fromX, fromY, bullet.knockback);
     if (bullet.pierceLeft > 0) bullet.pierceLeft--;
     else bullet.kill();

@@ -20,7 +20,15 @@ export interface PlayerShot {
   explodeRadius?: number;
   onExplode?: ExplodeHandler;
   knockback?: number;
+  /** Boomerang: fly out for `outMs`, then home back to `home()`; pierces everything, and can hit each enemy again on the way back. */
+  boomerang?: { outMs: number; home: () => { x: number; y: number } };
 }
+
+/** Boomerangs slow down to this fraction of their speed at the turn, then speed up on the way back. */
+const BOOMERANG_MIN_SPEED = 0.2;
+const BOOMERANG_RETURN_SPEED = 1.25;
+/** A returning boomerang this close to its link is caught. */
+const BOOMERANG_CATCH_PX = 22;
 
 export type ExplodeHandler = (x: number, y: number, radius: number, damage: number) => void;
 
@@ -34,6 +42,12 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
   onExplode: ExplodeHandler | null = null;
   readonly hitSet = new Set<Phaser.GameObjects.GameObject>();
   private dieAt = 0;
+  private speed = 0;
+  private home: (() => { x: number; y: number }) | null = null;
+  private firedAt = 0;
+  private turnAt = 0;
+  /** Set once a boomerang has turned around. */
+  returning = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -57,6 +71,12 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
     this.hitSet.clear();
     this.dieAt = now + shot.lifetimeMs;
     this.setScale(1);
+    this.speed = shot.speed;
+    this.home = shot.boomerang?.home ?? null;
+    this.firedAt = now;
+    this.turnAt = now + (shot.boomerang?.outMs ?? 0);
+    this.returning = false;
+    if (this.home) this.pierceLeft = Number.POSITIVE_INFINITY;
   }
 
   /** Lobbed shots don't collide in flight. */
@@ -78,7 +98,41 @@ export class PlayerBullet extends Phaser.Physics.Arcade.Image {
       }
       return;
     }
+    if (this.home) {
+      this.updateBoomerang(time, delta);
+      return;
+    }
     if (time >= this.dieAt || isOffscreen(this.x, this.y)) this.kill();
+  }
+
+  private updateBoomerang(time: number, delta: number): void {
+    this.rotation += 14 * (delta / 1000);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (!this.returning && time >= this.turnAt) {
+      this.returning = true;
+      // A fresh pass: everything can be hit once more on the way back.
+      this.hitSet.clear();
+    }
+    if (!this.returning) {
+      // Ease out: full speed at the throw, slow at the turn.
+      const left = 1 - (time - this.firedAt) / Math.max(1, this.turnAt - this.firedAt);
+      const v = Math.hypot(body.velocity.x, body.velocity.y) || 1;
+      const speed = this.speed * Math.max(BOOMERANG_MIN_SPEED, left);
+      body.velocity.set((body.velocity.x / v) * speed, (body.velocity.y / v) * speed);
+    } else {
+      const target = this.home!();
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < BOOMERANG_CATCH_PX) {
+        this.kill();
+        return;
+      }
+      const ramp = Math.min(1, (time - this.turnAt) / 300);
+      const speed = this.speed * (BOOMERANG_MIN_SPEED + (BOOMERANG_RETURN_SPEED - BOOMERANG_MIN_SPEED) * ramp);
+      body.velocity.set((dx / dist) * speed, (dy / dist) * speed);
+    }
+    if (time >= this.dieAt) this.kill();
   }
 
   kill(): void {

@@ -1,6 +1,6 @@
 /** Every weapon rides on its own sausage link. All balance numbers live here. */
 export type WeaponId = 'toothpick' | 'mustard' | 'pepper' | 'skewer' | 'pickle' | 'onion';
-export type WeaponKind = 'single' | 'cone' | 'shotgun' | 'pierce' | 'lob' | 'orbit';
+export type WeaponKind = 'single' | 'cone' | 'shotgun' | 'pierce' | 'lob' | 'boomerang';
 
 export interface WeaponDef {
   id: WeaponId;
@@ -9,10 +9,10 @@ export interface WeaponDef {
   kind: WeaponKind;
   price: number;
   damage: number;
-  /** Time between shots. For orbit weapons: how often a ring can hit the same enemy. */
+  /** Time between shots. */
   cooldownMs: number;
   speed: number;
-  /** Targeting range in px. For orbit weapons: the orbit radius. */
+  /** Targeting range in px. For boomerangs: how far they fly before turning back. */
   range: number;
   projectiles: number;
   spreadDeg: number;
@@ -64,10 +64,10 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     bulletTexture: 'pb-pickle', icon: 'icon-pickle', color: 0x5fae3a,
   },
   onion: {
-    id: 'onion', name: 'Onion Ring', kind: 'orbit',
-    desc: 'Rings orbit this link and slice anything they touch. Upgrades spin faster.',
-    price: 14, damage: 9, cooldownMs: 450, speed: 3.2, range: 64,
-    projectiles: 2, spreadDeg: 0, pierce: 0,
+    id: 'onion', name: 'Onion Ring', kind: 'boomerang',
+    desc: 'Throws an onion ring that slices through everything, then flies back and hits again.',
+    price: 14, damage: 9, cooldownMs: 1100, speed: 420, range: 260,
+    projectiles: 1, spreadDeg: 0, pierce: 0,
     bulletTexture: 'onion-ring', icon: 'icon-onion', color: 0xf3ead2,
   },
 };
@@ -79,19 +79,12 @@ export function tierDamage(def: WeaponDef, tier: number): number {
 }
 
 export function tierCooldown(def: WeaponDef, tier: number): number {
-  // Orbit rings hit once per pass, so a shorter re-hit cooldown does nothing; they spin faster instead.
-  if (def.kind === 'orbit') return def.cooldownMs;
   return def.cooldownMs * (1 - 0.1 * (tier - 1));
-}
-
-/** Orbit spin speed multiplier per tier. */
-export function tierSpin(def: WeaponDef, tier: number): number {
-  return def.kind === 'orbit' ? 1 + 0.2 * (tier - 1) : 1;
 }
 
 /** Extra projectiles / rings / pierce granted by higher tiers. */
 export function tierProjectiles(def: WeaponDef, tier: number): number {
-  if (def.kind === 'orbit') return def.projectiles + (tier >= 3 ? 1 : 0) + (tier >= 4 ? 1 : 0);
+  if (def.kind === 'boomerang') return def.projectiles + (tier >= 3 ? 1 : 0) + (tier >= 4 ? 1 : 0);
   if (def.kind === 'shotgun' || def.kind === 'cone') return def.projectiles + (tier - 1);
   return def.projectiles;
 }
