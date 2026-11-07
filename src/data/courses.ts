@@ -123,9 +123,9 @@ export function bossName(course: number): string {
   return course < COURSES.length ? name : `${name} (remix)`;
 }
 
-/** Spice multiplier of a course: x1, x2, x3, then +1 per Seconds loop. */
+/** Spice multiplier of a course: x1, x1.5, x2, then +0.5 per Seconds loop. */
 export function courseSpiceMult(course: number): number {
-  return course + 1;
+  return 1 + 0.5 * Math.max(0, course);
 }
 
 /** Trophy the course's boss drops. */

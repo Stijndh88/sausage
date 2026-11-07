@@ -22,19 +22,19 @@ export const MAX_DEATH_KEEP = 0.9;
 /** Each Chili level adds this much to the Spice multiplier. */
 export const CHILI_SPICE = 0.2;
 
-/** Spice per crumb an enemy is worth (a fork is 0.05 Spice, a turret 0.15). */
-export const KILL_SPICE_PER_CRUMB = 0.05;
+/** Spice per crumb an enemy is worth (a fork is 0.03 Spice, a turret 0.09). */
+export const KILL_SPICE_PER_CRUMB = 0.03;
 export const BOSS_SPICE = 25;
 /** Spice for each timed event you win (before the multiplier). */
-export const EVENT_SPICE = 8;
+export const EVENT_SPICE = 6;
 
 export function waveClearSpice(courseWave: number): number {
-  return 6 + 2 * courseWave;
+  return 4 + courseWave;
 }
 
 /** One-time bonus for the first kill of each course's boss with each sausage (Seconds pay none). */
 export function firstTasteSpice(course: number): number {
-  return course < 3 ? 40 * (course + 1) : 0;
+  return course < 3 ? 25 * (course + 1) : 0;
 }
 
 /** The Spice multiplier right now: course, pushes (All You Can Eat), talents, Chili and menu. */

@@ -48,8 +48,8 @@ describe('courses', () => {
     expect(waveConfig(courseStart(3)).hpMult).toBeGreaterThan(waveConfig(courseStart(2)).hpMult);
   });
 
-  it('Spice multipliers go x1, x2, x3, then +1 per Seconds loop', () => {
-    expect([0, 1, 2, 3, 4].map(courseSpiceMult)).toEqual([1, 2, 3, 4, 5]);
+  it('Spice multipliers go x1, x1.5, x2, then +0.5 per Seconds loop', () => {
+    expect([0, 1, 2, 3, 4].map(courseSpiceMult)).toEqual([1, 1.5, 2, 2.5, 3]);
   });
 });
 
@@ -78,16 +78,16 @@ describe('the doggy bag', () => {
     const run = newRun(1, 'frank', { chili: 2 });
     run.wave = courseStart(1);
     run.menu = 'grease_fire';
-    expect(spiceMult(run)).toBeCloseTo(2 * (1 + 0.4 + 0.25));
+    expect(spiceMult(run)).toBeCloseTo(1.5 * (1 + 0.4 + 0.25));
   });
 
-  it('a clean Backyard pays roughly 100 to 160 Spice, as the design says', () => {
+  it('a clean Backyard pays roughly 70 to 120 Spice', () => {
     // About 350 kills worth ~1.7 crumbs each, six cleared waves and the boss.
     const kills = 350 * 1.7 * KILL_SPICE_PER_CRUMB;
     const waves = [1, 2, 3, 4, 5, 6].reduce((a, w) => a + waveClearSpice(w), 0);
     const total = kills + waves + BOSS_SPICE;
-    expect(total).toBeGreaterThan(100);
-    expect(total).toBeLessThan(160);
+    expect(total).toBeGreaterThan(70);
+    expect(total).toBeLessThan(120);
     expect(firstTasteSpice(0)).toBeGreaterThan(0);
     expect(firstTasteSpice(3)).toBe(0);
   });
@@ -171,14 +171,14 @@ describe('settling a run', () => {
 });
 
 describe('the Spice Rack', () => {
-  it('the full tree costs a few thousand Spice: dozens of runs, not hundreds', () => {
+  it('the full tree costs about 16,000 Spice: a few dozen good runs, not one', () => {
     const total = fullTreeCost();
-    expect(total).toBeGreaterThan(4000);
-    expect(total).toBeLessThan(9000);
+    expect(total).toBeGreaterThan(12000);
+    expect(total).toBeLessThan(20000);
   });
 
-  it('the first rank of every shelf-1 talent costs 10, so the first run always buys something', () => {
-    for (const id of TALENT_IDS) if (TALENTS[id].shelf === 1) expect(rankCost(TALENTS[id], 0)).toBe(10);
+  it('the first rank of every shelf-1 talent costs 25, so even a short first run buys something', () => {
+    for (const id of TALENT_IDS) if (TALENTS[id].shelf === 1) expect(rankCost(TALENTS[id], 0)).toBe(25);
   });
 
   it('shelf 2 needs 5 points in the jar, keystones need 10 points and trophies', () => {

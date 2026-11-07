@@ -72,10 +72,18 @@ export const BASE_STATS: Readonly<PlayerStats> = {
   iframeBonusMs: 0,
 };
 
+/**
+ * Hard limits. The upper ones (dodge, crit, lifesteal, damage, fire rate) are a safety net: item
+ * stack limits keep normal builds well below them, so only an extremely lucky run touches them.
+ */
 export const CAPS = {
-  dodge: 0.6,
-  critChance: 1,
-  lifesteal: 0.5,
+  dodge: 0.5,
+  critChance: 0.6,
+  lifesteal: 0.3,
+  /** +300% damage. */
+  maxDamageMult: 4,
+  /** +200% fire rate. */
+  maxFireRateMult: 3,
   minDashCooldownMs: 500,
   minSpeedMult: 0.5,
   minMaxHp: 10,
@@ -96,8 +104,8 @@ export function computeStats(itemIds: readonly string[], base: Readonly<PlayerSt
   s.dashCooldownMs = Math.max(CAPS.minDashCooldownMs, s.dashCooldownMs);
   s.speedMult = Math.max(CAPS.minSpeedMult, s.speedMult);
   s.maxHp = Math.max(CAPS.minMaxHp, Math.round(s.maxHp));
-  s.fireRateMult = Math.max(CAPS.minFireRateMult, s.fireRateMult);
-  s.damageMult = Math.max(CAPS.minDamageMult, s.damageMult);
+  s.fireRateMult = Math.min(CAPS.maxFireRateMult, Math.max(CAPS.minFireRateMult, s.fireRateMult));
+  s.damageMult = Math.min(CAPS.maxDamageMult, Math.max(CAPS.minDamageMult, s.damageMult));
   s.grillImmune = s.grillImmune > 0 ? 1 : 0;
   s.grillDamageMult = Math.max(0, s.grillDamageMult);
   return s;

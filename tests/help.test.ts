@@ -88,6 +88,6 @@ describe('tooltips', () => {
     const t = itemTooltip(ITEMS.pickle_juice, 2);
     expect(t.subtitle).toBe('UNCOMMON ITEM');
     expect(t.lines).toEqual([ITEMS.pickle_juice.desc, 'You have 2 of max 4', 'Pairs with Pickle Launcher']);
-    expect(itemTooltip(ITEMS.paprika, 3).lines[1]).toBe('You have 3');
+    expect(itemTooltip(ITEMS.paprika, 3).lines[1]).toBe('You have 3 of max 10');
   });
 });

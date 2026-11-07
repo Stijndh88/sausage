@@ -14,14 +14,23 @@ export interface Offer {
 export const SHOP_SIZE = 4;
 export const WEAPON_OFFER_CHANCE = 0.45;
 
-/** Prices rise 25% (of the base price) per wave, then 12% per wave after wave 10 (deep runs). */
-export const PRICE_GROWTH_PER_WAVE = 0.25;
-export const LATE_PRICE_GROWTH_PER_WAVE = 0.12;
+/**
+ * Prices rise 30% of the base price per wave, and from wave 5 they also compound by 8% a wave, so
+ * deep runs, where crumbs pour in, still have to choose what to buy. Price multiplier by wave:
+ * 5: 2.2x · 7 (Tongs): 3.3x · 13 (Grinder): 8.5x · 19 (Big Smokey): 19x · 25: 38x.
+ * Tuned with tools/balance-sim.ts.
+ */
+export const PRICE_GROWTH_PER_WAVE = 0.3;
+export const PRICE_COMPOUND_PER_WAVE = 1.08;
+export const PRICE_COMPOUND_FROM_WAVE = 5;
+
+export function priceGrowth(wave: number): number {
+  const w = Math.max(1, Math.min(200, wave));
+  return (1 + PRICE_GROWTH_PER_WAVE * (w - 1)) * PRICE_COMPOUND_PER_WAVE ** Math.max(0, w - PRICE_COMPOUND_FROM_WAVE);
+}
 
 export function scalePrice(base: number, wave: number, priceMult = 1): number {
-  const w = Math.max(1, wave);
-  const growth = PRICE_GROWTH_PER_WAVE * (Math.min(w, 10) - 1) + LATE_PRICE_GROWTH_PER_WAVE * Math.max(0, w - 10);
-  return Math.max(1, Math.round(base * (1 + growth) * priceMult));
+  return Math.max(1, Math.round(base * priceGrowth(wave) * priceMult));
 }
 
 export function rerollCost(wave: number, rerollCount: number): number {
@@ -85,6 +94,13 @@ export function rollItem(rng: Rng, wave: number, ctx: ShopContext, owned: readon
     rarity = RARITY_ORDER[r];
     if (!allowed.includes(rarity) || r < min) continue;
     const pool = itemPool(rarity, owned, ctx.baseStats).filter((id) => !used.has(`item:${id}`));
+    if (pool.length) return pool[Math.floor(rng() * pool.length)];
+  }
+  // Everything at or below the rolled rarity is maxed (late in a run, or Food Truck with every
+  // Uncommon maxed): offer anything still worth having rather than an empty slot.
+  for (let r = RARITY_ORDER.length - 1; r >= 0; r--) {
+    if (!allowed.includes(RARITY_ORDER[r])) continue;
+    const pool = itemPool(RARITY_ORDER[r], owned).filter((id) => !used.has(`item:${id}`));
     if (pool.length) return pool[Math.floor(rng() * pool.length)];
   }
   return null;
