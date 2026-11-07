@@ -788,7 +788,7 @@ export class GameScene extends Phaser.Scene {
       this.run.bankedDuringRun += taste;
       this.time.delayedCall(900, () => this.banner('FIRST TASTE!', `+${taste} Spice, banked for keeps`, 1200));
     }
-    this.banner(`${bossName(course).toUpperCase()} IS DOWN!`, `+1 ${TROPHIES[trophy].name} in your doggy bag`, 1600);
+    this.banner('BOSS DEFEATED!', `+1 ${TROPHIES[trophy].name} in your doggy bag`, 1600);
     const hp = this.health.hp;
     this.time.delayedCall(2600, () => this.scene.start('Choice', { run: this.run, hp }));
   }

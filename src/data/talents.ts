@@ -97,7 +97,7 @@ const list: TalentDef[] = [
     stats: (s, r) => { s.firstBite += 0.2 * r; } },
   { id: 'extra_spicy', jar: 'seasoning', shelf: 3, name: 'Extra Spicy', desc: 'Crits set enemies on fire', maxRank: 1,
     trophies: { tong_tip: 2 }, stats: (s, r) => { s.critBurn += 8 * r; } },
-  { id: 'double_batch', jar: 'seasoning', shelf: 3, name: 'Double Batch', desc: 'Your starting weapon starts at tier II', maxRank: 1,
+  { id: 'double_batch', jar: 'seasoning', shelf: 3, name: 'Double Batch', desc: 'Starting weapon begins at tier II', maxRank: 1,
     trophies: { smoked_brisket: 1 }, mods: (m, r) => { m.starterTier2 += r; } },
 
   // --- Casing (defence) -----------------------------------------------------------------------
@@ -115,7 +115,7 @@ const list: TalentDef[] = [
     stats: (s, r) => { s.iframeBonusMs += 150 * r; } },
   { id: 'second_skin_key', jar: 'casing', shelf: 3, name: 'Second Skin', desc: 'Revive once per run at 40% HP', maxRank: 1,
     trophies: { grinder_blade: 2 }, mods: (m, r) => { m.revive += r; } },
-  { id: 'smoked', jar: 'casing', shelf: 3, name: 'Smoked', desc: 'A one-hit shield at the start of every wave', maxRank: 1,
+  { id: 'smoked', jar: 'casing', shelf: 3, name: 'Smoked', desc: 'A one-hit shield every wave', maxRank: 1,
     trophies: { tong_tip: 2 }, mods: (m, r) => { m.waveShield += r; } },
 
   // --- Hustle (movement and shop) -------------------------------------------------------------
@@ -131,9 +131,9 @@ const list: TalentDef[] = [
     mods: (m, r) => { m.freeRerolls += r; } },
   { id: 'regular_customer', jar: 'hustle', shelf: 2, name: 'Regular Customer', desc: '-5% shop prices', maxRank: 3,
     mods: (m, r) => { m.shopDiscount += 0.05 * r; } },
-  { id: 'food_truck', jar: 'hustle', shelf: 3, name: 'Food Truck', desc: 'Shop items are always Uncommon or better', maxRank: 1,
+  { id: 'food_truck', jar: 'hustle', shelf: 3, name: 'Food Truck', desc: 'Shop items Uncommon or better', maxRank: 1,
     trophies: { grinder_blade: 1 }, mods: (m, r) => { m.betterShop += r; } },
-  { id: 'mise_en_place', jar: 'hustle', shelf: 3, name: 'Mise en Place', desc: 'Start each run with a random common item', maxRank: 1,
+  { id: 'mise_en_place', jar: 'hustle', shelf: 3, name: 'Mise en Place', desc: 'Start with a random common item', maxRank: 1,
     trophies: { tong_tip: 2 }, mods: (m, r) => { m.startItem += r; } },
 
   // --- Doggy Bag (risk and reward) ------------------------------------------------------------
@@ -143,7 +143,7 @@ const list: TalentDef[] = [
     mods: (m, r) => { m.deathKeepBonus += 0.05 * r; } },
   { id: 'lucky_fork', jar: 'doggybag', shelf: 1, name: 'Lucky Fork', desc: '+3 luck', maxRank: 5,
     stats: (s, r) => { s.luck += 3 * r; } },
-  { id: 'lunchbox', jar: 'doggybag', shelf: 2, name: 'Lunchbox', desc: 'Bank 10% of the bag each time you push on', maxRank: 2,
+  { id: 'lunchbox', jar: 'doggybag', shelf: 2, name: 'Lunchbox', desc: 'Bank 10% of the bag per push', maxRank: 2,
     recipe: 'big_push', mods: (m, r) => { m.pushBank += 0.1 * r; } },
   { id: 'treasure_nose', jar: 'doggybag', shelf: 2, name: 'Treasure Nose', desc: '+20% Spice from bosses', maxRank: 3,
     mods: (m, r) => { m.bossBonus += 0.2 * r; } },
@@ -151,7 +151,7 @@ const list: TalentDef[] = [
     stats: (s, r) => { s.crumbMult += 0.1 * r; } },
   { id: 'takeout', jar: 'doggybag', shelf: 3, name: 'Takeout', desc: 'Bailing out keeps 75% of the bag', maxRank: 1,
     trophies: { grinder_blade: 1 }, mods: (m, r) => { if (r) m.bailKeep = 0.75; } },
-  { id: 'all_you_can_eat', jar: 'doggybag', shelf: 3, name: 'All You Can Eat', desc: '+0.5 Spice multiplier per course you push on', maxRank: 1,
+  { id: 'all_you_can_eat', jar: 'doggybag', shelf: 3, name: 'All You Can Eat', desc: '+0.5 Spice multiplier per push', maxRank: 1,
     trophies: { smoked_brisket: 1 }, mods: (m, r) => { m.pushMultBonus += 0.5 * r; } },
 ];
 

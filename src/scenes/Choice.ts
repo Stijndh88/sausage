@@ -120,7 +120,7 @@ export class ChoiceScene extends Phaser.Scene {
     const next = locate(run.wave + 1);
     const bag = Math.floor(run.bag);
     const trophyNames = run.trophies.map((t) => TROPHIES[t].name);
-    this.text(GAME_W / 2, 28, `${bossName(here.course).toUpperCase()} IS DOWN!`, 44, '#ffe0b0', true);
+    this.text(GAME_W / 2, 28, `${bossName(here.course).toUpperCase()}: DEFEATED!`, 44, '#ffe0b0', true);
     this.text(GAME_W / 2, 92, `Doggy bag: ${bag} Spice${trophyNames.length ? `  +  ${trophyNames.join(', ')}` : ''}`, 22, '#ffd060', true);
 
     // Take it home.

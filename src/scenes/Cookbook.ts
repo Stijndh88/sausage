@@ -12,6 +12,8 @@ import { onKeyPress } from '../ui/input';
 import { PadPoller } from '../ui/pad';
 import { fitCamera } from '../ui/view';
 
+const MILESTONES: ReadonlySet<string> = new Set(['bestCourseReached', 'bestEscape', 'chiliEscape']);
+
 function rewardShort(id: string): string {
   const r = RECIPES[id].reward;
   switch (r.kind) {
@@ -65,15 +67,18 @@ export class CookbookScene extends Phaser.Scene {
       const name = hidden ? '???' : r.name;
       const desc = hidden ? 'A secret recipe' : r.desc;
       this.add.text(x, y, `${done ? '✓' : '·'} ${name}`, { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color: done ? '#9cff7a' : '#ffffff' });
-      this.add.text(x + 190, y + 1, `${desc}${reward && !hidden ? ` [${reward}]` : ''}`, { fontFamily: FONT, fontSize: '12.5px', color: done ? '#9fc890' : '#b09080' });
+      this.add.text(x + 182, y + 1, `${desc}${reward && !hidden ? ` [${reward}]` : ''}`, { fontFamily: FONT, fontSize: '12px', color: done ? '#9fc890' : '#b09080' });
       const right = x + colW;
       if (done) {
         this.add.text(right, y + 1, `+${r.spice}`, { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#7a9a6a' }).setOrigin(1, 0);
       } else if (!hidden) {
         const p = Math.min(r.goal, Math.floor(recipeProgress(save.counters, id)));
-        const bw = 60;
-        g.fillStyle(0x000000, 0.6).fillRoundedRect(right - 110, y + 7, bw, 6, 3);
-        if (p > 0) g.fillStyle(0xffb347, 1).fillRoundedRect(right - 110, y + 7, Math.max(3, (bw * p) / r.goal), 6, 3);
+        const bw = 44;
+        // Milestones (reach a course) are done or not: no bar.
+        if (r.goal > 1 && !MILESTONES.has(r.counter)) {
+          g.fillStyle(0x000000, 0.6).fillRoundedRect(right - 92, y + 7, bw, 6, 3);
+          if (p > 0) g.fillStyle(0xffb347, 1).fillRoundedRect(right - 92, y + 7, Math.max(3, (bw * p) / r.goal), 6, 3);
+        }
         this.add.text(right, y + 1, `+${r.spice}`, { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffd060' }).setOrigin(1, 0);
       }
     });

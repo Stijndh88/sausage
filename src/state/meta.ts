@@ -58,6 +58,9 @@ export function bagValue(outcome: Outcome, run: Pick<RunState, 'bag' | 'pushes' 
   return outcome === 'home' ? kept + Math.floor(bag * ESCAPE_BONUS) : kept;
 }
 
+/** Counters that are milestones (a course index), not something a bar should fill toward. */
+const PROGRESS_HIDDEN: ReadonlySet<string> = new Set(['bestCourseReached', 'bestEscape', 'chiliEscape']);
+
 export interface RecipeProgress {
   id: string;
   before: number;
@@ -129,7 +132,7 @@ export function settleRun(run: RunState, outcome: Outcome, hpLeft = 0, save: Sav
   const recipeSpice = cookedNow.reduce((a, id) => a + RECIPES[id].spice, 0);
 
   const progress: RecipeProgress[] = RECIPE_IDS
-    .filter((id) => !save.cooked.includes(id) && !cookedNow.includes(id) && !RECIPES[id].secret)
+    .filter((id) => !save.cooked.includes(id) && !cookedNow.includes(id) && !RECIPES[id].secret && !PROGRESS_HIDDEN.has(RECIPES[id].counter))
     .map((id) => {
       const r = RECIPES[id];
       return { id, before: save.counters[r.counter] ?? 0, after: counters[r.counter] ?? 0, goal: r.goal };
