@@ -36,7 +36,7 @@ function eye(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, an
 /** Pictogram kinds for shop items; each is drawn in white and tinted with the item's colour. */
 export type ItemIcon =
   | 'chili' | 'bolt' | 'boot' | 'shield' | 'heart' | 'heartplus' | 'drop' | 'magnet' | 'coin'
-  | 'wing' | 'star' | 'swirl' | 'burst' | 'clover' | 'spikes' | 'apron' | 'dots' | 'crown' | 'flask' | 'ring';
+  | 'wing' | 'star' | 'swirl' | 'burst' | 'clover' | 'spikes' | 'apron' | 'dots' | 'crown' | 'flask' | 'ring' | 'spear';
 
 const ICON_SIZE = 40;
 
@@ -120,6 +120,12 @@ const ICON_DRAW: Record<ItemIcon, (g: Phaser.GameObjects.Graphics) => void> = {
   ring: (g) => {
     ICON_DRAW.heart(g);
     g.lineStyle(3, 0xffffff, 1).strokeCircle(20, 20, 18);
+  },
+  spear: (g) => {
+    // A spike through a block: piercing.
+    g.fillRect(12, 14, 16, 14);
+    g.lineStyle(4, 0xffffff, 1).lineBetween(3, 33, 30, 8);
+    g.fillTriangle(27, 5, 37, 2, 33, 12);
   },
 };
 

@@ -215,6 +215,10 @@
     33,
     48
   ],
+  "item-sharp_cheddar": [
+    45,
+    37
+  ],
   "tile-hot": [
     110,
     110
@@ -222,5 +226,29 @@
   "icon-lock": [
     18,
     24
+  ],
+  "portrait-corndog": [
+    58,
+    90
+  ],
+  "portrait-cocktail": [
+    58,
+    72
+  ],
+  "portrait-blackpudding": [
+    58,
+    72
+  ],
+  "portrait-merguez": [
+    58,
+    88
+  ],
+  "portrait-weisswurst": [
+    58,
+    72
+  ],
+  "portrait-kielbasa": [
+    56,
+    74
   ]
 }

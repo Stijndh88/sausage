@@ -91,12 +91,12 @@ class GameDriver {
 
   /**
    * Start a fresh run directly, skipping the menu.
-   * opts: { seed, wave, crumbs, weapons: [{id, tier}], items: [ids] }
+   * opts: { seed, wave, crumbs, sausage, weapons: [{id, tier}], items: [ids] }
    */
   async startRun(opts = {}) {
     await this.page.evaluate((o) => {
       const game = window.__game;
-      const run = window.__debug.newRun(o.seed ?? 12345);
+      const run = window.__debug.newRun(o.seed ?? 12345, o.sausage);
       if (o.wave) run.wave = o.wave;
       if (o.crumbs !== undefined) run.crumbs = o.crumbs;
       if (o.weapons) run.weapons = o.weapons;

@@ -19,6 +19,7 @@ const STATS: [keyof PlayerStats, string, Format][] = [
   ['dashCooldownMs', 'Dash cooldown', 'sec'],
   ['explosionRadiusMult', 'Explosion size', 'mult'],
   ['extraProjectiles', 'Spread pellets', 'plus'],
+  ['pierce', 'Pierce', 'plus'],
   ['thorns', 'Thorns', 'int'],
   ['grillImmune', 'Grill-proof', 'bool'],
   ['extraLives', 'Second Skin', 'int'],

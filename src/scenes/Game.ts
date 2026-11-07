@@ -4,10 +4,10 @@ import type { EnemyKind } from '../data/enemies';
 import { waveConfig, type WaveConfig } from '../data/waves';
 import { createEnemyBulletPool, createPlayerBulletPool, EnemyBullet, PlayerBullet } from '../entities/BulletPool';
 import { Enemy, type EnemyContext } from '../entities/Enemy';
-import { LINK_RADIUS, LinkChain } from '../entities/LinkChain';
+import { LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
 import { SausageHead } from '../entities/SausageHead';
-import { SAUSAGES } from '../data/sausages';
+import { SAUSAGES, type SausageRules } from '../data/sausages';
 import { runStats, type RunState } from '../state/run';
 import type { PlayerStats } from '../state/stats';
 import { BulletPatterns } from '../systems/BulletPatterns';
@@ -57,6 +57,13 @@ export class GameScene extends Phaser.Scene {
   /** Test hook: when true the sausage takes no damage (set by tests/e2e harness godMode). */
   invincible = false;
   private thornsReadyAt = new WeakMap<Enemy, number>();
+  /** The chosen sausage's special rule (see SausageRules). */
+  private rules: SausageRules = {};
+  /** Corn Dog: batter-shell hits left this wave, and the ring that shows it. */
+  private shellHits = 0;
+  private shellRing: Phaser.GameObjects.Image | null = null;
+  /** Weisswurst: whether the "gone stale" moment has happened this wave. */
+  private stale = false;
 
   private head!: SausageHead;
   private chain!: LinkChain;
@@ -122,6 +129,10 @@ export class GameScene extends Phaser.Scene {
     this.health.armor = this.stats.armor;
     this.health.regenPerSec = this.stats.regenPerSec;
     this.livesLeft = this.stats.extraLives;
+    this.rules = SAUSAGES[this.run.sausage].rules ?? {};
+    this.shellHits = this.rules.waveShield ?? 0;
+    this.shellRing = null;
+    this.stale = false;
     this.invincible = false;
     this.thornsReadyAt = new WeakMap();
     this.boss = null;
@@ -146,8 +157,12 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1; // in case a hit-stop was cut short by a scene change
     this.createHotTiles();
 
-    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock);
-    this.chain = new LinkChain(this, this.head.x, this.head.y, 0);
+    const bodyScale = this.rules.bodyScale ?? 1;
+    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock, bodyScale);
+    this.chain = new LinkChain(this, this.head.x, this.head.y, 0, bodyScale);
+    if (this.shellHits > 0) {
+      this.shellRing = this.add.image(this.head.x, this.head.y, 'ring').setDepth(10.5).setTint(0xffc84a).setAlpha(0.8).setScale(0.75);
+    }
     this.chain.setWeapons(this.run.weapons);
 
     this.enemies = this.physics.add.group();
@@ -234,7 +249,7 @@ export class GameScene extends Phaser.Scene {
       hurt: (dmg, source) => this.takeDamage(dmg, source),
       spawnElite: (kind, x, y, elite) => this.spawnEnemy(kind, x, y, elite),
       spawnCrumbs: (x, y, n) => this.pickups.spawnCrumbs(x, y, n),
-      spawnCondiment: (x, y) => this.pickups.spawnCondiment(x, y),
+      spawnCondiment: (x, y) => { if (!this.rules.noCondimentHeal) this.pickups.spawnCondiment(x, y); },
       grantItem: () => this.grantRandomItem(),
       floatText: (x, y, text, color) => this.floatText(x, y, text, color),
       blocked: (x, y, r) => this.hotTiles.some((t) => Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(x, y, r), t)),
@@ -270,6 +285,9 @@ export class GameScene extends Phaser.Scene {
     this.banner(this.cfg.boss ? "THE GRILL MASTER'S TONGS" : `WAVE ${this.run.wave}`, this.cfg.boss ? 'Defeat the boss to escape the BBQ!' : 'Survive!');
     audio.setMood(this.cfg.boss ? 'boss' : 'fight');
     audio.play('waveStart');
+    if (this.rules.freshness) {
+      this.time.delayedCall(900, () => this.floatText(this.head.x, this.head.y - 34, `FRESH! +${Math.round(this.rules.freshness!.bonus * 100)}% damage`, '#fff3c0'));
+    }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
 
     // A bullet-hell must not keep running when the player looks away.
@@ -324,9 +342,11 @@ export class GameScene extends Phaser.Scene {
       this.head.halt();
     }
     this.dashQueued = false;
-    const tint = this.dying ? 0x2a2a2a : SAUSAGES[this.run.sausage].tint;
+    const tint = this.dying ? 0x2a2a2a : this.stale ? 0xc9c0a6 : SAUSAGES[this.run.sausage].tint;
     this.head.setTint(tint);
     this.chain.update(this.head.x, this.head.y, tint, time);
+    this.shellRing?.setPosition(this.head.x, this.head.y).setRotation(time / 400);
+    if (this.rules.linksHittable) this.checkLinkHits();
 
     // --- Health: grill burns, regen heals ---
     this.onGrill = false;
@@ -343,7 +363,7 @@ export class GameScene extends Phaser.Scene {
 
     // --- Combat ---
     if (!this.dying && !this.ending) {
-      this.weapons.update(time, this.stats.damageMult, this.stats.fireRateMult * this.timedEvents.fireRateMult);
+      this.weapons.update(time, this.damageMultNow(), this.stats.fireRateMult * this.timedEvents.fireRateMult);
       this.director.update(dtMs);
       if (!this.director.timeUp) this.timedEvents.update(this.director.elapsedMs, dt);
       this.run.timeSurvivedSec += dt;
@@ -357,8 +377,9 @@ export class GameScene extends Phaser.Scene {
       // Melee enemies bounce off your links.
       if (e.def.melee && !e.dead) {
         for (const p of this.chain.positions) {
-          if (Math.abs(e.x - p.x) < e.def.radius + LINK_RADIUS && Math.abs(e.y - p.y) < e.def.radius + LINK_RADIUS) {
-            if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.radius + LINK_RADIUS) e.shove(p.x, p.y, 220);
+          const reach = e.def.radius + this.chain.radius;
+          if (Math.abs(e.x - p.x) < reach && Math.abs(e.y - p.y) < reach) {
+            if (Math.hypot(e.x - p.x, e.y - p.y) < reach) e.shove(p.x, p.y, 220);
           }
         }
       }
@@ -443,6 +464,7 @@ export class GameScene extends Phaser.Scene {
       this.sparks.explode(4, e.x, e.y);
     }
     if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) this.health.heal(1);
+    if (this.rules.burnDps) e.poison(this.rules.burnDps, POISON_MS, this.gameTime);
     audio.play(crit ? 'crit' : 'hit');
     if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
@@ -477,7 +499,7 @@ export class GameScene extends Phaser.Scene {
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
     const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult * this.timedEvents.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
-    if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
+    if (!this.rules.noCondimentHeal && Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
     this.killPop(e);
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
@@ -524,6 +546,19 @@ export class GameScene extends Phaser.Scene {
       this.floatText(this.head.x, this.head.y - 24, 'DODGE', '#8fd3ff');
       return;
     }
+    if (this.shellHits > 0) {
+      this.shellHits--;
+      this.head.markHit();
+      audio.play('dodge');
+      this.sparks.setParticleTint(0xffc84a);
+      this.sparks.explode(12, this.head.x, this.head.y);
+      this.floatText(this.head.x, this.head.y - 24, 'BATTER CRACKED!', '#ffd27a');
+      if (this.shellHits === 0) {
+        this.shellRing?.destroy();
+        this.shellRing = null;
+      }
+      return;
+    }
     const dealt = this.health.takeDamage(amount);
     this.head.markHit();
     if (!getSettings().reducedMotion) this.hitStopMs = 70;
@@ -531,6 +566,50 @@ export class GameScene extends Phaser.Scene {
     audio.play('hurt');
     this.floatText(this.head.x, this.head.y - 24, `-${dealt}`, '#ff6a5a');
     if (this.health.dead) this.onLethal(source);
+  }
+
+  /**
+   * Damage multiplier right now. Weisswurst: a bonus while the wave is young, a penalty once it
+   * has gone stale (the moment is announced once per wave).
+   */
+  private damageMultNow(): number {
+    const f = this.rules.freshness;
+    if (!f) return this.stats.damageMult;
+    const stale = this.director.elapsedMs >= f.ms;
+    if (stale && !this.stale) {
+      this.stale = true;
+      audio.play('hurt');
+      this.floatText(this.head.x, this.head.y - 34, `GONE STALE: ${Math.round(f.stale * 100)}% damage`, '#d8d0b8');
+    }
+    return Math.max(0.2, this.stats.damageMult + (stale ? f.stale : f.bonus));
+  }
+
+  /** Kielbasa: enemy shots and enemies that touch any link hurt, just like hitting the head. */
+  private checkLinkHits(): void {
+    if (this.dying || this.ending || this.head.invulnerable) return;
+    const r = this.chain.radius;
+    for (const b of this.enemyBullets.getChildren() as EnemyBullet[]) {
+      if (!b.active) continue;
+      const br = (b.body as Phaser.Physics.Arcade.Body).halfWidth;
+      for (const p of this.chain.positions) {
+        if (Math.abs(b.x - p.x) > r + br || Math.abs(b.y - p.y) > r + br) continue;
+        if (Math.hypot(b.x - p.x, b.y - p.y) < r + br) {
+          b.kill();
+          this.takeDamage(b.damage, b.source);
+          return;
+        }
+      }
+    }
+    for (const e of this.enemyList()) {
+      if (e.dead) continue;
+      for (const p of this.chain.positions) {
+        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.radius + r) {
+          e.shove(p.x, p.y, 260);
+          this.takeDamage(e.def.contactDamage, e.def.name);
+          return;
+        }
+      }
+    }
   }
 
   private onLethal(source: string): void {
