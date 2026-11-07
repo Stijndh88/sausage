@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_W } from '../art/textures';
 import { FONT, HUD_H } from './Hud';
+import { getSettings } from '../state/settings';
+import { labelForCode, moveLabel } from './keyboardLayout';
 
 type Point = { x: number; y: number };
 
@@ -16,7 +18,7 @@ export interface TutorialView {
 
 interface Step {
   id: string;
-  text: string;
+  text: string | (() => string);
   /** When to show; return the point to point at, or null to keep waiting. */
   when(v: TutorialView): Point | null;
   /** When it has been understood (or ignored long enough). */
@@ -27,7 +29,11 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    id: 'move', text: 'Move with WASD or the arrows. Space dashes.',
+    id: 'move',
+    text: () => {
+      const b = getSettings().keyBindings;
+      return `Move with ${moveLabel(b)} or the arrows. ${labelForCode(b.dash[0])} dashes.`;
+    },
     when: (v) => (v.timeMs > 1700 ? v.head : null),
     follow: (v) => v.head,
     done: (v, t) => v.movedPx > 260 || v.timeMs - t > 6500,
@@ -96,7 +102,7 @@ export class Tutorial {
       }
       this.shownAt = v.timeMs;
       this.pointer = at;
-      this.show(step.text);
+      this.show(typeof step.text === 'function' ? step.text() : step.text);
       this.shown.push(step.id);
     } else {
       const p = step.follow?.(v);

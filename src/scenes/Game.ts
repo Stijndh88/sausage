@@ -17,7 +17,8 @@ import { mulberry32, randRange, type Rng } from '../systems/rng';
 import { WaveDirector } from '../systems/WaveDirector';
 import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
-import { onKeyPress } from '../ui/input';
+import { onAction } from '../ui/input';
+import { PhysicalKeys } from '../ui/keys';
 import { PauseMenu } from '../ui/PauseMenu';
 import { SettingsPanel } from '../ui/SettingsPanel';
 import { Tutorial } from '../ui/Tutorial';
@@ -28,6 +29,7 @@ import { loadSave, writeSave } from '../state/save';
 import { newRun } from '../state/run';
 import { audio } from '../audio/Audio';
 import { getSettings } from '../state/settings';
+import { fitCamera } from '../ui/view';
 
 /** HP per second lost while standing on a hot grill tile (armor doesn't help). */
 export const GRILL_DAMAGE_PER_SEC = 6;
@@ -38,7 +40,6 @@ const TILE_SIZE = 110;
 const DODGE_IFRAMES_MS = 200;
 const THORNS_COOLDOWN_MS = 500;
 
-type Keys = Record<'W' | 'A' | 'S' | 'D' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'SPACE' | 'SHIFT' | 'ESC' | 'P', Phaser.Input.Keyboard.Key>;
 
 export class GameScene extends Phaser.Scene {
   private run!: RunState;
@@ -62,7 +63,8 @@ export class GameScene extends Phaser.Scene {
   private pickups!: Pickups;
   private director!: WaveDirector;
   private hud!: Hud;
-  private keys!: Keys;
+  /** Held keys by physical position; movement uses the player's bindings (WASD = ZQSD on AZERTY). */
+  controls!: PhysicalKeys;
   private sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sizzle!: Phaser.GameObjects.Particles.ParticleEmitter;
   private boss: Enemy | null = null;
@@ -131,7 +133,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDepth(0);
+    fitCamera(this);
+    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setDepth(0);
     this.physics.world.setBounds(this.arena.x, this.arena.y, this.arena.width, this.arena.height);
     this.physics.world.timeScale = 1; // in case a hit-stop was cut short by a scene change
     this.createHotTiles();
@@ -232,14 +235,12 @@ export class GameScene extends Phaser.Scene {
     });
 
     const kb = this.input.keyboard!;
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,SHIFT,ESC,P') as Keys;
+    this.controls = new PhysicalKeys(this);
     kb.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
     const queueDash = () => { if (!this.paused) this.dashQueued = true; };
     const queuePause = () => { this.pauseQueued = true; };
-    onKeyPress(kb, 'SPACE', queueDash);
-    onKeyPress(kb, 'SHIFT', queueDash);
-    onKeyPress(kb, 'ESC', queuePause);
-    onKeyPress(kb, 'P', queuePause);
+    onAction(kb, 'dash', queueDash);
+    onAction(kb, 'pause', queuePause);
 
     this.banner(this.cfg.boss ? "THE GRILL MASTER'S TONGS" : `WAVE ${this.run.wave}`, this.cfg.boss ? 'Defeat the boss to escape the BBQ!' : 'Survive!');
     audio.setMood(this.cfg.boss ? 'boss' : 'fight');
@@ -255,7 +256,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
-    const k = this.keys;
+    const k = this.controls;
     this.handlePad();
     if (this.pauseQueued) {
       this.pauseQueued = false;
@@ -283,8 +284,8 @@ export class GameScene extends Phaser.Scene {
 
     // --- Player ---
     if (!this.dying) {
-      let ix = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
-      let iy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
+      let ix = (k.action('right') ? 1 : 0) - (k.action('left') ? 1 : 0);
+      let iy = (k.action('down') ? 1 : 0) - (k.action('up') ? 1 : 0);
       if (ix === 0 && iy === 0) {
         // Analog input: gamepad stick, or the touch stick.
         const m = this.touch?.vector ?? { x: 0, y: 0 };
@@ -586,8 +587,8 @@ export class GameScene extends Phaser.Scene {
       if (this.settingsPanel.isOpen) {
         if (b === 'up' || b === 'down') this.settingsPanel.navigate(b === 'up' ? -1 : 1);
         else if (b === 'left' || b === 'right') this.settingsPanel.change(b === 'left' ? -1 : 1);
-        else if (b === 'a') this.settingsPanel.change(1);
-        else if (b === 'b') this.settingsPanel.hide();
+        else if (b === 'a') this.settingsPanel.confirm();
+        else if (b === 'b') this.settingsPanel.back();
       } else if (b === 'up' || b === 'down') {
         this.pauseMenu.navigate(b === 'up' ? -1 : 1);
       } else if (b === 'a') {
@@ -613,7 +614,7 @@ export class GameScene extends Phaser.Scene {
   private togglePause(): void {
     // Esc while the settings overlay is open just closes it.
     if (this.paused && this.settingsPanel.isOpen) {
-      this.settingsPanel.hide();
+      this.settingsPanel.back();
       return;
     }
     // Never *enter* pause during the end-of-wave/death/victory transitions,

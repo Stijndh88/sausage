@@ -5,10 +5,13 @@ import { getSettings, updateSettings, type Settings } from '../state/settings';
 import { Button } from './Button';
 import { FONT } from './Hud';
 import { onKeyPress } from './input';
+import { ControlsPanel } from './ControlsPanel';
+import { moveLabel } from './keyboardLayout';
 
 type Row =
   | { kind: 'slider'; key: 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'screenShake'; label: string }
-  | { kind: 'toggle'; key: 'reduceFlashing' | 'reducedMotion' | 'damageNumbers'; label: string };
+  | { kind: 'toggle'; key: 'reduceFlashing' | 'reducedMotion' | 'damageNumbers'; label: string }
+  | { kind: 'controls'; label: string };
 
 const ROWS: Row[] = [
   { kind: 'slider', key: 'masterVolume', label: 'Master volume' },
@@ -18,6 +21,7 @@ const ROWS: Row[] = [
   { kind: 'toggle', key: 'reduceFlashing', label: 'Reduce flashing' },
   { kind: 'toggle', key: 'reducedMotion', label: 'Reduce motion' },
   { kind: 'toggle', key: 'damageNumbers', label: 'Damage numbers' },
+  { kind: 'controls', label: 'Keyboard controls' },
 ];
 
 const W = 560;
@@ -36,10 +40,14 @@ export class SettingsPanel {
   private rowMarkers: Phaser.GameObjects.Graphics[] = [];
   private index = 0;
   private open = false;
+  /** The keyboard controls screen, opened from the last row. */
+  readonly controls: ControlsPanel;
 
   constructor(private readonly scene: Phaser.Scene, private readonly onClose: () => void) {
+    this.controls = new ControlsPanel(scene, () => this.refresh());
     const kb = scene.input.keyboard!;
-    const when = (fn: () => void) => () => { if (this.open) fn(); };
+    // While the controls screen is open it owns the keyboard.
+    const when = (fn: () => void) => () => { if (this.open && !this.controls.isOpen) fn(); };
     onKeyPress(kb, 'UP', when(() => this.focus(this.index - 1)));
     onKeyPress(kb, 'W', when(() => this.focus(this.index - 1)));
     onKeyPress(kb, 'DOWN', when(() => this.focus(this.index + 1)));
@@ -55,13 +63,26 @@ export class SettingsPanel {
     return this.open;
   }
 
-  /** Gamepad / external navigation. */
+  /** Gamepad / external navigation (forwarded to the controls screen when it's open). */
   navigate(dy: number): void {
-    if (this.open) this.focus(this.index + dy);
+    if (this.controls.isOpen) this.controls.navigate(dy);
+    else if (this.open) this.focus(this.index + dy);
   }
 
   change(dx: number): void {
-    if (this.open) this.adjust(ROWS[this.index], dx);
+    if (this.open && !this.controls.isOpen) this.adjust(ROWS[this.index], dx);
+  }
+
+  /** A / Enter equivalent. */
+  confirm(): void {
+    if (this.controls.isOpen) this.controls.confirm();
+    else if (this.open) this.adjust(ROWS[this.index], 1);
+  }
+
+  /** Esc / B: step back one level (cancel a rebind, close controls, then close settings). */
+  back(): void {
+    if (this.controls.isOpen) this.controls.back();
+    else this.hide();
   }
 
   show(): void {
@@ -91,7 +112,9 @@ export class SettingsPanel {
       add(s.add.text(left + 34, y, row.label, { fontFamily: FONT, fontSize: '19px', color: '#ffffff' }).setOrigin(0, 0.5));
       const value = add(s.add.text(left + W - 150, y, '', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#ffd23f' }).setOrigin(0.5));
       this.valueTexts.push(value);
-      if (row.kind === 'slider') {
+      if (row.kind === 'controls') {
+        add(new Button(s, left + W - 80, y, 'Change…', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
+      } else if (row.kind === 'slider') {
         add(new Button(s, left + W - 220, y, '−', { width: 40, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 22 }, () => this.adjust(row, -1)));
         add(new Button(s, left + W - 80, y, '+', { width: 40, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 22 }, () => this.adjust(row, 1)));
       } else {
@@ -106,6 +129,7 @@ export class SettingsPanel {
 
   hide(): void {
     if (!this.open) return;
+    this.controls.hide();
     this.open = false;
     for (const o of this.objects) o.destroy();
     this.objects = [];
@@ -125,6 +149,11 @@ export class SettingsPanel {
 
   private adjust(row: Row, dir: number): void {
     const s = getSettings();
+    if (row.kind === 'controls') {
+      audio.play('click');
+      this.controls.show();
+      return;
+    }
     if (row.kind === 'slider') {
       const v = Math.round((s[row.key] + dir * 0.1) * 10) / 10;
       updateSettings({ [row.key]: Math.min(1, Math.max(0, v)) } as Partial<Settings>);
@@ -141,7 +170,8 @@ export class SettingsPanel {
     ROWS.forEach((row, i) => {
       const t = this.valueTexts[i];
       if (!t) return;
-      t.setText(row.kind === 'slider' ? `${Math.round(s[row.key] * 100)}%` : s[row.key] ? 'On' : 'Off');
+      if (row.kind === 'controls') t.setText(`Move: ${moveLabel(s.keyBindings)}`);
+      else t.setText(row.kind === 'slider' ? `${Math.round(s[row.key] * 100)}%` : s[row.key] ? 'On' : 'Off');
     });
   }
 }

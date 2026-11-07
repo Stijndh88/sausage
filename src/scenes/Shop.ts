@@ -18,6 +18,7 @@ import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
 import { audio } from '../audio/Audio';
 import { PadPoller } from '../ui/pad';
+import { fitCamera } from '../ui/view';
 
 const CARD_W = 250;
 const CARD_H = 322;
@@ -53,8 +54,9 @@ export class ShopScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitCamera(this);
     audio.setMood('menu');
-    this.add.image(0, 0, 'bg-grill').setOrigin(0).setAlpha(0.35);
+    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setAlpha(0.35);
     this.add.rectangle(0, 0, GAME_W, GAME_H, 0x140d0a, 0.6).setOrigin(0);
 
     // Space is deliberately NOT bound: it's the dash key, and a held dash must never skip the shop.

@@ -2,7 +2,7 @@
  * Tests for the features added with HP, sausage types and "the basics":
  * settings, pause menu, sausage select + unlocks, first-run tips, touch, gamepad, audio, shop clarity.
  */
-const { assert } = require('./harness.cjs');
+const { assert, GameDriver } = require('./harness.cjs');
 
 const SAVE_KEY = 'wurst-case-scenario/save';
 const SETTINGS_KEY = 'wurst-case-scenario/settings';
@@ -298,6 +298,95 @@ module.exports = {
         assert.deepEqual(r.locked, [0], 'Shift+1 kept the first offer');
         assert.equal(r.crumbs, 500, 'and did not buy it');
         assert.ok(r.texts.some((t) => /→/.test(t) || /^DMG /.test(t)), 'stat lines shown on cards');
+      },
+    },
+
+    {
+      name: 'keyboard layouts: movement follows physical keys, so ZQSD works on AZERTY',
+      fn: async ({ page, g }) => {
+        await g.startRun({ seed: 2, weapons: [] });
+        await g.godMode();
+        await g.evaluate(() => window.__game.scene.getScene('Game').director.stop());
+        await frames(g, 5);
+        const cdp = await page.context().newCDPSession(page);
+        // An AZERTY keyboard: the key above S prints "z" but its physical code is KeyW.
+        const key = (type, code, keyName, vk) => cdp.send('Input.dispatchKeyEvent', {
+          type, code, key: keyName, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, text: type === 'keyDown' ? keyName : undefined,
+        });
+        const y0 = await g.evaluate(() => window.__game.scene.getScene('Game').head.y);
+        await key('keyDown', 'KeyW', 'z', 90);
+        await g.waitGameMs(400);
+        await key('keyUp', 'KeyW', 'z', 90);
+        const y1 = await g.evaluate(() => window.__game.scene.getScene('Game').head.y);
+        assert.ok(y1 < y0 - 30, `Z (physical W) moved up: ${y0} → ${y1}`);
+        // The key printed "A" on AZERTY sits where Q is; it must not move left (it used to).
+        const x0 = await g.evaluate(() => window.__game.scene.getScene('Game').head.x);
+        await key('keyDown', 'KeyQ', 'a', 65);
+        await g.waitGameMs(400);
+        await key('keyUp', 'KeyQ', 'a', 65);
+        const x1 = await g.evaluate(() => window.__game.scene.getScene('Game').head.x);
+        assert.ok(Math.abs(x1 - x0) < 2, `the AZERTY "A" key did not move left: ${x0} → ${x1}`);
+        await cdp.detach();
+      },
+    },
+    {
+      name: 'controls: rebinding Dash in Settings works in a fight and survives a reload',
+      fn: async ({ page, g }) => {
+        await page.mouse.click(640 - 270, 630); // Settings
+        await frames(g, 3);
+        for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowDown'); // "Keyboard controls"
+        await page.keyboard.press('Enter');
+        await frames(g, 3);
+        assert.equal(await g.evaluate(() => window.__game.scene.getScene('Menu').settingsPanel.controls.isOpen), true, 'controls screen open');
+        for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown'); // Dash
+        await page.keyboard.press('Enter'); // Change
+        await frames(g, 2);
+        assert.equal(await g.evaluate(() => window.__game.scene.getScene('Menu').settingsPanel.controls.capturing), 'dash');
+        await page.keyboard.press('j');
+        await frames(g, 2);
+        await page.keyboard.press('Escape'); // close controls
+        await page.keyboard.press('Escape'); // close settings
+        await frames(g, 3);
+        assert.equal(await g.evaluate(() => window.__game.scene.isActive('Menu')), true, 'still on the menu');
+        const stored = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SETTINGS_KEY));
+        assert.equal(stored.keyBindings.dash[0], 'KeyJ');
+        await reload(page, g);
+        await g.startRun({ seed: 2 });
+        await g.godMode();
+        await frames(g, 5);
+        await page.keyboard.press('j');
+        await frames(g, 3);
+        const charge = await g.evaluate(() => window.__game.scene.getScene('Game').head.dashCharge(1500));
+        assert.ok(charge < 1, 'J dashes after a reload');
+      },
+    },
+    {
+      name: 'high-DPI screens: the canvas renders at 2× with sharp text, and clicks still land',
+      fn: async ({ browser, url }) => {
+        const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
+        const page = await ctx.newPage();
+        const g2 = new GameDriver(page);
+        try {
+          await g2.open(url);
+          const r = await page.evaluate(() => {
+            const menu = window.__game.scene.getScene('Menu');
+            const text = menu.children.list.find((o) => o.type === 'Text');
+            return { scale: window.__renderScale, w: window.__game.canvas.width, h: window.__game.canvas.height, zoom: menu.cameras.main.zoom, res: text.style.resolution };
+          });
+          assert.deepEqual(r, { scale: 2, w: 2560, h: 1440, zoom: 2, res: 2 });
+          await page.mouse.click(640, 630); // START, in CSS pixels
+          await g2.waitForScene('Select');
+          await g2.wait(400);
+          await page.keyboard.press('Enter');
+          await g2.waitForScene('Game');
+          await g2.godMode();
+          await g2.waitGameMs(3000);
+          const s = await g2.gameState();
+          assert.ok(s && s.wave === 1);
+          g2.assertNoErrors();
+        } finally {
+          await ctx.close();
+        }
       },
     },
   ],

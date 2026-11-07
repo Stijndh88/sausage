@@ -329,7 +329,7 @@ tests.push({
     await frames(page, 2);
     await page.keyboard.up('Escape');
     await frames(page, 10);
-    const st = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { paused: s.paused, D: s.keys.D.isDown, S: s.keys.S.isDown, vx: s.head.body.velocity.x, vy: s.head.body.velocity.y }; });
+    const st = await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); return { paused: s.paused, D: s.controls.isDown('KeyD'), S: s.controls.isDown('KeyS'), vx: s.head.body.velocity.x, vy: s.head.body.velocity.y }; });
     assert.deepEqual(st, { paused: false, D: false, S: false, vx: 0, vy: 0 });
   },
 });

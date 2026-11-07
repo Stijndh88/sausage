@@ -20,10 +20,14 @@ terminal in the folder and run `npm install` and `npm run dev`.
 ## How to play
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
-| Move | WASD / arrows | Left stick / D-pad | Drag on the left half |
+| Move | WASD (ZQSD on AZERTY) / arrows | Left stick / D-pad | Drag on the left half |
 | Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | DASH button |
 | Pause menu | Esc / P | Start | II button |
 | Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap |
+
+Keys work by **position**, not by the letter printed on them, so the defaults work on any keyboard
+(WASD on QWERTY, ZQSD on AZERTY, and so on) and the game shows the letters of your layout.
+Every key can be changed in **Settings → Keyboard controls**.
 
 **Pick a sausage.** Five sausages with their own stats, starting weapons and one special rule each.
 The Classic Frank is unlocked from the start; the others unlock by reaching later waves or escaping.
@@ -111,6 +115,11 @@ Everything you'd want to tweak is plain data:
 - `src/data/weapons.ts` sets damage, cooldown, range, projectiles and price.
 - `src/data/items.ts` holds the shop items and what each one does to your stats.
 
+## Screen resolution
+The game world is always 1280×720, but the canvas renders at your screen's real pixel count
+(up to 2.5×), so text and shapes stay sharp on big and high-DPI screens. Add `?scale=1` to the URL to
+force the old 1× rendering (e.g. on a slow machine).
+
 ## Swapping in real art
 All art is generated in `src/art/textures.ts` under fixed keys (`sausage-head`, `sausage-link`, `enemy-fork`, `eb-ketchup`, …).
 To use real sprites, add the PNGs to `public/` and load them in `src/scenes/Boot.ts` with the same keys **before** `generateTextures(this)`:
@@ -119,6 +128,7 @@ preload() { this.load.image('enemy-fork', 'sprites/fork.png'); }
 ```
 `generateTextures` skips any key that already exists, so no other code needs to change.
 Sprites face **right** for the sausage and **up** for enemies.
+Provide sprites at 2× their in-game size (and scale them with `setScale(0.5)`) to keep them sharp on high-DPI screens.
 
 ## What's next
 See [docs/ROADMAP.md](docs/ROADMAP.md). Not done yet: mid-wave level-ups, elites and wave modifiers,

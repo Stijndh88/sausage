@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
+import { GAME_H, GAME_W, RENDER_SCALE } from '../ui/view';
+
+// The world size lives in ui/view.ts (it decides the render scale); re-exported here for convenience.
+export { GAME_H, GAME_W };
 
 /**
  * Placeholder art drawn in code. Every texture is cached under a fixed key.
  * To use real sprites later, load PNGs with the same keys in Boot (this.load.image('enemy-fork', ...))
  * and skip the matching generator below; no game code needs to change.
  */
-export const GAME_W = 1280;
-export const GAME_H = 720;
 
 type Draw = (g: Phaser.GameObjects.Graphics) => void;
 
@@ -313,7 +315,10 @@ export function generateTextures(scene: Phaser.Scene): void {
   });
 
   // --- Arena backdrop: charcoal grill with grates --------------------------
-  make(scene, 'bg-grill', GAME_W, GAME_H, (g) => {
+  // Drawn at the render scale so the full-screen backdrop is sharp on big screens;
+  // scenes show it with setDisplaySize(GAME_W, GAME_H).
+  make(scene, 'bg-grill', Math.round(GAME_W * RENDER_SCALE), Math.round(GAME_H * RENDER_SCALE), (g) => {
+    g.scaleCanvas(RENDER_SCALE, RENDER_SCALE);
     g.fillStyle(0x1e1714, 1).fillRect(0, 0, GAME_W, GAME_H);
     // Glowing coals peeking through
     for (let i = 0; i < 220; i++) {

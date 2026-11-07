@@ -1,3 +1,5 @@
+import { defaultBindings, sanitizeBindings, type Bindings } from './controls';
+
 /** Player settings, saved in localStorage (guarded: the game works without storage). */
 export interface Settings {
   masterVolume: number;
@@ -10,6 +12,8 @@ export interface Settings {
   /** Fewer particles and tweens; defaults to the OS "reduce motion" setting. */
   reducedMotion: boolean;
   damageNumbers: boolean;
+  /** Keyboard bindings by physical key position (see state/controls.ts). */
+  keyBindings: Bindings;
 }
 
 const KEY = 'wurst-case-scenario/settings';
@@ -32,6 +36,7 @@ export function defaultSettings(): Settings {
     reduceFlashing: reduced,
     reducedMotion: reduced,
     damageNumbers: true,
+    keyBindings: defaultBindings(),
   };
 }
 
@@ -83,6 +88,7 @@ export function sanitize(s: Settings): Settings {
     reduceFlashing: !!s.reduceFlashing,
     reducedMotion: !!s.reducedMotion,
     damageNumbers: s.damageNumbers !== false,
+    keyBindings: sanitizeBindings(s.keyBindings),
   };
 }
 

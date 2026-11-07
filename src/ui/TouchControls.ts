@@ -41,16 +41,18 @@ export class TouchControls {
     pause.on('pointerdown', () => onPause());
 
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (this.stickPointer !== null || p.x > GAME_W * 0.55 || p.y < HUD_H) return;
+      // World coordinates: the camera is zoomed by the render scale, so screen pixels ≠ game units.
+      if (this.stickPointer !== null || p.worldX > GAME_W * 0.55 || p.worldY < HUD_H) return;
       this.stickPointer = p.id;
-      this.origin = { x: p.x, y: p.y };
-      this.base.setPosition(p.x, p.y).setVisible(true);
-      this.knob.setPosition(p.x, p.y).setVisible(true);
+      this.origin = { x: p.worldX, y: p.worldY };
+      this.base.setPosition(p.worldX, p.worldY).setVisible(true);
+      this.knob.setPosition(p.worldX, p.worldY).setVisible(true);
     });
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       if (p.id !== this.stickPointer) return;
-      const dx = p.x - this.origin.x;
-      const dy = p.y - this.origin.y;
+      p.updateWorldPoint(this.base.scene.cameras.main);
+      const dx = p.worldX - this.origin.x;
+      const dy = p.worldY - this.origin.y;
       const len = Math.hypot(dx, dy);
       const k = len > STICK_R ? STICK_R / len : 1;
       this.knob.setPosition(this.origin.x + dx * k, this.origin.y + dy * k);

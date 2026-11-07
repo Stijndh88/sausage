@@ -172,7 +172,7 @@ class GameDriver {
         const game = window.__game;
         if (!game.scene.isActive('Game')) return;
         const s = game.scene.getScene('Game');
-        if (!s.head || !s.head.active || !s.keys) return;
+        if (!s.head || !s.head.active || !s.controls) return;
         const h = s.head;
         let fx = 0;
         let fy = 0;
@@ -196,11 +196,12 @@ class GameDriver {
         }
         fx += (640 - h.x) * 0.004 - (h.y - 400) * 0.003;
         fy += (400 - h.y) * 0.004 + (h.x - 640) * 0.003;
-        const k = s.keys;
-        k.D.isDown = fx > 0.3;
-        k.A.isDown = fx < -0.3;
-        k.S.isDown = fy > 0.3;
-        k.W.isDown = fy < -0.3;
+        // Physical keys (KeyboardEvent.code), the same on every keyboard layout.
+        const c = s.controls;
+        c.setHeld('KeyD', fx > 0.3);
+        c.setHeld('KeyA', fx < -0.3);
+        c.setHeld('KeyS', fy > 0.3);
+        c.setHeld('KeyW', fy < -0.3);
       }, 50);
     });
   }

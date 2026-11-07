@@ -9,6 +9,7 @@ import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
 import { audio } from '../audio/Audio';
 import { PadPoller } from '../ui/pad';
+import { fitCamera } from '../ui/view';
 
 const CARD_W = 226;
 const CARD_H = 430;
@@ -34,8 +35,9 @@ export class SelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    fitCamera(this);
     audio.setMood('menu');
-    this.add.image(0, 0, 'bg-grill').setOrigin(0);
+    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H);
     this.add.rectangle(0, 0, GAME_W, GAME_H, 0x140d0a, 0.55).setOrigin(0);
     this.add.text(GAME_W / 2, 52, 'PICK YOUR SAUSAGE', {
       fontFamily: FONT, fontSize: '44px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#3a1408', strokeThickness: 7,

@@ -9,12 +9,13 @@ import { PadPoller } from '../ui/pad';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
+import { fitCamera } from '../ui/view';
 
 /** Shared layout for the end-of-run screens. */
 export function endScreen(scene: Phaser.Scene, run: RunState, title: string, subtitle: string, color: string, headTint: number, won = false): void {
   // Save progress first: best wave, wins, and any sausage this run unlocked.
   const unlocked = recordRun(run.sausage, Math.min(run.wave, TOTAL_WAVES), won);
-  scene.add.image(0, 0, 'bg-grill').setOrigin(0).setAlpha(0.4);
+  scene.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setAlpha(0.4);
   scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0c0806, 0.65).setOrigin(0);
   scene.add.image(GAME_W / 2, 150, 'sausage-head').setScale(4).setTint(headTint);
   scene.add.text(GAME_W / 2, 250, title, {
@@ -77,6 +78,7 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: { run: RunState }): void {
+    fitCamera(this);
     const cause = data.run.causeOfDeath ? `Done in by ${data.run.causeOfDeath} on wave ${data.run.wave}.` : 'That sausage is done.';
     endScreen(this, data.run, 'SKEWERED', cause, '#ff6a3a', 0x6a6a6a);
   }

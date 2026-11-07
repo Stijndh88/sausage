@@ -34,7 +34,7 @@ function installSim(g) {
     const steer = () => {
       if (!game.scene.isActive('Game')) return;
       const s = game.scene.getScene('Game');
-      if (!s.head || !s.head.active || !s.keys) return;
+      if (!s.head || !s.head.active || !s.controls) return;
       const h = s.head;
       let fx = 0;
       let fy = 0;
@@ -58,11 +58,11 @@ function installSim(g) {
       }
       fx += (640 - h.x) * 0.004 - (h.y - 400) * 0.003;
       fy += (400 - h.y) * 0.004 + (h.x - 640) * 0.003;
-      const k = s.keys;
-      k.D.isDown = fx > 0.3;
-      k.A.isDown = fx < -0.3;
-      k.S.isDown = fy > 0.3;
-      k.W.isDown = fy < -0.3;
+      const c = s.controls;
+      c.setHeld('KeyD', fx > 0.3);
+      c.setHeld('KeyA', fx < -0.3);
+      c.setHeld('KeyS', fy > 0.3);
+      c.setHeld('KeyW', fy < -0.3);
     };
     const summarize = (arr) => {
       if (!arr.length) return { n: 0 };
@@ -614,7 +614,7 @@ module.exports = {
         const before = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.head.x = s.arena.right - 30;
-          s.keys.D.isDown = true;
+          s.controls.setHeld('KeyD', true);
           s.head.drive(1, 0, 1, true, s.stats.dashCooldownMs);
           return { x: s.head.x, kills: s.run.kills };
         });
@@ -622,7 +622,7 @@ module.exports = {
         await g.wait(1500);
         const after = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
-          s.keys.D.isDown = false;
+          s.controls.setHeld('KeyD', false);
           const a = s.arena;
           const b = s.physics.world.bounds;
           const out = (o, r, m) => o.x < r.left - m || o.x > r.right + m || o.y < r.top - m || o.y > r.bottom + m;
