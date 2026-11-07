@@ -16,6 +16,10 @@ type Mode = 'move' | 'windup' | 'charge' | 'recover' | 'idle' | 'spray';
 
 const UP_OFFSET = Math.PI / 2; // textures are drawn facing up
 export const MAX_POISON_STACKS = 3;
+/** Burn is one flame per enemy: a new burn refreshes it (keeping the stronger one) instead of stacking. */
+export const BURN_MS = 2000;
+/** When a burning enemy dies, the fire jumps to enemies within this many pixels of it. */
+export const BURN_SPREAD_RADIUS = 90;
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   readonly def: EnemyDef;
@@ -37,6 +41,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private kbY = 0;
   /** Up to MAX_POISON_STACKS independent poison stacks, each with its own timer. */
   private poisons: { dps: number; until: number }[] = [];
+  /** Fire: a single flame, short and hot, that spreads on death (see Game.killEnemy). */
+  private burn = { dps: 0, until: 0 };
   private flashUntil = 0;
   private mode: Mode = 'move';
   private stateUntil = 0;
@@ -145,6 +151,17 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.poisons.length;
   }
 
+  /** Sets the enemy on fire. Doesn't stack: refreshes the timer and keeps the stronger flame. */
+  ignite(dps: number, durationMs: number, now: number): void {
+    const live = this.burn.until > now;
+    this.burn = { dps: live ? Math.max(this.burn.dps, dps) : dps, until: Math.max(live ? this.burn.until : 0, now + durationMs) };
+  }
+
+  /** Damage per second of the flame on this enemy, or 0 when it isn't burning. */
+  burnDpsAt(now: number): number {
+    return this.burn.until > now ? this.burn.dps : 0;
+  }
+
   shove(fromX: number, fromY: number, strength: number): void {
     // Turrets are rooted and the boss is immovable.
     if (this.isBoss || this.def.kind === 'hotsauce') return;
@@ -153,14 +170,17 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.kbY = Math.sin(a) * strength;
   }
 
-  /** Returns true if poison killed it this frame. */
+  /** Returns true if poison or fire killed it this frame. */
   think(ctx: EnemyContext, now: number, dt: number): boolean {
     if (this.dead) return false;
     let poisonKill = false;
-    if (this.poisons.length) {
-      let dps = 0;
-      for (const p of this.poisons) if (p.until > now) dps += p.dps;
-      if (dps === 0) this.poisons.length = 0;
+    const burnDps = this.burnDpsAt(now);
+    if (this.poisons.length || burnDps > 0) {
+      let dps = burnDps;
+      let poisonDps = 0;
+      for (const p of this.poisons) if (p.until > now) poisonDps += p.dps;
+      if (poisonDps === 0) this.poisons.length = 0;
+      dps += poisonDps;
       this.hp -= dps * dt;
       if (this.hp <= 0) {
         this.dead = true;
@@ -348,6 +368,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.setTintFill(0xffffff);
     } else if (this.mode === 'windup') {
       this.setTint(Math.floor(now / 80) % 2 ? 0xff5040 : 0xffffff);
+    } else if (this.burn.until > now) {
+      this.setTint(Math.floor(now / 90) % 2 ? 0xff7a2a : 0xffc060);
     } else if (this.poisons.length) {
       this.setTint(0xc8ff6a);
     } else if (this.elite) {
