@@ -6,7 +6,7 @@ import { createEnemyBulletPool, createPlayerBulletPool, EnemyBullet, PlayerBulle
 import { Enemy, type EnemyContext } from '../entities/Enemy';
 import { LINK_RADIUS, LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
-import { SausageHead } from '../entities/SausageHead';
+import { HIT_INVULN_MS, SausageHead } from '../entities/SausageHead';
 import { SAUSAGES } from '../data/sausages';
 import { runStats, type RunState } from '../state/run';
 import type { PlayerStats } from '../state/stats';
@@ -25,8 +25,12 @@ import { Tutorial } from '../ui/Tutorial';
 import { DamageNumbers } from '../ui/DamageNumbers';
 import { PadPoller } from '../ui/pad';
 import { TouchControls, wantsTouchControls } from '../ui/TouchControls';
-import { loadSave, writeSave } from '../state/save';
-import { newRun } from '../state/run';
+import { bankSpice, loadSave, writeSave } from '../state/save';
+import { tally } from '../state/run';
+import { bossName, courseDef, courseName, courseTrophy, TROPHIES } from '../data/courses';
+import { menuDef } from '../data/menus';
+import { BOSS_SPICE, firstTasteSpice, KILL_SPICE_PER_CRUMB, settleRun, spiceMult, waveClearSpice, bagValue } from '../state/meta';
+import { startRun } from './startRun';
 import { audio } from '../audio/Audio';
 import { getSettings } from '../state/settings';
 import { fitCamera } from '../ui/view';
@@ -90,6 +94,13 @@ export class GameScene extends Phaser.Scene {
   private lastHeadPos = { x: 0, y: 0 };
   private settingsPanel!: SettingsPanel;
   private onGrill = false;
+  /** Smoked keystone: a one-hit shield each wave. */
+  private shieldUp = false;
+  private hitThisWave = false;
+  /** Game times of recent kills, for the "50 kills in 10 seconds" recipe. */
+  private killTimes: number[] = [];
+  /** Glass Plates menu. */
+  private damageTakenMult = 1;
   /**
    * Game time in ms. Advances only on unpaused frames, by the same capped delta physics uses,
    * so every gameplay timer (cooldowns, invulnerability, lifetimes, enemy AI) pauses and
@@ -108,13 +119,17 @@ export class GameScene extends Phaser.Scene {
   init(data: { run: RunState }): void {
     this.run = data.run;
     this.stats = runStats(this.run);
-    this.cfg = waveConfig(this.run.wave);
+    this.cfg = adjustedWave(this.run);
     this.rng = mulberry32((this.run.seed + this.run.wave * 31337) >>> 0);
     // You start every wave at full health.
     this.health = new Health(this.stats.maxHp);
     this.health.armor = this.stats.armor;
     this.health.regenPerSec = this.stats.regenPerSec;
     this.livesLeft = this.stats.extraLives;
+    this.shieldUp = this.run.mods.waveShield > 0;
+    this.hitThisWave = false;
+    this.killTimes = [];
+    this.damageTakenMult = menuDef(this.run.menu).damageTakenMult ?? 1;
     this.invincible = false;
     this.thornsReadyAt = new WeakMap();
     this.boss = null;
@@ -134,7 +149,9 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     fitCamera(this);
-    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setDepth(0);
+    this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setDepth(0).setTint(courseDef(this.cfg.course).arenaTint);
+    tally(this.run, 'bestCourseReached', this.cfg.course, 'max');
+    tally(this.run, 'maxLinks', this.run.weapons.length, 'max');
     this.physics.world.setBounds(this.arena.x, this.arena.y, this.arena.width, this.arena.height);
     this.physics.world.timeScale = 1; // in case a hit-stop was cut short by a scene change
     this.createHotTiles();
@@ -197,7 +214,7 @@ export class GameScene extends Phaser.Scene {
       enemy.shove(this.head.x, this.head.y, 260);
       this.applyThorns(enemy);
       if (this.head.invulnerable) return;
-      this.takeDamage(enemy.def.contactDamage, enemy.def.name);
+      this.takeDamage(enemy.def.contactDamage, enemy.label);
     });
     this.physics.add.collider(this.enemies, this.enemies);
 
@@ -219,7 +236,10 @@ export class GameScene extends Phaser.Scene {
     }).setDepth(12);
     this.sizzle.startFollow(this.head);
 
-    this.hud = new Hud(this, this.run.wave);
+    this.hud = new Hud(this, this.cfg.boss
+      ? `${courseName(this.cfg.course).toUpperCase()} · BOSS`
+      : `${courseName(this.cfg.course).toUpperCase()} · WAVE ${this.cfg.courseWave}/${this.cfg.courseWaves}`);
+    this.hud.setBossName(bossName(this.cfg.course));
     this.damageNumbers = new DamageNumbers(this);
     this.touch = wantsTouchControls(this.game)
       ? new TouchControls(this, () => { if (!this.paused) this.dashQueued = true; }, () => { this.pauseQueued = true; })
@@ -230,9 +250,12 @@ export class GameScene extends Phaser.Scene {
     this.settingsPanel = new SettingsPanel(this, () => this.pauseMenu.setActive(true));
     this.pauseMenu = new PauseMenu(this, {
       resume: () => { if (this.paused) this.togglePause(); },
-      restart: () => this.leavePaused(() => this.scene.start('Game', { run: newRun(undefined, this.run.sausage) })),
+      // Leaving a run early banks it like a bail-out, so the bag and the Cookbook progress aren't lost.
+      restart: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); startRun(this, this.run.sausage); }),
       settings: () => { this.pauseMenu.setActive(false); this.settingsPanel.show(); },
-      quit: () => this.leavePaused(() => this.scene.start('Menu')),
+      quit: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); this.scene.start('Menu'); }),
+      bail: () => this.leavePaused(() => this.scene.start('GameOver', { run: this.run, outcome: 'bail', hp: this.health.hp })),
+      bailValue: () => bagValue('bail', this.run),
     });
 
     const kb = this.input.keyboard!;
@@ -243,7 +266,9 @@ export class GameScene extends Phaser.Scene {
     onAction(kb, 'dash', queueDash);
     onAction(kb, 'pause', queuePause);
 
-    this.banner(this.cfg.boss ? "THE GRILL MASTER'S TONGS" : `WAVE ${this.run.wave}`, this.cfg.boss ? 'Defeat the boss to escape the BBQ!' : 'Survive!');
+    if (this.cfg.boss) this.banner(bossName(this.cfg.course).toUpperCase(), 'Beat the boss, then take it home or go for seconds!');
+    else if (this.cfg.courseWave === 1) this.banner(courseName(this.cfg.course).toUpperCase(), courseDef(this.cfg.course).intro);
+    else this.banner(`WAVE ${this.cfg.courseWave}`, 'Survive!');
     audio.setMood(this.cfg.boss ? 'boss' : 'fight');
     audio.play('waveStart');
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
@@ -295,7 +320,10 @@ export class GameScene extends Phaser.Scene {
         iy = p.y;
       }
       const wantDash = this.dashQueued;
-      if (this.head.drive(ix, iy, this.stats.speedMult, wantDash, this.stats.dashCooldownMs)) audio.play('dash');
+      if (this.head.drive(ix, iy, this.stats.speedMult, wantDash, this.stats.dashCooldownMs)) {
+        audio.play('dash');
+        tally(this.run, 'dashes');
+      }
     } else {
       this.head.halt();
     }
@@ -309,10 +337,12 @@ export class GameScene extends Phaser.Scene {
     if (!this.dying && !this.ending) {
       this.onGrill = !this.stats.grillImmune && this.hotTiles.some((r) => r.contains(this.head.x, this.head.y));
       if (this.onGrill && !this.invincible) {
-        this.health.hp = Math.max(0, this.health.hp - GRILL_DAMAGE_PER_SEC * dt);
+        this.health.hp = Math.max(0, this.health.hp - GRILL_DAMAGE_PER_SEC * this.stats.grillDamageMult * dt);
         if (this.health.dead) this.onLethal('Grill tile');
       }
+      const before = this.health.hp;
       this.health.tick(dt);
+      if (this.health.hp > before) tally(this.run, 'healed', this.health.hp - before);
     }
     this.sizzle.emitting = !this.dying && this.onGrill;
     this.sizzle.frequency = 90;
@@ -328,7 +358,7 @@ export class GameScene extends Phaser.Scene {
         e.setVelocity(0, 0);
         continue;
       }
-      if (e.think(this.enemyCtx, time, dt)) this.killEnemy(e);
+      if (e.think(this.enemyCtx, time, dt)) this.killEnemy(e, true);
       // Melee enemies bounce off your links.
       if (e.def.melee && !e.dead) {
         for (const p of this.chain.positions) {
@@ -360,6 +390,7 @@ export class GameScene extends Phaser.Scene {
     this.graveyard.length = 0;
 
     this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
+    this.hud.setBag(Math.floor(this.run.bag), bagValue('death', this.run), this.run.trophies.map((t) => TROPHIES[t].color));
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
     this.damageNumbers.update(time);
 
@@ -369,7 +400,7 @@ export class GameScene extends Phaser.Scene {
       this.patterns.clear();
       this.shake(350, 0.012);
       audio.play('bossPhase');
-      this.banner('PHASE 2', 'The tongs are furious!', 900);
+      this.banner('PHASE 2', `${this.boss.label} is furious!`, 900);
     }
 
     if (!this.ending && !this.dying && this.director.timeUp) this.endWave();
@@ -383,7 +414,12 @@ export class GameScene extends Phaser.Scene {
 
   private spawnEnemy(kind: EnemyKind, x: number, y: number): void {
     if (this.ending || this.dying) return;
-    const e = new Enemy(this, x, y, kind, this.cfg.hpMult);
+    const e = new Enemy(this, x, y, kind, kind === 'tongs' ? this.cfg.bossHpMult : this.cfg.hpMult);
+    if (this.run.chili >= 1) e.speedMult = 1.15;
+    if (kind === 'tongs') {
+      const style = courseDef(this.cfg.course).boss;
+      e.applyStyle({ ...style, name: bossName(this.cfg.course), extraAttack: style.extraAttack || this.run.chili >= 4 });
+    }
     this.enemies.add(e);
     e.setup(this.gameTime);
     if (kind === 'tongs') {
@@ -397,7 +433,7 @@ export class GameScene extends Phaser.Scene {
     const [bullet, enemy] = pair<PlayerBullet, Enemy>(a, b, PlayerBullet);
     if (!bullet || !enemy || !bullet.active || enemy.dead || bullet.hitSet.has(enemy)) return;
     bullet.hitSet.add(enemy);
-    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps, POISON_MS, this.gameTime);
+    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps * this.stats.poisonMult, POISON_MS, this.gameTime);
     // Push away from where the shot came from (its velocity: spinning shots' rotation means nothing).
     const v = (bullet.body as Phaser.Physics.Arcade.Body).velocity;
     const heading = v.lengthSq() > 1 ? Math.atan2(v.y, v.x) : bullet.rotation;
@@ -410,13 +446,18 @@ export class GameScene extends Phaser.Scene {
 
   /** Every source of player damage goes through here: crits and lifesteal apply to all of them. */
   private damageEnemy(e: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void {
+    // First Bite talent: extra damage to enemies that haven't been hurt yet.
+    if (this.stats.firstBite > 0 && e.hp >= e.maxHp) amount *= 1 + this.stats.firstBite;
     const crit = this.stats.critChance > 0 && Math.random() < this.stats.critChance;
     if (crit) {
       amount *= 2;
+      tally(this.run, 'crits');
+      // Extra Spicy keystone: crits set enemies on fire.
+      if (this.stats.critBurn > 0) e.poison(this.stats.critBurn, 2000, this.gameTime);
       this.sparks.setParticleTint(0xffd23f);
       this.sparks.explode(4, e.x, e.y);
     }
-    if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) this.health.heal(1);
+    if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) tally(this.run, 'healed', this.health.heal(1));
     audio.play(crit ? 'crit' : 'hit');
     if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
@@ -443,13 +484,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private killEnemy(e: Enemy): void {
+  private killEnemy(e: Enemy, byPoison = false): void {
     e.dead = true;
     audio.play('kill');
     this.run.kills++;
+    tally(this.run, 'kills');
+    if (byPoison) tally(this.run, 'poisonKills');
+    this.killTimes.push(this.gameTime);
+    while (this.killTimes.length && this.killTimes[0] < this.gameTime - 10_000) this.killTimes.shift();
+    tally(this.run, 'killBurst', this.killTimes.length, 'max');
+    if (!e.isBoss) this.addSpice(e.def.crumbs * KILL_SPICE_PER_CRUMB);
     this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
-    const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult);
+    const crumbs = rollCrumbs(this.rng, e.def.crumbs * this.cfg.crumbMult, this.stats.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
     if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
     this.killPop(e);
@@ -457,6 +504,12 @@ export class GameScene extends Phaser.Scene {
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
     if (e.isBoss) this.win();
+  }
+
+  /** Spice goes into the doggy bag, times the current multiplier. */
+  private addSpice(base: number): void {
+    this.run.bag += base * spiceMult(this.run);
+    tally(this.run, 'peakBag', Math.floor(this.run.bag), 'max');
   }
 
   private collect(kind: 'crumb' | 'condiment'): void {
@@ -467,6 +520,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       audio.play('heal');
       const healed = this.health.heal(this.stats.condimentHeal);
+      tally(this.run, 'healed', healed);
       this.floatText(this.head.x, this.head.y - 24, `+${Math.round(healed)} HP`, '#7dff9a');
     }
   }
@@ -480,8 +534,17 @@ export class GameScene extends Phaser.Scene {
       this.floatText(this.head.x, this.head.y - 24, 'DODGE', '#8fd3ff');
       return;
     }
-    const dealt = this.health.takeDamage(amount);
-    this.head.markHit();
+    this.hitThisWave = true;
+    if (this.shieldUp) {
+      // Smoked keystone: the first hit of every wave is absorbed.
+      this.shieldUp = false;
+      this.head.markHit(600);
+      audio.play('dodge');
+      this.floatText(this.head.x, this.head.y - 24, 'SHIELD!', '#ffd0a0');
+      return;
+    }
+    const dealt = this.health.takeDamage(amount * this.damageTakenMult);
+    this.head.markHit(HIT_INVULN_MS + this.stats.iframeBonusMs);
     if (!getSettings().reducedMotion) this.hitStopMs = 70;
     this.shake(110, 0.005);
     audio.play('hurt');
@@ -497,6 +560,16 @@ export class GameScene extends Phaser.Scene {
       this.flash(250, 255, 200, 160);
       audio.play('save');
       this.floatText(this.head.x, this.head.y - 40, 'SECOND SKIN!', '#ffd23f');
+      return;
+    }
+    if (this.run.mods.revive && !this.run.reviveUsed) {
+      // Second Skin keystone: once per run, get back up at 40% HP.
+      this.run.reviveUsed = true;
+      this.health.hp = this.health.maxHp * 0.4;
+      this.head.markHit(2000);
+      this.flash(300, 255, 220, 120);
+      audio.play('save');
+      this.floatText(this.head.x, this.head.y - 40, 'BACK FROM THE GRILL!', '#ffd23f');
       return;
     }
     this.die(source);
@@ -672,6 +745,8 @@ export class GameScene extends Phaser.Scene {
     const banked = rollCrumbs(this.rng, floor, FLOOR_CRUMB_BANK);
     this.run.crumbs += banked;
     this.run.crumbsEarned += banked;
+    this.addSpice(waveClearSpice(this.cfg.courseWave));
+    if (!this.hitThisWave) tally(this.run, 'hitlessWaves');
     audio.play('waveClear');
     this.banner('WAVE CLEARED!', floor
       ? `You left ${floor} crumb${floor === 1 ? '' : 's'} on the floor: you get half (+${banked})`
@@ -695,8 +770,27 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.pickups.collectAll((kind) => this.collect(kind));
-    this.banner('YOU ESCAPED THE BBQ!', undefined, 1800);
-    this.time.delayedCall(2600, () => this.scene.start('Victory', { run: this.run }));
+
+    // The boss pays into the bag, drops its trophy, and the first kill pays a First Taste bonus.
+    const course = this.cfg.course;
+    this.addSpice(BOSS_SPICE * (1 + this.run.mods.bossBonus));
+    const trophy = courseTrophy(course);
+    this.run.trophies.push(trophy);
+    tally(this.run, 'bossKills');
+    if (courseDef(course).id === 'smokehouse') tally(this.run, 'smokeyKills');
+    if (!this.hitThisWave) tally(this.run, 'hitlessBosses');
+    const key = `${this.run.sausage}:${course}`;
+    const save = loadSave();
+    const taste = firstTasteSpice(course);
+    if (taste > 0 && !save.firstTaste.includes(key)) {
+      writeSave({ ...save, firstTaste: [...save.firstTaste, key] });
+      bankSpice(taste);
+      this.run.bankedDuringRun += taste;
+      this.time.delayedCall(900, () => this.banner('FIRST TASTE!', `+${taste} Spice, banked for keeps`, 1200));
+    }
+    this.banner(`${bossName(course).toUpperCase()} IS DOWN!`, `+1 ${TROPHIES[trophy].name} in your doggy bag`, 1600);
+    const hp = this.health.hp;
+    this.time.delayedCall(2600, () => this.scene.start('Choice', { run: this.run, hp }));
   }
 
   private die(source = 'Unknown'): void {
@@ -711,7 +805,7 @@ export class GameScene extends Phaser.Scene {
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
     this.banner('SKEWERED!', `Done in by: ${source}`, 1500);
-    this.time.delayedCall(2200, () => this.scene.start('GameOver', { run: this.run }));
+    this.time.delayedCall(2200, () => this.scene.start('GameOver', { run: this.run, outcome: 'death', hp: 0 }));
   }
 
   private cleanup(): void {
@@ -720,6 +814,19 @@ export class GameScene extends Phaser.Scene {
     this.weapons.destroy();
     this.chain.destroy();
   }
+}
+
+/** The wave as served: the course's wave plus this run's menu and Chili twists. */
+export function adjustedWave(run: RunState): WaveConfig {
+  const base = waveConfig(run.wave);
+  const menu = menuDef(run.menu);
+  return {
+    ...base,
+    hotTiles: base.hotTiles + (menu.extraHotTiles ?? 0),
+    spawnIntervalMs: Math.round(base.spawnIntervalMs * (menu.spawnMult ?? 1)),
+    hpMult: base.hpMult * (menu.enemyHpMult ?? 1) * (run.chili >= 2 ? 1.25 : 1),
+    bossHpMult: base.bossHpMult * (menu.enemyHpMult ?? 1) * (run.chili >= 2 ? 1.25 : 1),
+  };
 }
 
 /** Arcade overlap callbacks don't guarantee argument order; sort them out by type. */

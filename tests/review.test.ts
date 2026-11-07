@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 // WaveDirector only uses Phaser for types; make sure the real engine never loads under Node.
 vi.mock('phaser', () => ({ default: {} }));
 
-import { waveConfig, TOTAL_WAVES, type WaveConfig } from '../src/data/waves';
+import { waveConfig, BACKYARD_BOSS_WAVE, type WaveConfig } from '../src/data/waves';
 import { ITEM_IDS } from '../src/data/items';
 import { WEAPON_IDS } from '../src/data/weapons';
 import { Health } from '../src/systems/Health';
@@ -79,7 +79,7 @@ function makeDirector(cfg: WaveConfig, seed = 1) {
 
 describe('review: WaveDirector', () => {
   it('never lets alive + telegraphed exceed maxAlive', () => {
-    for (let w = 1; w < TOTAL_WAVES; w++) {
+    for (let w = 1; w < BACKYARD_BOSS_WAVE; w++) {
       const cfg = waveConfig(w);
       const { director, alive, run } = makeDirector(cfg, w);
       for (let i = 0; i < 200; i++) {
@@ -92,7 +92,7 @@ describe('review: WaveDirector', () => {
 
   it('respects the turret cap even with turrets still telegraphing', () => {
     let total = 0;
-    for (let w = 4; w < TOTAL_WAVES; w++) {
+    for (let w = 4; w < BACKYARD_BOSS_WAVE; w++) {
       const cfg = waveConfig(w);
       const { alive, run } = makeDirector(cfg, 100 + w);
       run(cfg.durationSec * 1000);
@@ -115,7 +115,7 @@ describe('review: WaveDirector', () => {
   });
 
   it('telegraphs the boss once on the boss wave and never times out', () => {
-    const { director, spawned, run } = makeDirector(waveConfig(TOTAL_WAVES), 5);
+    const { director, spawned, run } = makeDirector(waveConfig(BACKYARD_BOSS_WAVE), 5);
     run(60_000);
     expect(spawned.filter((k) => k === 'tongs')).toHaveLength(1);
     expect(director.timeUp).toBe(false);
@@ -185,7 +185,7 @@ describe('review: rng', () => {
   });
 
   it('every wave weight table is pickable', () => {
-    for (let w = 1; w <= TOTAL_WAVES; w++) expect(() => pickWeighted(mulberry32(w), waveConfig(w).weights)).not.toThrow();
+    for (let w = 1; w <= BACKYARD_BOSS_WAVE; w++) expect(() => pickWeighted(mulberry32(w), waveConfig(w).weights)).not.toThrow();
   });
 });
 

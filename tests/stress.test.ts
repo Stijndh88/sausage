@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { FIRST_LINK_GAP, LINK_GAP } from '../src/entities/LinkChain';
 import { MAX_LINKS } from '../src/data/weapons';
-import { TOTAL_WAVES, waveConfig } from '../src/data/waves';
+import { BACKYARD_BOSS_WAVE, waveConfig } from '../src/data/waves';
 import { Health } from '../src/systems/Health';
 import { mulberry32 } from '../src/systems/rng';
 import { Trail } from '../src/systems/Trail';
@@ -73,10 +73,10 @@ describe('Health with extreme frame times', () => {
 
 describe('Wave caps', () => {
   it('every wave (and out-of-range waves) has finite caps the pools can absorb', () => {
-    for (const w of [-5, 0, 1, 5, 9, TOTAL_WAVES, TOTAL_WAVES + 1, 1e6]) {
+    for (const w of [-5, 0, 1, 5, 9, BACKYARD_BOSS_WAVE, BACKYARD_BOSS_WAVE + 1, 1e6]) {
       const cfg = waveConfig(w);
       expect(cfg.wave).toBeGreaterThanOrEqual(1);
-      expect(cfg.wave).toBeLessThanOrEqual(TOTAL_WAVES);
+      expect(Number.isFinite(cfg.hpMult)).toBe(true);
       expect(cfg.maxAlive).toBeGreaterThan(0);
       expect(cfg.maxAlive).toBeLessThanOrEqual(100);
       expect(cfg.maxTurrets).toBeLessThanOrEqual(cfg.maxAlive);

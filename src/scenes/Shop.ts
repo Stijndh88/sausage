@@ -2,13 +2,16 @@ import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
 import { ITEMS } from '../data/items';
 import { WEAPONS, tierLabel, type WeaponId } from '../data/weapons';
-import { TOTAL_WAVES } from '../data/waves';
 import type { RunState } from '../state/run';
+import { runBaseStats, tally } from '../state/run';
+import { bossName, courseName, locate } from '../data/courses';
+import { menuDef } from '../data/menus';
+import { SAUSAGES } from '../data/sausages';
+import { MAX_TIER } from '../data/weapons';
+import { loadSave, unlockedRarities, unlockedWeapons } from '../state/save';
 import { RARITIES } from '../data/rarity';
 import { maxLinksFor, runStats } from '../state/run';
 import { computeStats } from '../state/stats';
-import { sausageBaseStats } from '../data/sausages';
-import { BASE_STATS } from '../state/stats';
 import { statChanges, weaponStatLine } from '../systems/statText';
 import {
   applyWeaponPurchase, canBuy, generateOffers, rerollCost, shopRng, type Offer, type ShopContext,
@@ -39,6 +42,10 @@ export class ShopScene extends Phaser.Scene {
   /** Card with keyboard/gamepad focus (arrows / D-pad), bought with A, kept with Y. */
   private focus = 0;
   private readonly pad = new PadPoller();
+  /** Free Refill talent: rerolls left in this shop that cost nothing. */
+  private freeRerolls = 0;
+  /** Every reroll in this shop, free ones included (seeds the next roll). */
+  private rerollsDone = 0;
 
   constructor() {
     super('Shop');
@@ -47,6 +54,8 @@ export class ShopScene extends Phaser.Scene {
   init(data: { run: RunState }): void {
     this.run = data.run;
     this.run.rerollCount = 0;
+    this.freeRerolls = this.run.mods.freeRerolls;
+    this.rerollsDone = 0;
     this.leaving = false;
     const lockedOffers = this.run.lockedOffers;
     this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers, undefined, this.run.weapons, this.shopContext());
@@ -89,7 +98,7 @@ export class ShopScene extends Phaser.Scene {
     add(this.add.text(GAME_W / 2, 46, 'THE CONDIMENT STAND', {
       fontFamily: FONT, fontSize: '40px', fontStyle: 'bold', color: '#ffe0b0', stroke: '#3a1408', strokeThickness: 6,
     }).setOrigin(0.5));
-    add(this.add.text(GAME_W / 2, 88, `Wave ${run.wave} survived. Next up: ${run.wave + 1 >= TOTAL_WAVES ? 'THE BOSS' : `wave ${run.wave + 1}`}`, {
+    add(this.add.text(GAME_W / 2, 88, this.headline(), {
       fontFamily: FONT, fontSize: '18px', color: '#c8a890',
     }).setOrigin(0.5));
 
@@ -107,8 +116,8 @@ export class ShopScene extends Phaser.Scene {
     this.offers.forEach((offer, i) => this.renderCard(add, offer, i, startX + i * (CARD_W + gap), CARD_Y));
 
     // Bottom row: reroll + next
-    const cost = rerollCost(run.wave, run.rerollCount);
-    add(new Button(this, GAME_W / 2 - 150, ROW_Y, `Reroll (R)  ${cost}`, { width: 240, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.reroll())
+    const cost = this.rerollPrice();
+    add(new Button(this, GAME_W / 2 - 150, ROW_Y, cost === 0 ? 'Reroll (R)  free' : `Reroll (R)  ${cost}`, { width: 240, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.reroll())
       .setEnabled(run.crumbs >= cost && this.canReroll()));
     add(new Button(this, GAME_W / 2 + 150, ROW_Y, 'Next wave (Enter)  ▶', { width: 240, height: 52, fill: 0x3c8d3c, hover: 0x52b052 }, () => this.next()));
 
@@ -182,7 +191,7 @@ export class ShopScene extends Phaser.Scene {
         stats = weaponStatLine(def!, 1);
       }
     } else {
-      const base = sausageBaseStats(BASE_STATS, this.run.sausage);
+      const base = runBaseStats(this.run);
       const lines = statChanges(computeStats(this.run.items, base), computeStats([...this.run.items, offer.id], base));
       stats = lines.length ? lines.join('\n') : 'No effect (maxed)';
     }
@@ -209,7 +218,34 @@ export class ShopScene extends Phaser.Scene {
   }
 
   private shopContext(): ShopContext {
-    return { items: this.run.items, luck: runStats(this.run).luck, maxLinks: maxLinksFor(this.run) };
+    const save = loadSave();
+    const run = this.run;
+    const weaponPool = [...new Set([...unlockedWeapons(save), ...SAUSAGES[run.sausage].startWeapons])];
+    const priceMult = (1 - run.mods.shopDiscount) * (run.chili >= 3 ? 1.2 : 1) * (menuDef(run.menu).priceMult ?? 1);
+    return {
+      items: run.items,
+      luck: runStats(run).luck,
+      maxLinks: maxLinksFor(run),
+      weaponPool,
+      rarities: unlockedRarities(save),
+      minRarity: run.mods.betterShop ? 'uncommon' : undefined,
+      priceMult,
+    };
+  }
+
+  /** "The Backyard: wave 3/6 survived. Next up: wave 4" (or the boss, or the next course). */
+  private headline(): string {
+    const here = locate(this.run.wave);
+    const next = locate(this.run.wave + 1);
+    const done = here.boss ? `${bossName(here.course)} beaten` : `${courseName(here.course)}: wave ${here.courseWave}/${here.waves} survived`;
+    const up = next.boss
+      ? `THE BOSS: ${bossName(next.course)}`
+      : next.course !== here.course ? `${courseName(next.course)}, wave 1` : `wave ${next.courseWave}`;
+    return `${done}. Next up: ${up}`;
+  }
+
+  private rerollPrice(): number {
+    return this.freeRerolls > 0 ? 0 : rerollCost(this.run.wave, this.run.rerollCount);
   }
 
   update(): void {
@@ -244,8 +280,11 @@ export class ShopScene extends Phaser.Scene {
     this.run.crumbs -= offer.price;
     if (offer.type === 'weapon') {
       this.run.weapons = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run))!;
+      if (this.run.weapons.some((w) => w.id === offer.id && w.tier === MAX_TIER)) tally(this.run, 'tier4', 1, 'max');
+      tally(this.run, 'maxLinks', this.run.weapons.length, 'max');
     } else {
       this.run.items.push(offer.id);
+      if (ITEMS[offer.id]?.rarity === 'legendary') tally(this.run, 'legendaries');
     }
     this.offers[i] = null;
     this.locked.delete(i);
@@ -267,13 +306,16 @@ export class ShopScene extends Phaser.Scene {
 
   private reroll(): void {
     if (this.leaving || !this.canReroll()) return;
-    const cost = rerollCost(this.run.wave, this.run.rerollCount);
+    const cost = this.rerollPrice();
     if (this.run.crumbs < cost) return;
     this.run.crumbs -= cost;
-    this.run.rerollCount++;
+    if (cost === 0) this.freeRerolls--;
+    else this.run.rerollCount++;
+    this.rerollsDone++;
+    tally(this.run, 'rerolls');
     audio.play('reroll');
     const keep = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
-    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.run.rerollCount), this.run.wave + 1, keep, undefined, this.run.weapons, this.shopContext());
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.rerollsDone), this.run.wave + 1, keep, undefined, this.run.weapons, this.shopContext());
     this.locked = new Set(keep.map((_, i) => i));
     this.render();
   }

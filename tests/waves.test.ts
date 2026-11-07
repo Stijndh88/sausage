@@ -1,27 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { TOTAL_WAVES, waveConfig } from '../src/data/waves';
+import { BACKYARD_BOSS_WAVE, waveConfig } from '../src/data/waves';
 import { mulberry32, pickWeighted } from '../src/systems/rng';
 
 describe('waves', () => {
   it('only the last wave is the boss and it has no timer', () => {
-    for (let w = 1; w < TOTAL_WAVES; w++) {
+    for (let w = 1; w < BACKYARD_BOSS_WAVE; w++) {
       expect(waveConfig(w).boss).toBe(false);
       expect(waveConfig(w).durationSec).toBeGreaterThan(0);
     }
-    expect(waveConfig(TOTAL_WAVES).boss).toBe(true);
-    expect(waveConfig(TOTAL_WAVES).durationSec).toBe(0);
+    expect(waveConfig(BACKYARD_BOSS_WAVE).boss).toBe(true);
+    expect(waveConfig(BACKYARD_BOSS_WAVE).durationSec).toBe(0);
   });
 
   it('gets harder every wave', () => {
-    for (let w = 2; w <= TOTAL_WAVES; w++) {
+    for (let w = 2; w <= BACKYARD_BOSS_WAVE; w++) {
       expect(waveConfig(w).hpMult).toBeGreaterThan(waveConfig(w - 1).hpMult);
       expect(waveConfig(w).maxAlive).toBeGreaterThan(waveConfig(w - 1).maxAlive);
     }
   });
 
-  it('clamps out-of-range waves', () => {
+  it('clamps low waves and carries high ones into later courses', () => {
     expect(waveConfig(0).wave).toBe(1);
-    expect(waveConfig(99).wave).toBe(TOTAL_WAVES);
+    expect(waveConfig(-3).course).toBe(0);
+    expect(waveConfig(BACKYARD_BOSS_WAVE + 1).course).toBe(1);
+    expect(waveConfig(BACKYARD_BOSS_WAVE + 1).courseWave).toBe(1);
+    expect(waveConfig(99).course).toBeGreaterThan(2);
   });
 
   it('wave 1 only spawns forks', () => {

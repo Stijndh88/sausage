@@ -4,7 +4,7 @@ import type { GameClock } from '../systems/clock';
 export const BASE_SPEED = 235;
 const DASH_SPEED_MULT = 3.2;
 const DASH_MS = 170;
-const HIT_INVULN_MS = 750;
+export const HIT_INVULN_MS = 750;
 
 /** The player. Only the head can be hit; its hitbox is the small dot in the middle. */
 export class SausageHead extends Phaser.Physics.Arcade.Sprite {

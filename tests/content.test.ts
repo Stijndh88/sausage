@@ -3,7 +3,7 @@ import { ITEMS, ITEM_IDS } from '../src/data/items';
 import { SAUSAGES, SAUSAGE_IDS, sausageBaseStats } from '../src/data/sausages';
 import { WEAPONS } from '../src/data/weapons';
 import { maxLinksFor, newRun, runStats } from '../src/state/run';
-import { isUnlocked, loadSave, recordRun, resetSaveCache, unlockedSausages, writeSave, defaultSave } from '../src/state/save';
+import { buySausage, loadSave, migrate, ownedSausages, resetSaveCache, sausageState, writeSave, defaultSave } from '../src/state/save';
 import { BASE_STATS, computeStats } from '../src/state/stats';
 import { applyWeaponPurchase } from '../src/systems/Economy';
 import { statChanges, weaponStatLine } from '../src/systems/statText';
@@ -51,20 +51,39 @@ describe('save data and unlocks', () => {
   });
 
   it('a fresh profile has only the Classic Frank', () => {
-    expect(unlockedSausages()).toEqual(['frank']);
+    expect(ownedSausages()).toEqual(['frank']);
+    for (const id of SAUSAGE_IDS.filter((x) => x !== 'frank')) expect(sausageState(id)).toBe('locked');
   });
 
-  it('reaching waves and winning unlock sausages, and records bests per sausage', () => {
-    expect(recordRun('frank', 4, false)).toEqual(['bratwurst']);
-    expect(recordRun('bratwurst', 7, false)).toEqual(['chorizo']);
-    expect(recordRun('chorizo', 10, true).sort()).toEqual(['hotdog', 'veggie']);
-    const s = loadSave();
-    expect(s.bestWave).toBe(10);
-    expect(s.wins).toBe(1);
-    expect(s.runs).toBe(3);
-    expect(s.bestWaveBy).toEqual({ frank: 4, bratwurst: 7, chorizo: 10 });
-    expect(s.winsBy).toEqual({ chorizo: 1 });
-    expect(isUnlocked(SAUSAGES.veggie.unlock)).toBe(true);
+  it('a sausage needs its recipe cooked, then Spice (and sometimes a trophy) to buy', () => {
+    expect(buySausage('bratwurst')).toBe(false);
+    writeSave({ ...loadSave(), cooked: ['escape_backyard'], spice: 99 });
+    expect(sausageState('bratwurst')).toBe('buyable');
+    expect(buySausage('bratwurst')).toBe(false);
+    writeSave({ ...loadSave(), spice: 150 });
+    expect(buySausage('bratwurst')).toBe(true);
+    expect(loadSave().spice).toBe(50);
+    expect(ownedSausages()).toEqual(['frank', 'bratwurst']);
+    // The Veggie Sausage also costs a Grinder Blade.
+    writeSave({ ...loadSave(), cooked: [...loadSave().cooked, 'heal_1000'], spice: 1000 });
+    expect(buySausage('veggie')).toBe(false);
+    writeSave({ ...loadSave(), trophies: { tong_tip: 0, grinder_blade: 1, smoked_brisket: 0 } });
+    expect(buySausage('veggie')).toBe(true);
+    expect(loadSave().trophies.grinder_blade).toBe(0);
+  });
+
+  it('upgrading an old save keeps every sausage it had unlocked, without paying recipes again', () => {
+    const old = { version: 1, bestWave: 10, wins: 1, runs: 7, bestWaveBy: { frank: 10 }, winsBy: { frank: 1 }, lastSausage: 'frank', tutorialDone: true };
+    const s = migrate(old);
+    expect(s.version).toBe(2);
+    expect(s.owned.sort()).toEqual(['bratwurst', 'chorizo', 'frank', 'hotdog', 'veggie']);
+    expect(s.spice).toBe(0);
+    expect(s.cooked).toContain('beat_tongs');
+    expect(s.cooked).toContain('escape_backyard');
+    expect(s.counters.runs).toBe(7);
+    expect(s.bestEscapeBy.frank).toBe(1);
+    const early = migrate({ version: 1, bestWave: 5, wins: 0, runs: 2 });
+    expect(early.owned.sort()).toEqual(['bratwurst', 'frank']);
   });
 
   it('survives a broken save in storage', () => {

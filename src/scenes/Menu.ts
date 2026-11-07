@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
 import { loadSave } from '../state/save';
+import { COURSES } from '../data/courses';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
@@ -17,6 +18,8 @@ export class MenuScene extends Phaser.Scene {
   private icons: Phaser.GameObjects.Image[] = [];
   private readonly pad = new PadPoller();
   private startFn: () => void = () => {};
+  private rackFn: () => void = () => {};
+  private bookFn: () => void = () => {};
   private settingsPanel: SettingsPanel | null = null;
 
   constructor() {
@@ -40,6 +43,8 @@ export class MenuScene extends Phaser.Scene {
         else if (b === 'b' || b === 'start') sp.back();
       } else if (b === 'a' || b === 'start') this.startFn();
       else if (b === 'x') sp?.show();
+      else if (b === 'y') this.rackFn();
+      else if (b === 'b') this.bookFn();
     }
   }
 
@@ -89,10 +94,24 @@ export class MenuScene extends Phaser.Scene {
     };
     const save = loadSave();
     if (save.runs > 0) {
-      this.add.text(GAME_W / 2, 578, `Best: wave ${save.bestWave}  ·  ${save.wins} escape${save.wins === 1 ? '' : 's'}  ·  ${save.runs} run${save.runs === 1 ? '' : 's'}`, {
-        fontFamily: FONT, fontSize: '16px', color: '#c8a890',
+      const best = Math.max(0, ...Object.values(save.bestEscapeBy).map((n) => n ?? 0));
+      const bestText = best ? `best: home after ${best <= COURSES.length ? COURSES[best - 1].name : `Seconds #${best - COURSES.length}`}` : 'not taken home yet';
+      this.add.text(GAME_W / 2, 528, `${save.spice} Spice  ·  ${bestText}  ·  ${save.runs} run${save.runs === 1 ? '' : 's'}`, {
+        fontFamily: FONT, fontSize: '16px', color: '#ffd060',
       }).setOrigin(0.5);
     }
+    const go = (key: string) => {
+      if (leaving || settings.isOpen) return;
+      leaving = true;
+      this.scene.start(key, { back: 'Menu' });
+    };
+    this.rackFn = () => go('SpiceRack');
+    this.bookFn = () => go('Cookbook');
+    new Button(this, GAME_W / 2 - 130, 568, 'Spice Rack (Tab)', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.rackFn);
+    new Button(this, GAME_W / 2 + 130, 568, 'Cookbook (C)', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.bookFn);
+    onKeyPress(this.input.keyboard!, 'TAB', () => this.rackFn());
+    onKeyPress(this.input.keyboard!, 'C', () => this.bookFn());
+    this.input.keyboard!.addCapture('TAB');
     this.startFn = start;
     new Button(this, GAME_W / 2, 630, 'START  (Enter)', { width: 280, height: 60, fontSize: 24 }, start);
     new Button(this, GAME_W / 2 - 270, 630, 'Settings', { width: 180, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => settings.show());

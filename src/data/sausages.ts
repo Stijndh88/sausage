@@ -1,14 +1,19 @@
 import type { PlayerStats } from '../state/stats';
 import type { WeaponId } from './weapons';
 import { MAX_LINKS } from './weapons';
+import type { TrophyId } from './courses';
 
 export type SausageId = 'frank' | 'bratwurst' | 'chorizo' | 'hotdog' | 'veggie';
 
-/** What a saved profile must have achieved to unlock a sausage. */
-export type Unlock =
-  | { kind: 'always' }
-  | { kind: 'reachWave'; wave: number }
-  | { kind: 'win' };
+/**
+ * How a sausage is unlocked: cook its Cookbook recipe, then buy it with Spice (and, for some,
+ * a trophy). A sausage with no recipe and no price is owned from the start.
+ */
+export interface Unlock {
+  recipe: string | null;
+  spice: number;
+  trophies?: Partial<Record<TrophyId, number>>;
+}
 
 export interface SausageDef {
   id: SausageId;
@@ -30,43 +35,35 @@ export const SAUSAGES: Record<SausageId, SausageDef> = {
     id: 'frank', name: 'Classic Frank', tagline: 'Good at everything, great at nothing.',
     tint: 0xffffff, stats: {}, startWeapons: ['toothpick'], maxLinks: MAX_LINKS,
     perks: ['No strengths, no weaknesses', 'Starts with a Toothpick'],
-    unlock: { kind: 'always' },
+    unlock: { recipe: null, spice: 0 },
   },
   bratwurst: {
     id: 'bratwurst', name: 'Bratwurst', tagline: 'Thick-skinned and in no hurry.',
     tint: 0xe2b48a, stats: { maxHp: 40, armor: 3, speedMult: -0.1, damageMult: -0.1 }, startWeapons: ['pepper'], maxLinks: MAX_LINKS,
     perks: ['+40 max HP, +3 armor', '-10% speed, -10% damage', 'Starts with a Pepper Mill'],
-    unlock: { kind: 'reachWave', wave: 4 },
+    unlock: { recipe: 'escape_backyard', spice: 100 },
   },
   chorizo: {
     id: 'chorizo', name: 'Chorizo', tagline: 'Spicy. Fragile. Hits like a truck.',
     tint: 0xff8f6e, stats: { damageMult: 0.2, critChance: 0.1, maxHp: -25 }, startWeapons: ['mustard'], maxLinks: MAX_LINKS,
     perks: ['+20% damage, +10% crit chance', '-25 max HP', 'Starts with a Mustard Squirt'],
-    unlock: { kind: 'reachWave', wave: 7 },
+    unlock: { recipe: 'crits_300', spice: 200 },
   },
   hotdog: {
     id: 'hotdog', name: 'Hot Dog', tagline: 'Long, fast and always in a hurry.',
     tint: 0xffcfa6, stats: { speedMult: 0.15, dashCooldownMs: -400, maxHp: -15 }, startWeapons: ['toothpick', 'skewer'], maxLinks: MAX_LINKS + 1,
     perks: ['7 links instead of 6', '+15% speed, faster dash', '-15 max HP', 'Starts with a Toothpick and a Skewer'],
-    unlock: { kind: 'reachWave', wave: 10 },
+    unlock: { recipe: 'dash_500', spice: 200 },
   },
   veggie: {
     id: 'veggie', name: 'Veggie Sausage', tagline: 'Grows back. Grill-proof.',
     tint: 0xb9e08c, stats: { regenPerSec: 1.5, grillImmune: 1, damageMult: -0.1 }, startWeapons: ['onion'], maxLinks: MAX_LINKS,
     perks: ['Regenerates 1.5 HP/s', 'Immune to grill tiles', '-10% damage', 'Starts with an Onion Ring'],
-    unlock: { kind: 'win' },
+    unlock: { recipe: 'heal_1000', spice: 250, trophies: { grinder_blade: 1 } },
   },
 };
 
 export const SAUSAGE_IDS = Object.keys(SAUSAGES) as SausageId[];
-
-export function unlockText(u: Unlock): string {
-  switch (u.kind) {
-    case 'always': return 'Unlocked';
-    case 'reachWave': return `Reach wave ${u.wave} to unlock`;
-    case 'win': return 'Escape the BBQ once to unlock';
-  }
-}
 
 /** Applies a sausage's stat offsets to the base stats. */
 export function sausageBaseStats(base: Readonly<PlayerStats>, id: SausageId): PlayerStats {
