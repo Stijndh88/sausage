@@ -110,6 +110,15 @@ always has at least one event that pays something.
 **Settings** (from the menu or the pause menu): volumes, screen shake, reduce flashing, reduce motion
 (defaults to your OS setting) and damage numbers. Settings, Spice, talents, recipes and best runs are saved in the browser.
 
+**Run stats.** After every run, **Run stats** (S / (Y)) on the results screen shows the damage you dealt,
+DPS, kills, crumbs collected, damage taken and healed; damage, DPS and kills per link (and for thorns and
+fire); what hurt you most; where your crumbs went; and damage per wave.
+
+**Play data.** The game keeps a summary of each run, the errors it hit, and runs that never finished
+(a closed tab, or a crash) **on this device only**, so balance problems and bugs can be spotted from real
+play. Nothing is sent anywhere. **Settings → Play data → Download** saves it as a JSON file;
+in the browser console it's `window.__telemetry`. See `src/state/telemetry.ts`.
+
 ## Running it
 Requires Node 20+.
 ```bash
@@ -142,6 +151,7 @@ fail; when the bug is fixed the runner flags it so the marker can be removed.
 | `features` | settings, pause menu, sausage select and unlocks, tips, touch, gamepad, audio, shop controls |
 | `controls` | prompts per device, touch stick/dash/left-handed layout, controller in any slot, menu focus, rumble, pause on disconnect |
 | `sausages` | each newer sausage's special rule in a real run, and the scrolling select screen |
+| `stats` | damage credited per link, the run stats screen, play data (runs, errors, unfinished runs) |
 
 ### Timing rule
 All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on
@@ -157,7 +167,8 @@ src/
   systems/           Health, Economy, WaveDirector, WeaponSystem, BulletPatterns, Trail, statText, rng
   data/              weapons, items, rarity, sausages, enemies, waves, courses, talents, recipes, menus
                      ← all balance numbers live here
-  state/             run state, player stats, save file, settings, meta (Spice and settling a run)
+  state/             run state, player stats, save file, settings, meta (Spice and settling a run),
+                     runLog (per-run statistics), telemetry (play data kept on the device)
   audio/Audio.ts     synthesized sound effects and music (Web Audio, no files)
   art/sprites.ts     loads the painted sprites (art/sprites/*.png, sizes in art/sprites.json)
   art/textures.ts    code-drawn background, effects and fallbacks

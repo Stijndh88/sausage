@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ENEMIES, type EnemyDef, type EnemyKind } from '../data/enemies';
 import type { BulletPatterns } from '../systems/BulletPatterns';
 import type { BossStyle } from '../data/courses';
+import type { SourceKey } from '../state/runLog';
 
 export interface EnemyContext {
   player: { x: number; y: number };
@@ -40,9 +41,13 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private kbX = 0;
   private kbY = 0;
   /** Up to MAX_POISON_STACKS independent poison stacks, each with its own timer. */
-  private poisons: { dps: number; until: number }[] = [];
+  private poisons: { dps: number; until: number; src: SourceKey }[] = [];
   /** Fire: a single flame, short and hot, that spreads on death (see Game.killEnemy). */
-  private burn = { dps: 0, until: 0 };
+  private burn: { dps: number; until: number; src: SourceKey } = { dps: 0, until: 0, src: 'other' };
+  /** Damage over time dealt since the scene last read it, by source (for the run stats). */
+  readonly dot = new Map<SourceKey, number>();
+  /** Who hit it last: gets the kill in the run stats. */
+  lastHitBy: SourceKey = 'other';
   private flashUntil = 0;
   private mode: Mode = 'move';
   private stateUntil = 0;
@@ -131,9 +136,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Adds a poison stack; at the cap, the weakest (or oldest) stack is replaced. */
-  poison(dps: number, durationMs: number, now: number): void {
+  poison(dps: number, durationMs: number, now: number, src: SourceKey = 'other'): void {
     this.poisons = this.poisons.filter((p) => p.until > now);
-    const stack = { dps, until: now + durationMs };
+    const stack = { dps, until: now + durationMs, src };
     if (this.poisons.length < MAX_POISON_STACKS) {
       this.poisons.push(stack);
       return;
@@ -152,9 +157,20 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Sets the enemy on fire. Doesn't stack: refreshes the timer and keeps the stronger flame. */
-  ignite(dps: number, durationMs: number, now: number): void {
+  ignite(dps: number, durationMs: number, now: number, src: SourceKey = 'other'): void {
     const live = this.burn.until > now;
-    this.burn = { dps: live ? Math.max(this.burn.dps, dps) : dps, until: Math.max(live ? this.burn.until : 0, now + durationMs) };
+    // The stronger flame wins, and so does its source in the run stats.
+    const keep = live && this.burn.dps >= dps;
+    this.burn = {
+      dps: keep ? this.burn.dps : dps,
+      until: Math.max(live ? this.burn.until : 0, now + durationMs),
+      src: keep ? this.burn.src : src,
+    };
+  }
+
+  /** Who lit the flame on this enemy (run stats; spreading fire keeps the credit). */
+  get burnSource(): SourceKey {
+    return this.burn.src;
   }
 
   /** Damage per second of the flame on this enemy, or 0 when it isn't burning. */
@@ -181,10 +197,22 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       for (const p of this.poisons) if (p.until > now) poisonDps += p.dps;
       if (poisonDps === 0) this.poisons.length = 0;
       dps += poisonDps;
+      // Credit each flame / stack its share of what the enemy actually lost (no overkill).
+      const lost = Math.min(dps * dt, Math.max(0, this.hp));
+      let top: { dps: number; src: SourceKey } | null = null;
+      if (lost > 0 && dps > 0) {
+        const credit = (src: SourceKey, part: number) => {
+          this.dot.set(src, (this.dot.get(src) ?? 0) + (lost * part) / dps);
+          if (!top || part > top.dps) top = { dps: part, src };
+        };
+        if (burnDps > 0) credit(this.burn.src, burnDps);
+        for (const p of this.poisons) if (p.until > now) credit(p.src, p.dps);
+      }
       this.hp -= dps * dt;
       if (this.hp <= 0) {
         this.dead = true;
         poisonKill = true;
+        if (top) this.lastHitBy = (top as { src: SourceKey }).src;
       }
     }
 

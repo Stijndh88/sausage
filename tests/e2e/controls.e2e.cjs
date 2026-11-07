@@ -180,7 +180,7 @@ module.exports = {
         await g.evaluate(() => window.__game.scene.getScene('Menu').settingsPanel.show());
         await frames(g, 3);
         // Rows start at y = top + 90, 48 apart; vibration is row 8, DASH side row 9 (0-based 7 and 8).
-        const top = (720 - (146 + 10 * 48)) / 2;
+        const top = (720 - (146 + 11 * 48)) / 2; // 11 rows (the last is Play data)
         await page.mouse.click(500, top + 90 + 7 * 48);
         await page.mouse.click(500, top + 90 + 8 * 48);
         await frames(g, 2);

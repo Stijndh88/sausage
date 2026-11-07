@@ -356,8 +356,12 @@ export class ShopScene extends Phaser.Scene {
       this.run.weapons = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run), mode)!;
       if (this.run.weapons.some((w) => w.id === offer.id && w.tier === MAX_TIER)) tally(this.run, 'tier4', 1, 'max');
       tally(this.run, 'maxLinks', this.run.weapons.length, 'max');
+      this.run.log.crumbs.spentWeapons += offer.price;
+      this.run.log.bought.weapons++;
     } else {
       this.run.items.push(offer.id);
+      this.run.log.crumbs.spentItems += offer.price;
+      this.run.log.bought.items++;
       if (ITEMS[offer.id]?.rarity === 'legendary') tally(this.run, 'legendaries');
     }
     this.offers[i] = null;
@@ -388,6 +392,8 @@ export class ShopScene extends Phaser.Scene {
     else this.run.rerollCount++;
     this.rerollsDone++;
     tally(this.run, 'rerolls');
+    this.run.log.crumbs.spentRerolls += cost;
+    this.run.log.bought.rerolls++;
     audio.play('reroll');
     const keep = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
     this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.rerollsDone), this.run.wave + 1, keep, undefined, this.run.weapons, this.shopContext());
