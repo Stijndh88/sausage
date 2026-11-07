@@ -7,7 +7,7 @@ import { BIG_PUSH, menuOptions, secondsItems } from '../state/seconds';
 import { RARITIES } from '../data/rarity';
 import { tally, type RunState } from '../state/run';
 import { bagValue, keepShare } from '../state/meta';
-import { bankSpice } from '../state/save';
+import { bankSpice, markSeen } from '../state/save';
 import { audio } from '../audio/Audio';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
@@ -54,6 +54,7 @@ export class ChoiceScene extends Phaser.Scene {
     audio.setMood('menu');
     this.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setAlpha(0.35);
     this.add.rectangle(0, 0, GAME_W, GAME_H, 0x140d0a, 0.7).setOrigin(0);
+    markSeen('mech:seconds');
     this.readyAt = this.time.now + 500;
     const kb = this.input.keyboard!;
     const ready = () => this.time.now >= this.readyAt;
@@ -230,6 +231,7 @@ export class ChoiceScene extends Phaser.Scene {
   private pickItem(id: string): void {
     if (this.time.now < this.readyAt) return;
     this.run.items.push(id);
+    markSeen(`item:${id}`, 'mech:menus');
     audio.play('buy');
     this.stage = 'menu';
     this.focus = 0;

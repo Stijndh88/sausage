@@ -26,6 +26,8 @@ terminal in the folder and run `npm install` and `npm run dev`.
 | Pause menu | Esc / P | Start / Back | II button, top right |
 | Menus | Arrows + Enter, Esc to go back | D-pad / stick + A, B to go back | Tap |
 | Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap Buy / Keep / Reroll / Next |
+| What a link or item does | Hover it; ←→ in the pause menu, Tab in the shop | ◄► in the pause menu, LB / RB in the shop | Tap it |
+| How to play screen | H on the main menu, or the pause menu | RB on the main menu, or the pause menu | Tap How to play |
 
 On-screen prompts follow whatever you last touched: key names on a keyboard, (A)/(B) on a controller,
 nothing on a touch screen. Any controller in any slot works; the game pauses if it disconnects,
@@ -115,9 +117,13 @@ DPS, kills, crumbs collected, damage taken and healed; damage, DPS and kills per
 fire); what hurt you most; where your crumbs went; and damage per wave.
 
 **Play data.** The game keeps a summary of each run, the errors it hit, and runs that never finished
-(a closed tab, or a crash) **on this device only**, so balance problems and bugs can be spotted from real
-play. Nothing is sent anywhere. **Settings → Play data → Download** saves it as a JSON file;
-in the browser console it's `window.__telemetry`. See `src/state/telemetry.ts`.
+(a closed tab, or a crash) on the device, and uploads each one once to the game's own Supabase project
+with a random player id (nothing else about the player), so balance problems and bugs can be spotted
+from real play. **Settings → Share play data** turns uploading off; **Save** downloads the local copy as
+JSON (in the console it's `window.__telemetry`). Uploading needs `VITE_PLAY_DATA_URL` and
+`VITE_PLAY_DATA_KEY` (the project URL and publishable key) at build time, and is skipped on localhost
+unless the page has `?playdata=1`. The tables and insert-only rules are in `supabase/play_data.sql`.
+See `src/state/telemetry.ts` and `src/state/playDataSync.ts`.
 
 ## Running it
 Requires Node 20+.
@@ -194,6 +200,8 @@ Everything you'd want to tweak is plain data:
 - `src/data/rarity.ts` sets how rarity odds grow with waves and Luck.
 - `src/data/weapons.ts` sets damage, cooldown, range, projectiles and price.
 - `src/data/items.ts` holds the shop items and what each one does to your stats.
+- `src/data/help.ts` holds the How to Play text. Each entry says when the player has met it (the save's
+  `seen` list), so the screen never shows what they haven't run into. Change the text when a mechanic changes.
 
 ## Screen resolution
 The game world is always 1280×720, but the canvas renders at your screen's real pixel count
