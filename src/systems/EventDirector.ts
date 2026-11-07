@@ -28,6 +28,8 @@ export interface EventHooks {
   blocked(x: number, y: number, radius: number): boolean;
   /** Kills so far this run (for bounties). */
   kills(): number;
+  /** An event just started (the How to Play screen learns about it here). */
+  onEventStart?(kind: EventKind): void;
   /** Every event ends here exactly once (unless the wave ends first): the one place rewards are paid. */
   onEventDone(result: EventResult): void;
 }
@@ -101,6 +103,7 @@ export class EventDirector {
     if (this.stopped) return;
     const def = EVENTS[kind];
     this.fired.push(kind);
+    this.hooks.onEventStart?.(kind);
     this.announce(def.name, def.hint, css(def.color));
     audio.play(def.category === 'hazard' || def.category === 'fight' ? 'waveStart' : 'unlock');
     const start = this.nowMs;

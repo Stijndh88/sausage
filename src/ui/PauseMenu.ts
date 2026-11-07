@@ -12,11 +12,16 @@ import { Button } from './Button';
 import { FONT } from './Hud';
 import { MenuList } from './MenuList';
 import { itemIcon } from './itemIcon';
+import { onKeyPress } from './input';
+import { Tooltip } from './Tooltip';
+import { itemTooltip, weaponTooltip, type TooltipContent } from './tooltipText';
 
 export interface PauseActions {
   resume(): void;
   restart(): void;
   settings(): void;
+  /** Open the How to Play screen. */
+  help(): void;
   quit(): void;
   /** End the run now and keep part of the doggy bag. */
   bail(): void;
@@ -34,8 +39,28 @@ export class PauseMenu {
   open = false;
   /** The "PAUSED" heading while the menu is open (tests check it's visible and on top). */
   title: Phaser.GameObjects.Text | null = null;
+  /** Info on a link or item: hover / tap it, or browse with ←→ (D-pad). */
+  readonly tooltip: Tooltip;
+  /** Links then items, in screen order, for ←→ browsing. */
+  private targets: { content: () => TooltipContent; x: number; y: number }[] = [];
+  private browseIndex = -1;
 
-  constructor(private readonly scene: Phaser.Scene, private readonly actions: PauseActions) {}
+  constructor(private readonly scene: Phaser.Scene, private readonly actions: PauseActions) {
+    this.tooltip = new Tooltip(scene, DEPTH + 10);
+    const kb = scene.input.keyboard!;
+    const when = (fn: () => void) => () => { if (this.open && this.list?.active) fn(); };
+    onKeyPress(kb, 'LEFT', when(() => this.browse(-1)));
+    onKeyPress(kb, 'RIGHT', when(() => this.browse(1)));
+  }
+
+  /** Step through your links and items, showing each one's tooltip. */
+  browse(d: number): void {
+    if (!this.open || !this.list?.active || !this.targets.length) return;
+    const n = this.targets.length;
+    this.browseIndex = this.browseIndex < 0 ? (d > 0 ? 0 : n - 1) : (this.browseIndex + d + n) % n;
+    const t = this.targets[this.browseIndex];
+    this.tooltip.show(t.content(), t.x, t.y);
+  }
 
   show(run: RunState, stats: PlayerStats, hp: number): void {
     this.hide();
@@ -62,16 +87,23 @@ export class PauseMenu {
     const bail = mk(270, `Bail out: bank ${keep} Spice`, () => this.confirm('bail', bail, `Bank ${keep}? Press again`), 0x8a6a1a);
     const restart = mk(340, 'Restart run', () => this.confirm('restart', restart, 'Restart? Press again'), 0x5a4a3a);
     const settings = mk(410, 'Settings', () => this.actions.settings(), 0x5a4a3a);
-    const quit = mk(480, 'Main menu', () => this.confirm('quit', quit, 'Quit run? Press again'), 0x5a4a3a);
-    const buttons = [resume, bail, restart, settings, quit];
+    const help = mk(480, 'How to play', () => this.actions.help(), 0x5a4a3a);
+    const quit = mk(550, 'Main menu', () => this.confirm('quit', quit, 'Quit run? Press again'), 0x5a4a3a);
+    const buttons = [resume, bail, restart, settings, help, quit];
     if (this.list) this.list.setButtons(buttons);
     else this.list = new MenuList(s, buttons, () => this.open);
     this.list.active = true;
-    add(s.add.text(bx, 540, 'Bailing out keeps part of your doggy bag.\nRestart and Main menu count as bailing out.', {
+    add(s.add.text(bx, 600, 'Bailing out keeps part of your doggy bag.\nRestart and Main menu count as bailing out.', {
       fontFamily: FONT, fontSize: '13px', color: '#b09080', align: 'center',
     }).setOrigin(0.5, 0));
-    const help = add(s.add.text(bx, 600, '', { fontFamily: FONT, fontSize: '13px', color: '#b09080' }).setOrigin(0.5));
-    bindPrompt(help, () => ({ keyboard: '↑↓ + Enter, or click', pad: '↑↓ + (A) · (B) resumes', touch: 'Tap a button' })[getInputMode()]);
+    const how = add(s.add.text(bx, 660, '', { fontFamily: FONT, fontSize: '13px', color: '#b09080', align: 'center' }).setOrigin(0.5));
+    bindPrompt(how, () => ({
+      keyboard: '↑↓ + Enter, or click\n←→ or hover: what your links and items do',
+      pad: '↑↓ + (A) · (B) resumes\n◄► what your links and items do',
+      touch: 'Tap a button\nTap a link or item to see what it does',
+    })[getInputMode()]);
+    this.targets = [];
+    this.browseIndex = -1;
 
     // Build overview
     const px = 470;
@@ -117,6 +149,7 @@ export class PauseMenu {
       add(s.add.text(x, wy + 70, `${WEAPONS[w.id].name.split(' ')[0]} ${tierLabel(w.tier)}`, {
         fontFamily: FONT, fontSize: '12px', color: '#ffffff', align: 'center',
       }).setOrigin(0.5, 0));
+      this.addTarget(add(s.add.zone(x, wy + 54, 80, 76)), () => weaponTooltip(WEAPONS[w.id], w.tier, run.weapons.filter((o) => o.id === w.id).length), x, wy + 20);
     });
 
     // Items as icon chips with counts.
@@ -135,7 +168,15 @@ export class PauseMenu {
       chip.lineStyle(2, RARITIES[item.rarity].color, 1).strokeCircle(x, y, 20);
       add(itemIcon(s, x, y, item, 32));
       if (n > 1) add(s.add.text(x + 14, y + 12, `×${n}`, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5));
+      this.addTarget(add(s.add.zone(x, y, 44, 44)), () => itemTooltip(item, n), x, y - 20);
     });
+  }
+
+  private addTarget(zone: Phaser.GameObjects.Zone, content: () => TooltipContent, x: number, y: number): void {
+    const i = this.targets.length;
+    this.targets.push({ content, x, y });
+    zone.setInteractive();
+    this.tooltip.attach(zone, content, x, y, () => { this.browseIndex = i; });
   }
 
   /** Destructive actions need a second press. */
@@ -162,11 +203,14 @@ export class PauseMenu {
   /** Temporarily hand the keyboard to another overlay (settings). */
   setActive(active: boolean): void {
     if (this.list) this.list.active = active && this.open;
+    if (!active) this.tooltip.hide();
   }
 
   hide(): void {
     this.open = false;
     this.title = null;
+    this.tooltip.hide();
+    this.targets = [];
     if (this.list) this.list.active = false;
     for (const o of this.objects) o.destroy();
     this.objects = [];
