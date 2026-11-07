@@ -78,7 +78,10 @@ talents and **Chili levels**: optional difficulty steps per sausage that add Spi
 on the sausage select screen (up and down).
 
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
-preferring ranged enemies. Buying a new weapon adds a link; buying one you own upgrades it (tiers I–IV).
+preferring ranged enemies. Any link can hold any weapon, so you can run 3 or even 6 Onion Rings. Buying a
+weapon you own puts it on a new link by default; switch the card to **Upgrade** (▲▼ or tap) to raise a copy's
+tier instead (I–IV). With full links, buying upgrades. **Stack bonuses:** 2, 4 and 6 links of the same weapon
+each unlock a bonus for every copy (see `src/data/stacks.ts`), e.g. Onion Ring: +15% range, +1 ring, +25% damage.
 Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 
 **Health.** Armor reduces every hit (diminishing returns), regen and lifesteal heal you, and blue condiment
