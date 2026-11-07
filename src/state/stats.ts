@@ -22,6 +22,8 @@ export interface PlayerStats {
   explosionRadiusMult: number;
   /** Extra pellets for spread weapons (Pepper Mill, Mustard Squirt). */
   extraProjectiles: number;
+  /** Extra enemies every straight shot passes through (Toothpick, Mustard, Pepper, Skewer). */
+  pierce: number;
   /** Damage dealt to an enemy that touches you. */
   thorns: number;
   /** 1 = grill tiles don't burn you. */
@@ -48,6 +50,7 @@ export const BASE_STATS: Readonly<PlayerStats> = {
   dashCooldownMs: 1500,
   explosionRadiusMult: 1,
   extraProjectiles: 0,
+  pierce: 0,
   thorns: 0,
   grillImmune: 0,
   extraLives: 0,

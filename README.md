@@ -107,6 +107,13 @@ src/
 tests/               Vitest tests for the logic in systems/, data/ and state/
 ```
 
+## Versioning
+The version lives in `package.json` and follows [semantic versioning](https://semver.org): bump the
+minor number for new content or features, the patch number for fixes. The main menu shows it in the
+bottom-right corner with the build's commit, e.g. `v0.2.0 (1a2b3c4)`, so a bug report can name the
+exact build. Bump it with `npm version minor --no-git-tag-version` (or `patch`) and add a line to
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Tuning the game
 Everything you'd want to tweak is plain data:
 - `src/data/waves.ts` sets wave length, spawn rate, enemy mix, turret cap and grill tile count.

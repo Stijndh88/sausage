@@ -93,3 +93,13 @@ describe('shop stat text', () => {
     expect(weaponStatLine(WEAPONS.onion, 3, 2)).toContain('1 → 2 rings');
   });
 });
+
+describe('Sharp Cheddar (piercing)', () => {
+  it('adds one pierce per stack and stops being offered at 3', () => {
+    expect(BASE_STATS.pierce).toBe(0);
+    expect(computeStats(['sharp_cheddar']).pierce).toBe(1);
+    expect(computeStats(['sharp_cheddar', 'sharp_cheddar']).pierce).toBe(2);
+    expect(ITEMS.sharp_cheddar.maxStacks).toBe(3);
+    expect(statChanges(BASE_STATS, computeStats(['sharp_cheddar']))).toEqual(['Pierce +0 → +1']);
+  });
+});
