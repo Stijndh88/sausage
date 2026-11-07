@@ -53,7 +53,7 @@ then buy it with Spice (the Veggie Sausage also needs a Grinder Blade trophy).
 | Corn Dog | Batter shell blocks the first hit of every wave, +10 HP, Pickle Launcher | -15% speed | Clear 3 waves without a hit, 300 Spice |
 | Cocktail Sausage | 35% smaller hitbox, +20% speed, Toothpick | -30 HP, only 4 links | Take it home after the Smokehouse on Chili 1, 400 Spice |
 | Black Pudding | 12% lifesteal, +10 HP, Pepper Mill | Condiment packets don't drop | Heal 300 HP in one run, 400 Spice |
-| Merguez | Every hit sets enemies on fire, Toothpick | -4 armor (takes 20% more damage) | Finish 500 enemies with poison or fire, 400 Spice |
+| Merguez | Every hit sets enemies on fire (fire spreads when a burning enemy dies), Toothpick | -4 armor (takes 20% more damage) | Finish 500 enemies with poison or fire, 400 Spice |
 | Weisswurst | +40% damage for the first 20 s of every wave, Skewer | -20% damage after that | Kill 50 enemies within 10 s, 450 Spice |
 | Kielbasa | 8 links, +20 HP, Toothpick + Pepper Mill | Every link can be hit | Have 6 links at once, 600 Spice |
 
@@ -78,7 +78,10 @@ talents and **Chili levels**: optional difficulty steps per sausage that add Spi
 on the sausage select screen (up and down).
 
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
-preferring ranged enemies. Buying a new weapon adds a link; buying one you own upgrades it (tiers I–IV).
+preferring ranged enemies. Any link can hold any weapon, so you can run 3 or even 6 Onion Rings. Buying a
+weapon you own puts it on a new link by default; switch the card to **Upgrade** (▲▼ or tap) to raise a copy's
+tier instead (I–IV). With full links, buying upgrades. **Stack bonuses:** 2, 4 and 6 links of the same weapon
+each unlock a bonus for every copy (see `src/data/stacks.ts`), e.g. Onion Ring: +15% range, +1 ring, +25% damage.
 Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 
 **Health.** Armor reduces every hit (diminishing returns), regen and lifesteal heal you, and blue condiment
@@ -98,7 +101,7 @@ always has at least one event that pays something.
 | Picnic Basket | 1 | Stand in its circle for 3 s to open it: a free random item and some crumbs. It vanishes after 16 s. |
 | Golden Hot Dog | 1 | A golden runner flees from you; catch it within 10 s for a pile of crumbs. |
 | Happy Hour | 2 | 15 s of double crumbs and +30% fire rate. |
-| Chef's Bounty | 2 | Kill a number of enemies within 20 s for a crumb bonus. |
+| Chef's Bounty | 2 | Kill a number of enemies within 20 s (less, with fewer kills, if the wave ends sooner) for a crumb bonus. |
 | Fork Stampede | 2 | Arrows warn you; then a wall of forks charges across the arena. Dodge, or dash through the gap. |
 | Elite | 3 | A big, glowing enemy with 6× HP; drops a pile of crumbs and a condiment packet. |
 | Grease Flare-up | 4 | Two lanes flash for 2 s, then burn for 3.5 s. |

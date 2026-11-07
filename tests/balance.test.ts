@@ -103,9 +103,10 @@ describe('weapon tiers', () => {
 
   it('upgrading costs one purchase per tier and caps at MAX_TIER', () => {
     let w: WeaponSlot[] = [{ id: 'pepper', tier: 1 }];
-    for (let i = 1; i < MAX_TIER; i++) w = applyWeaponPurchase(w, 'pepper')!;
+    for (let i = 1; i < MAX_TIER; i++) w = applyWeaponPurchase(w, 'pepper', undefined, 'upgrade')!;
     expect(w).toEqual([{ id: 'pepper', tier: MAX_TIER }]);
-    // The next copy is a new link, not a tier V.
+    // No tier V: upgrading is refused, the default adds a new link instead.
+    expect(applyWeaponPurchase(w, 'pepper', undefined, 'upgrade')).toBeNull();
     expect(applyWeaponPurchase(w, 'pepper')).toEqual([{ id: 'pepper', tier: MAX_TIER }, { id: 'pepper', tier: 1 }]);
   });
 

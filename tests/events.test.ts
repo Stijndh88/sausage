@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EVENTS, EVENT_EDGE_SEC, EVENT_MIN_GAP_SEC, bountyTarget, eventCount, rollWaveEvents,
+  EVENTS, EVENT_EDGE_SEC, EVENT_MIN_GAP_SEC, BOUNTY_SEC, bountySeconds, bountyTarget, eventCount, rollWaveEvents,
 } from '../src/data/events';
 import { BACKYARD_BOSS_WAVE as TOTAL_WAVES, waveConfig } from '../src/data/waves';
 import { mulberry32 } from '../src/systems/rng';
@@ -66,5 +66,26 @@ describe('timed events', () => {
       expect(bountyTarget(w)).toBeLessThan(spawnedIn20s);
       expect(bountyTarget(w)).toBeGreaterThanOrEqual(8);
     }
+  });
+
+  it("a bounty's timer never runs past the wave timer", () => {
+    for (const seed of SEEDS) for (let w = 1; w < TOTAL_WAVES; w++) {
+      const cfg = waveConfig(w);
+      for (const e of rollWaveEvents(mulberry32(seed), w)) {
+        if (e.kind !== 'bounty') continue;
+        const sec = bountySeconds(e.atSec, cfg.durationSec);
+        expect(e.atSec + sec).toBeLessThan(cfg.durationSec);
+        expect(sec).toBeLessThanOrEqual(BOUNTY_SEC);
+      }
+    }
+  });
+
+  it('a shortened bounty asks for proportionally fewer kills', () => {
+    for (let w = 1; w < TOTAL_WAVES; w++) {
+      expect(bountyTarget(w, 10)).toBeLessThan(bountyTarget(w, BOUNTY_SEC));
+      expect(bountyTarget(w, 10)).toBeGreaterThanOrEqual(3);
+    }
+    expect(bountySeconds(5, 60)).toBe(BOUNTY_SEC);
+    expect(bountySeconds(18, 25)).toBe(6);
   });
 });

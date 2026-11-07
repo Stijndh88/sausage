@@ -37,7 +37,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   },
   mustard: {
     id: 'mustard', name: 'Mustard Squirt', kind: 'cone',
-    desc: 'Cone of mustard. Poison stacks up to 3 times.',
+    desc: 'Cone of mustard. Poison lasts 4s and stacks up to 3 times.',
     price: 12, damage: 2, cooldownMs: 750, speed: 360, range: 260,
     projectiles: 5, spreadDeg: 50, pierce: 0, poisonDps: 5,
     bulletTexture: 'pb-mustard', icon: 'icon-mustard', color: 0xf2c418,

@@ -7,11 +7,13 @@ import type { Enemy } from '../entities/Enemy';
 import type { LinkChain } from '../entities/LinkChain';
 import type { WeaponSlot } from '../state/run';
 import { linkSource } from '../state/runLog';
+import { stackBonus, stackCounts, type StackBonus } from '../data/stacks';
 import { audio } from '../audio/Audio';
 import type { GameClock } from './clock';
 
 const DEG = Math.PI / 180;
-export const POISON_MS = 2500;
+/** Poison lasts long and stacks (up to 3); fire is short, hot, single and spreads (Enemy.ignite). */
+export const POISON_MS = 4000;
 /** A shot this late (at most ~one long frame) keeps its rhythm; later than that it restarts. */
 const MAX_CARRY_MS = 100;
 
@@ -32,6 +34,8 @@ export class WeaponSystem {
   private nextFire: number[] = [];
   /** The link whose shots are being made right now (tags them for the run stats). */
   private firing = 0;
+  /** Each link's stack bonus (from how many links hold the same weapon). */
+  private bonus: StackBonus[] = [];
 
   constructor(
     private readonly pool: Phaser.Physics.Arcade.Group,
@@ -42,6 +46,8 @@ export class WeaponSystem {
 
   setWeapons(weapons: readonly WeaponSlot[]): void {
     this.weapons = weapons.map((w) => ({ ...w }));
+    const counts = stackCounts(this.weapons);
+    this.bonus = this.weapons.map((w) => stackBonus(w.id, counts.get(w.id) ?? 1));
     const now = this.clock.now();
     // Stagger first shots so links don't all fire on the same frame.
     this.nextFire = this.weapons.map((_, i) => now + 300 + i * 90);
@@ -55,27 +61,29 @@ export class WeaponSystem {
       const pos = this.chain.positions[slot];
       if (!pos) continue;
       if (now < this.nextFire[slot]) continue;
-      const target = nearest(enemies, pos.x, pos.y, def.range);
+      const bonus = this.bonus[slot];
+      const target = nearest(enemies, pos.x, pos.y, def.range * bonus.rangeMult);
       if (!target) continue;
       // Carry the frame-rounding leftover so fire rate doesn't depend on frame rate, but if the
       // weapon sat idle (no target) restart from now instead of banking shots.
       const late = now - this.nextFire[slot];
       const base = late <= MAX_CARRY_MS ? this.nextFire[slot] : now;
-      this.nextFire[slot] = base + tierCooldown(def, w.tier) / fireRateMult;
-      this.fire(def, w.tier, slot, pos.x, pos.y, target, now, damageMult);
+      this.nextFire[slot] = base + tierCooldown(def, w.tier) / (fireRateMult * bonus.fireRateMult);
+      this.fire(def, w.tier, slot, pos.x, pos.y, target, now, damageMult * bonus.damageMult, bonus);
     }
   }
 
-  private fire(def: WeaponDef, tier: number, slot: number, x: number, y: number, target: Enemy, now: number, damageMult: number): void {
+  private fire(def: WeaponDef, tier: number, slot: number, x: number, y: number, target: Enemy, now: number, damageMult: number, bonus: StackBonus): void {
     this.firing = slot;
     const angle = Math.atan2(target.y - y, target.x - x);
     const damage = tierDamage(def, tier) * damageMult;
-    const lifetimeMs = (def.range / def.speed) * 1000 + 80;
+    const range = def.range * bonus.rangeMult;
+    const lifetimeMs = (range / def.speed) * 1000 + 80;
     const spread = def.kind === 'cone' || def.kind === 'shotgun';
     const mods = this.hooks.mods();
-    const count = tierProjectiles(def, tier) + (spread ? mods.extraProjectiles : 0);
+    const count = tierProjectiles(def, tier) + (spread ? mods.extraProjectiles : 0) + bonus.extraProjectiles;
     // Sharp Cheddar: straight shots pass through extra enemies (lobs explode, boomerangs already pass through all).
-    const pierce = (p: number) => p + mods.pierce;
+    const pierce = (p: number) => p + mods.pierce + bonus.pierce;
 
     audio.play(`shoot_${def.kind}`);
     switch (def.kind) {
@@ -92,7 +100,7 @@ export class WeaponSystem {
           this.shot({
             x, y, angle: a, speed, damage, texture: def.bulletTexture, lifetimeMs,
             pierce: pierce(0),
-            poisonDps: def.poisonDps ? def.poisonDps * (1 + 0.5 * (tier - 1)) * damageMult : 0,
+            poisonDps: def.poisonDps ? def.poisonDps * (1 + 0.5 * (tier - 1)) * damageMult * bonus.poisonMult : 0,
             knockback: def.kind === 'shotgun' ? 90 : 20,
           }, now);
         }
@@ -104,7 +112,7 @@ export class WeaponSystem {
           x, y, angle, speed: def.speed, damage, texture: def.bulletTexture,
           lifetimeMs: (dist / def.speed) * 1000 + 50,
           lobTarget: { x: target.x, y: target.y },
-          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)) * mods.explosionRadiusMult,
+          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)) * mods.explosionRadiusMult * bonus.radiusMult,
           onExplode: this.hooks.explode,
         }, now);
         break;
@@ -116,8 +124,8 @@ export class WeaponSystem {
           const a = angle + (i - (count - 1) / 2) * 0.35;
           this.shot({
             x, y, angle: a, speed: def.speed, damage, texture: def.bulletTexture,
-            lifetimeMs: (def.range / def.speed) * 1000 * 4 + 1000,
-            boomerang: { outMs: (def.range / def.speed) * 1000, home },
+            lifetimeMs: (range / def.speed) * 1000 * 4 + 1000,
+            boomerang: { outMs: (range / def.speed) * 1000, home },
             knockback: 40,
           }, now);
         }

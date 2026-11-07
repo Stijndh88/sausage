@@ -107,8 +107,8 @@ export const SAUSAGES: Record<SausageId, SausageDef> = {
   merguez: {
     id: 'merguez', name: 'Merguez', tagline: 'Hot-blooded. Sets everything on fire.',
     tint: 0xd8583a, stats: { armor: -4 }, startWeapons: ['toothpick'], maxLinks: MAX_LINKS,
-    perks: ['Every hit sets enemies on fire (4 dmg/s, stacks 3×)', '-4 armor: takes 20% more damage', 'Starts with a Toothpick'],
-    rules: { burnDps: 4 },
+    perks: ['Every hit sets enemies on fire (9 dmg/s)', 'Fire spreads when a burning enemy dies', '-4 armor: takes 20% more damage', 'Starts with a Toothpick'],
+    rules: { burnDps: 9 },
     unlock: { recipe: 'poison_500', spice: 400 },
   },
   weisswurst: {
