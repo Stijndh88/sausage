@@ -104,10 +104,14 @@ export class SelectScene extends Phaser.Scene {
       g.fillStyle(sel ? 0x3a2418 : 0x241812, 1).fillRoundedRect(left, top, CARD_W, CARD_H, 14);
       g.lineStyle(sel ? 4 : 2, sel ? 0xffb347 : 0x5a4a3a, 1).strokeRoundedRect(left, top, CARD_W, CARD_H, 14);
 
-      // The sausage itself: head + three links in its colour.
-      const tint = unlocked ? def.tint : 0x333333;
-      for (let k = 2; k >= 0; k--) add(this.add.image(x - 30 - k * 26, top + 70, 'sausage-link').setScale(1.2).setTint(tint));
-      add(this.add.image(x + 26, top + 70, 'sausage-head').setScale(1.5).setTint(tint));
+      // The sausage itself: its portrait, or head + three links in its colour.
+      if (this.textures.exists(`portrait-${id}`)) {
+        add(this.add.image(x, top + 62, `portrait-${id}`).setTint(unlocked ? 0xffffff : 0x333333));
+      } else {
+        const tint = unlocked ? def.tint : 0x333333;
+        for (let k = 2; k >= 0; k--) add(this.add.image(x - 30 - k * 26, top + 70, 'sausage-link').setScale(1.2).setTint(tint));
+        add(this.add.image(x + 26, top + 70, 'sausage-head').setScale(1.5).setTint(tint));
+      }
 
       add(this.add.text(x, top + 118, `${i + 1}  ${def.name}`, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: unlocked ? '#ffffff' : '#8a7a70' }).setOrigin(0.5));
       if (!unlocked) {

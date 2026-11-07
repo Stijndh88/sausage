@@ -533,8 +533,13 @@ export class GameScene extends Phaser.Scene {
       this.hotTiles.push(r);
     }
     // Red-hot grate sections: glowing coals under bright bars.
+    const tiles: Phaser.GameObjects.Image[] = [];
     for (const r of this.hotTiles) {
       g.fillStyle(0xff2000, 0.18).fillRoundedRect(r.x - 10, r.y - 10, r.width + 20, r.height + 20, 18);
+      if (this.textures.exists('tile-hot')) {
+        tiles.push(this.add.image(r.centerX, r.centerY, 'tile-hot').setDisplaySize(r.width, r.height).setDepth(1));
+        continue;
+      }
       g.fillStyle(0x7a1200, 0.9).fillRoundedRect(r.x, r.y, r.width, r.height, 10);
       for (let i = 0; i < 9; i++) {
         g.fillStyle(i % 2 ? 0xff5a00 : 0xffa020, 0.55)
@@ -544,7 +549,7 @@ export class GameScene extends Phaser.Scene {
       for (let i = 1; i < 5; i++) g.lineBetween(r.x + 6, r.y + (r.height * i) / 5, r.right - 6, r.y + (r.height * i) / 5);
       g.lineStyle(2, 0xffb040, 0.8).strokeRoundedRect(r.x, r.y, r.width, r.height, 10);
     }
-    this.tweens.add({ targets: g, alpha: 0.7, duration: 700, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: [g, ...tiles], alpha: 0.7, duration: 700, yoyo: true, repeat: -1 });
   }
 
   /** A white flash of the enemy that pops outward as it dies (skipped with reduced motion). */

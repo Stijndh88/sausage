@@ -9,6 +9,7 @@ import type { PlayerStats } from '../state/stats';
 import { Button } from './Button';
 import { FONT } from './Hud';
 import { MenuList } from './MenuList';
+import { itemIcon } from './itemIcon';
 
 export interface PauseActions {
   resume(): void;
@@ -118,7 +119,7 @@ export class PauseMenu {
       const chip = add(s.add.graphics());
       chip.fillStyle(0x140d0a, 1).fillCircle(x, y, 20);
       chip.lineStyle(2, RARITIES[item.rarity].color, 1).strokeCircle(x, y, 20);
-      add(s.add.image(x, y, `icon-item-${item.icon}`).setScale(0.75).setTint(item.color));
+      add(itemIcon(s, x, y, item, 32));
       if (n > 1) add(s.add.text(x + 14, y + 12, `×${n}`, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5));
     });
   }

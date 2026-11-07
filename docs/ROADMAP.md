@@ -55,4 +55,4 @@ and update the QA report.
 
 ## Later (not in this pass)
 Mid-wave level-ups (pick 1 of 3), elites and wave modifiers, meta-progression and a longer run,
-real pixel art.
+a painted arena background and sprite animations. (Painted sprites are in: see Art in the README.)

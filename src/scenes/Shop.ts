@@ -19,6 +19,7 @@ import { onKeyPress } from '../ui/input';
 import { audio } from '../audio/Audio';
 import { PadPoller } from '../ui/pad';
 import { fitCamera } from '../ui/view';
+import { itemIcon } from '../ui/itemIcon';
 
 const CARD_W = 250;
 const CARD_H = 322;
@@ -164,7 +165,7 @@ export class ShopScene extends Phaser.Scene {
     } else {
       g.fillStyle(0x140d0a, 1).fillCircle(x, top + 44, 28);
       g.lineStyle(3, rarity!.color, 1).strokeCircle(x, top + 44, 28);
-      add(this.add.image(x, top + 44, `icon-item-${item!.icon}`).setTint(item!.color));
+      add(itemIcon(this, x, top + 44, item!, 46));
     }
     if (kept) add(this.add.image(left + 22, top + 20, 'icon-lock').setTint(0x8fd3ff));
 

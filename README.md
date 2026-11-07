@@ -101,7 +101,8 @@ src/
   data/              weapons, items, rarity, sausages, enemies, waves   ← all balance numbers live here
   state/             run state, player stats, save file, settings
   audio/Audio.ts     synthesized sound effects and music (Web Audio, no files)
-  art/textures.ts    placeholder art and item pictograms drawn in code
+  art/sprites.ts     loads the painted sprites (art/sprites/*.png, sizes in art/sprites.json)
+  art/textures.ts    code-drawn background, effects and fallbacks
   ui/                HUD, buttons, pause menu, settings, tips, damage numbers, touch and gamepad input
 tests/               Vitest tests for the logic in systems/, data/ and state/
 ```
@@ -120,16 +121,22 @@ The game world is always 1280×720, but the canvas renders at your screen's real
 (up to 2.5×), so text and shapes stay sharp on big and high-DPI screens. Add `?scale=1` to the URL to
 force the old 1× rendering (e.g. on a slow machine).
 
-## Swapping in real art
-All art is generated in `src/art/textures.ts` under fixed keys (`sausage-head`, `sausage-link`, `enemy-fork`, `eb-ketchup`, …).
-To use real sprites, add the PNGs to `public/` and load them in `src/scenes/Boot.ts` with the same keys **before** `generateTextures(this)`:
-```ts
-preload() { this.load.image('enemy-fork', 'sprites/fork.png'); }
-```
-`generateTextures` skips any key that already exists, so no other code needs to change.
-Sprites face **right** for the sausage and **up** for enemies.
-Provide sprites at 2× their in-game size (and scale them with `setScale(0.5)`) to keep them sharp on high-DPI screens.
+## Art
+The sprites are painted art, cut from a concept sheet (`art/source/concept-atlas-01.png`) by
+`tools/cut_sprites.py` into `src/art/sprites/<key>.png`, with each sprite's in-game size in
+`src/art/sprites.json`. `src/art/sprites.ts` loads them in Boot. Each sprite keeps its in-game size
+while its texture holds 2–4× the pixels, so it stays sharp on high-DPI screens.
+
+A few things are still drawn in code (`src/art/textures.ts`): the arena background, the hitbox dot
+and the white particle effects (spark, smoke, ring), which the game tints. Any sprite key without a
+PNG falls back to its drawn placeholder.
+
+**To replace or add a sprite:** drop a PNG named after its key into `src/art/sprites/` (transparent
+background; the sausage faces **right**, enemies face **up**), add its in-game size to
+`sprites.json`, and reload. To re-cut everything from a new sheet with the same layout, run
+`python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy). The keys and sizes the art
+must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md).
 
 ## What's next
 See [docs/ROADMAP.md](docs/ROADMAP.md). Not done yet: mid-wave level-ups, elites and wave modifiers,
-meta-progression and a longer run, real pixel art.
+meta-progression and a longer run, a painted arena background and animations.

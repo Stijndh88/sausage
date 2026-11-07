@@ -5,9 +5,9 @@ import { GAME_H, GAME_W, RENDER_SCALE } from '../ui/view';
 export { GAME_H, GAME_W };
 
 /**
- * Placeholder art drawn in code. Every texture is cached under a fixed key.
- * To use real sprites later, load PNGs with the same keys in Boot (this.load.image('enemy-fork', ...))
- * and skip the matching generator below; no game code needs to change.
+ * Art drawn in code, cached under fixed keys. Most keys are replaced by painted sprites
+ * (art/sprites.ts, loaded first); `make` skips any key that already exists, so these drawings are
+ * only used where no PNG exists. The arena, hitbox and white tintable effects are always drawn here.
  */
 
 type Draw = (g: Phaser.GameObjects.Graphics) => void;

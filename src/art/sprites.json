@@ -1,0 +1,226 @@
+{
+  "sausage-head": [
+    50,
+    29
+  ],
+  "sausage-link": [
+    37,
+    23
+  ],
+  "portrait-frank": [
+    60,
+    76
+  ],
+  "portrait-bratwurst": [
+    59,
+    77
+  ],
+  "portrait-chorizo": [
+    60,
+    76
+  ],
+  "portrait-hotdog": [
+    59,
+    77
+  ],
+  "portrait-veggie": [
+    58,
+    78
+  ],
+  "icon-toothpick": [
+    13,
+    20
+  ],
+  "icon-mustard": [
+    13,
+    19
+  ],
+  "icon-pepper": [
+    13,
+    20
+  ],
+  "icon-skewer": [
+    14,
+    19
+  ],
+  "icon-pickle": [
+    15,
+    18
+  ],
+  "icon-onion": [
+    14,
+    18
+  ],
+  "pb-toothpick": [
+    17,
+    4
+  ],
+  "pb-mustard": [
+    13,
+    10
+  ],
+  "pb-pepper": [
+    9,
+    9
+  ],
+  "pb-skewer": [
+    24,
+    6
+  ],
+  "pb-pickle": [
+    15,
+    14
+  ],
+  "onion-ring": [
+    21,
+    19
+  ],
+  "enemy-fork": [
+    22,
+    55
+  ],
+  "enemy-spatula": [
+    30,
+    60
+  ],
+  "enemy-ketchup": [
+    27,
+    49
+  ],
+  "enemy-hotsauce": [
+    26,
+    52
+  ],
+  "enemy-tongs": [
+    90,
+    150
+  ],
+  "eb-ketchup": [
+    13,
+    13
+  ],
+  "eb-hot": [
+    13,
+    13
+  ],
+  "eb-boss": [
+    14,
+    14
+  ],
+  "crumb": [
+    12,
+    12
+  ],
+  "condiment": [
+    16,
+    15
+  ],
+  "spawn-mark": [
+    28,
+    24
+  ],
+  "item-paprika": [
+    37,
+    44
+  ],
+  "item-espresso_mustard": [
+    38,
+    42
+  ],
+  "item-sesame": [
+    47,
+    34
+  ],
+  "item-casing": [
+    38,
+    42
+  ],
+  "item-cold_cuts": [
+    42,
+    38
+  ],
+  "item-ketchup_kiss": [
+    37,
+    43
+  ],
+  "item-big_bun": [
+    45,
+    36
+  ],
+  "item-relish": [
+    34,
+    47
+  ],
+  "item-hearty_meal": [
+    41,
+    39
+  ],
+  "item-oven_mitt": [
+    42,
+    38
+  ],
+  "item-mustard_seed": [
+    43,
+    37
+  ],
+  "item-slippery_oil": [
+    33,
+    49
+  ],
+  "item-double_dip": [
+    38,
+    43
+  ],
+  "item-pickle_juice": [
+    38,
+    42
+  ],
+  "item-smoked_ham": [
+    38,
+    42
+  ],
+  "item-four_leaf_relish": [
+    34,
+    47
+  ],
+  "item-secret_sauce": [
+    34,
+    47
+  ],
+  "item-spiky_bun": [
+    41,
+    39
+  ],
+  "item-grill_apron": [
+    38,
+    43
+  ],
+  "item-extra_pellet": [
+    54,
+    29
+  ],
+  "item-vampire_ketchup": [
+    31,
+    52
+  ],
+  "item-golden_sausage": [
+    46,
+    34
+  ],
+  "item-hot_dog_cart": [
+    39,
+    41
+  ],
+  "item-second_skin": [
+    33,
+    48
+  ],
+  "tile-hot": [
+    110,
+    110
+  ],
+  "icon-lock": [
+    18,
+    24
+  ]
+}

@@ -17,7 +17,9 @@ export function endScreen(scene: Phaser.Scene, run: RunState, title: string, sub
   const unlocked = recordRun(run.sausage, Math.min(run.wave, TOTAL_WAVES), won);
   scene.add.image(0, 0, 'bg-grill').setOrigin(0).setDisplaySize(GAME_W, GAME_H).setAlpha(0.4);
   scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0c0806, 0.65).setOrigin(0);
-  scene.add.image(GAME_W / 2, 150, 'sausage-head').setScale(4).setTint(headTint);
+  const portrait = `portrait-${run.sausage}`;
+  if (scene.textures.exists(portrait)) scene.add.image(GAME_W / 2, 145, portrait).setScale(1.5).setTint(headTint);
+  else scene.add.image(GAME_W / 2, 150, 'sausage-head').setScale(4).setTint(headTint);
   scene.add.text(GAME_W / 2, 250, title, {
     fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color, stroke: '#000', strokeThickness: 8,
   }).setOrigin(0.5);
