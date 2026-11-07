@@ -8,7 +8,7 @@ import { LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
 import { HIT_INVULN_MS, SausageHead } from '../entities/SausageHead';
 import { SAUSAGES, type SausageRules } from '../data/sausages';
-import { runStats, type RunState } from '../state/run';
+import { runBaseStats, runStats, type RunState } from '../state/run';
 import type { PlayerStats } from '../state/stats';
 import { BulletPatterns } from '../systems/BulletPatterns';
 import { Health } from '../systems/Health';
@@ -490,7 +490,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     // --- Pickups ---
-    this.pickups.update(dt, this.head.x, this.head.y, this.stats.pickupRadius, (kind) => this.collect(kind));
+    // Condiments stay on the floor while you're at full HP, so they're still there when you need them.
+    this.pickups.update(dt, this.head.x, this.head.y, this.stats.pickupRadius, (kind) => this.collect(kind),
+      (kind) => kind !== 'condiment' || this.health.hp < this.health.maxHp);
 
     for (const e of this.graveyard) e.destroy();
     this.graveyard.length = 0;
@@ -680,7 +682,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Picnic Basket reward: a random item rolled like a shop slot, applied right away. */
   private grantRandomItem(): { name: string; color: string } | null {
-    const id = rollItem(this.rng, this.run.wave, { luck: this.stats.luck, rarities: unlockedRarities() }, this.run.items, new Set());
+    const id = rollItem(this.rng, this.run.wave, { luck: this.stats.luck, rarities: unlockedRarities(), baseStats: runBaseStats(this.run) }, this.run.items, new Set());
     if (!id) return null;
     this.run.items.push(id);
     markSeen(`item:${id}`);

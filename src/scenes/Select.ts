@@ -239,7 +239,6 @@ export class SelectScene extends Phaser.Scene {
     if (state === 'buyable') {
       if (buySausage(this.selected)) {
         audio.play('unlock');
-        this.cameras.main.flash(200, 255, 220, 150);
       } else {
         audio.play('deny');
       }

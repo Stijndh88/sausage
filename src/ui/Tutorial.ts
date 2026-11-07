@@ -72,7 +72,7 @@ const STEPS: Step[] = [
     done: (v, t) => v.timeMs - t > 5000,
   },
   {
-    id: 'condiment', text: 'Blue condiment packets heal you.',
+    id: 'condiment', text: 'Blue condiment packets heal you. At full HP they wait on the floor.',
     when: (v) => v.firstPickup('condiment'),
     follow: (v) => v.firstPickup('condiment'),
     done: (v, t) => v.timeMs - t > 4500 || !v.firstPickup('condiment'),
