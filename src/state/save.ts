@@ -67,6 +67,7 @@ export function isUnlocked(u: Unlock, save: SaveData = loadSave()): boolean {
     case 'always': return true;
     case 'reachWave': return save.bestWave >= u.wave;
     case 'win': return save.wins > 0;
+    case 'winWith': return (save.winsBy[u.sausage] ?? 0) > 0;
   }
 }
 
