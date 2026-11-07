@@ -3,7 +3,7 @@ import { GAME_H, GAME_W } from '../art/textures';
 import type { EnemyKind } from '../data/enemies';
 import { waveConfig, type WaveConfig } from '../data/waves';
 import { createEnemyBulletPool, createPlayerBulletPool, EnemyBullet, PlayerBullet } from '../entities/BulletPool';
-import { Enemy, type EnemyContext } from '../entities/Enemy';
+import { BURN_MS, BURN_SPREAD_RADIUS, Enemy, type EnemyContext } from '../entities/Enemy';
 import { LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
 import { HIT_INVULN_MS, SausageHead } from '../entities/SausageHead';
@@ -320,7 +320,8 @@ export class GameScene extends Phaser.Scene {
     onAction(kb, 'pause', queuePause);
 
     // What the How to Play screen may explain: this run's links and items, and bosses once you meet one.
-    markSeen(...this.run.weapons.map((w) => `weapon:${w.id}`), ...this.run.items.map((id) => `item:${id}`), ...(this.cfg.boss ? ['mech:boss'] : []));
+    markSeen(...this.run.weapons.map((w) => `weapon:${w.id}`), ...this.run.items.map((id) => `item:${id}`), ...(this.cfg.boss ? ['mech:boss'] : []),
+      ...(this.stats.critBurn > 0 || this.rules.burnDps ? ['mech:burn'] : []));
 
     if (this.cfg.boss) this.banner(bossName(this.cfg.course).toUpperCase(), 'Beat the boss, then take it home or go for seconds!');
     else if (this.cfg.courseWave === 1) this.banner(courseName(this.cfg.course).toUpperCase(), courseDef(this.cfg.course).intro);
@@ -521,15 +522,32 @@ export class GameScene extends Phaser.Scene {
       amount *= 2;
       tally(this.run, 'crits');
       // Extra Spicy keystone: crits set enemies on fire.
-      if (this.stats.critBurn > 0) e.poison(this.stats.critBurn, 2000, this.gameTime);
+      if (this.stats.critBurn > 0) e.ignite(this.stats.critBurn, BURN_MS, this.gameTime);
       this.sparks.setParticleTint(0xffd23f);
       this.sparks.explode(4, e.x, e.y);
     }
     if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) tally(this.run, 'healed', this.health.heal(1));
-    if (this.rules.burnDps) e.poison(this.rules.burnDps, POISON_MS, this.gameTime);
+    if (this.rules.burnDps) e.ignite(this.rules.burnDps, BURN_MS, this.gameTime);
     audio.play(crit ? 'crit' : 'hit');
     if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
+  }
+
+  /** A burning enemy that dies sets the enemies around it on fire (poison doesn't spread). */
+  private spreadFire(e: Enemy): void {
+    const dps = e.burnDpsAt(this.gameTime);
+    if (dps <= 0) return;
+    let caught = 0;
+    for (const o of this.enemyList()) {
+      if (o === e || o.dead) continue;
+      if (Math.hypot(o.x - e.x, o.y - e.y) > BURN_SPREAD_RADIUS + o.def.radius) continue;
+      o.ignite(dps, BURN_MS, this.gameTime);
+      caught++;
+    }
+    if (caught) {
+      this.sparks.setParticleTint(0xff7a2a);
+      this.sparks.explode(6 + 2 * caught, e.x, e.y);
+    }
   }
 
   /** Spiky Bun: enemies touching you take damage (at most every THORNS_COOLDOWN_MS each). */
@@ -555,6 +573,7 @@ export class GameScene extends Phaser.Scene {
 
   private killEnemy(e: Enemy, byPoison = false): void {
     e.dead = true;
+    this.spreadFire(e);
     audio.play('kill');
     this.run.kills++;
     tally(this.run, 'kills');

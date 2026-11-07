@@ -137,11 +137,11 @@ module.exports = {
       },
     },
     {
-      name: 'shop: ↓ then ◄► browses your links and items; buying marks them seen',
+      name: 'shop: Tab then ◄► browses your links and items; buying marks them seen',
       fn: async ({ page, g }) => {
         await g.openShop({ run: { wave: 3, crumbs: 500, weapons: [{ id: 'toothpick', tier: 1 }, { id: 'pepper', tier: 3 }], items: ['casing', 'big_bun', 'big_bun'] } });
         await g.wait(400);
-        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Tab');
         await frames(g, 2);
         let t = await tooltip(g, 'Shop');
         assert.equal(t.title, 'Toothpick I');
@@ -151,9 +151,10 @@ module.exports = {
         assert.equal(t.title, 'Big Bun');
         assert.ok(t.lines.includes('You have 2 of max 6'), JSON.stringify(t.lines));
         await shot(page, 'shop-tooltip');
-        await page.keyboard.press('ArrowUp');
+        await page.keyboard.press('ArrowUp'); // back to the cards (doesn't flip a card's buy mode)
         await frames(g, 2);
         assert.equal(await tooltip(g, 'Shop'), null);
+        assert.equal(await g.evaluate(() => window.__game.scene.getScene('Shop').upgradeMode.size), 0);
         // Hovering the second link (x = 60 + 104).
         await page.mouse.move(164, 610);
         await frames(g, 3);

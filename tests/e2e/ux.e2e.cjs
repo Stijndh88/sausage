@@ -286,6 +286,13 @@ module.exports = {
         await g.evaluate(() => { const s = window.__game.scene.getScene('Shop'); s.toggleLock(1); s.buy(0); });
         await checkShopLayout(page, 'kept+sold');
 
+        // Stacking: an owned weapon with a free link shows the New link / Upgrade choice and the stack line.
+        await g.openShop({ seed: 11, run: { wave: 3, crumbs: 60, weapons: W(['onion', 'onion', 'onion', 'toothpick', 'toothpick']) } });
+        await setOffers(g, LONG_OFFERS);
+        await checkShopLayout(page, 'stack choice (new link)');
+        await g.evaluate(() => window.__game.scene.getScene('Shop').toggleMode(1));
+        await checkShopLayout(page, 'stack choice (upgrade)');
+
         await g.openShop({ seed: 21, run: { wave: 8, crumbs: 3, weapons: FULL_LINKS, items: MANY_ITEMS } });
         await setOffers(g, LONG_OFFERS, [2]);
         await checkShopLayout(page, 'full links, many items, long descriptions, unaffordable');

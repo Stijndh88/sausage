@@ -3,10 +3,10 @@ import { EVENT_TEX_SCALE } from '../art/textures';
 import { audio } from '../audio/Audio';
 import type { EnemyKind } from '../data/enemies';
 import {
-  BASKET_LIFETIME_SEC, BASKET_OPEN_SEC, BASKET_RADIUS, BOUNTY_SEC, ELITE_HP_MULT, ELITE_SCALE, EVENTS,
+  BASKET_LIFETIME_SEC, BASKET_OPEN_SEC, BASKET_RADIUS, ELITE_HP_MULT, ELITE_SCALE, EVENTS,
   FLARE_BURN_SEC, FLARE_DAMAGE, FLARE_LANE, GOLDEN_LIFETIME_SEC, GOLDEN_SPEED_FRACTION, HAPPY_CRUMB_MULT,
   HAPPY_FIRE_RATE, HAPPY_HOUR_SEC, RAIN_DAMAGE, RAIN_DROPS, RAIN_RADIUS, RAIN_SEC, STAMPEDE_DAMAGE, STAMPEDE_SPEED,
-  type EventKind, type ScheduledEvent, bountyCrumbs, bountyTarget, eliteCrumbs, goldenCrumbs,
+  type EventKind, type ScheduledEvent, bountyCrumbs, bountySeconds, bountyTarget, eliteCrumbs, goldenCrumbs,
 } from '../data/events';
 import type { WaveConfig } from '../data/waves';
 import { BASE_SPEED } from '../entities/SausageHead';
@@ -346,14 +346,16 @@ export class EventDirector {
   // --- Chef's Bounty: kill N in time ---------------------------------------------------------
 
   private bounty(t0: number): Running {
-    const target = bountyTarget(this.cfg.wave);
+    // Fit the bounty inside what's left of the wave, asking for fewer kills when it's cut short.
+    const seconds = bountySeconds(t0 / 1000, this.cfg.durationSec);
+    const target = bountyTarget(this.cfg.wave, seconds);
     const base = this.hooks.kills();
     const r: Running = {
       kind: 'bounty',
       startedMs: t0,
       tick: (now) => {
         const got = this.hooks.kills() - base;
-        const left = BOUNTY_SEC - (now - t0) / 1000;
+        const left = seconds - (now - t0) / 1000;
         this.setStatus(r, `BOUNTY ${Math.min(got, target)}/${target} kills · ${Math.ceil(Math.max(0, left))}s`);
         if (got >= target) {
           const p = this.hooks.player();

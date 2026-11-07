@@ -5,7 +5,7 @@ import { MAX_LINKS } from '../src/data/weapons';
 import { CAPS, computeStats } from '../src/state/stats';
 import type { WeaponSlot } from '../src/state/run';
 import {
-  applyWeaponPurchase, canBuy, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
+  applyWeaponPurchase, canBuy, weaponBuyModes, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
 } from '../src/systems/Economy';
 import { mulberry32 } from '../src/systems/rng';
 
@@ -44,8 +44,29 @@ describe('weapon purchases', () => {
   });
 
   it('upgrades the lowest tier copy you already own', () => {
-    const result = applyWeaponPurchase([{ id: 'toothpick', tier: 3 }, { id: 'toothpick', tier: 2 }], 'toothpick');
+    const result = applyWeaponPurchase([{ id: 'toothpick', tier: 3 }, { id: 'toothpick', tier: 2 }], 'toothpick', undefined, 'upgrade');
     expect(result).toEqual([{ id: 'toothpick', tier: 3 }, { id: 'toothpick', tier: 3 }]);
+  });
+
+  it('stacks: an owned weapon goes on a new link by default, up to every link', () => {
+    let w: WeaponSlot[] = [{ id: 'onion', tier: 1 }];
+    for (let i = 1; i < MAX_LINKS; i++) w = applyWeaponPurchase(w, 'onion')!;
+    expect(w).toHaveLength(MAX_LINKS);
+    expect(w.every((x) => x.id === 'onion' && x.tier === 1)).toBe(true);
+    // Links full: the default now upgrades a copy, and "new link" is refused.
+    expect(applyWeaponPurchase(w, 'onion')!.filter((x) => x.tier === 2)).toHaveLength(1);
+    expect(applyWeaponPurchase(w, 'onion', MAX_LINKS, 'link')).toBeNull();
+    expect(canBuy({ type: 'weapon', id: 'onion', price: 1 }, 10, w).ok).toBe(true);
+    expect(canBuy({ type: 'weapon', id: 'onion', price: 1 }, 10, w, [], MAX_LINKS, 'link').ok).toBe(false);
+  });
+
+  it('offers both choices only when you own the weapon and have a free link', () => {
+    expect(weaponBuyModes([{ id: 'onion', tier: 1 }], 'onion')).toEqual(['link', 'upgrade']);
+    expect(weaponBuyModes([{ id: 'onion', tier: 1 }], 'pepper')).toEqual(['link']);
+    expect(weaponBuyModes([{ id: 'onion', tier: 4 }], 'onion')).toEqual(['link']);
+    const full: WeaponSlot[] = Array.from({ length: MAX_LINKS }, () => ({ id: 'onion', tier: 2 }));
+    expect(weaponBuyModes(full, 'onion')).toEqual(['upgrade']);
+    expect(weaponBuyModes(full, 'pepper')).toEqual([]);
   });
 
   it('adds a new copy once the owned one is maxed, and refuses when links are full', () => {

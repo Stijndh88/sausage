@@ -149,7 +149,7 @@ export class PauseMenu {
       add(s.add.text(x, wy + 70, `${WEAPONS[w.id].name.split(' ')[0]} ${tierLabel(w.tier)}`, {
         fontFamily: FONT, fontSize: '12px', color: '#ffffff', align: 'center',
       }).setOrigin(0.5, 0));
-      this.addTarget(add(s.add.zone(x, wy + 54, 80, 76)), () => weaponTooltip(WEAPONS[w.id], w.tier), x, wy + 20);
+      this.addTarget(add(s.add.zone(x, wy + 54, 80, 76)), () => weaponTooltip(WEAPONS[w.id], w.tier, run.weapons.filter((o) => o.id === w.id).length), x, wy + 20);
     });
 
     // Items as icon chips with counts.

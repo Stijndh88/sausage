@@ -116,22 +116,39 @@ export function generateOffers(
 }
 
 /**
- * Buying a weapon you own upgrades your lowest-tier copy that isn't maxed.
- * Otherwise it adds a new link, if there's room. Returns null if it can't be bought.
+ * What buying a weapon does:
+ * - 'link' puts it on a new link (any link can hold any weapon, so copies stack).
+ * - 'upgrade' raises your lowest-tier copy that isn't maxed.
+ * - 'auto' (the default) adds a link while there's room, otherwise upgrades.
  */
-export function applyWeaponPurchase(weapons: readonly WeaponSlot[], id: WeaponId, maxLinks = MAX_LINKS): WeaponSlot[] | null {
+export type WeaponBuyMode = 'auto' | 'link' | 'upgrade';
+
+/** Returns the new loadout, or null if this purchase isn't possible. */
+export function applyWeaponPurchase(
+  weapons: readonly WeaponSlot[],
+  id: WeaponId,
+  maxLinks = MAX_LINKS,
+  mode: WeaponBuyMode = 'auto',
+): WeaponSlot[] | null {
   const next = weapons.map((w) => ({ ...w }));
+  const room = next.length < maxLinks;
+  if (mode === 'link' || (mode === 'auto' && room)) {
+    if (!room) return null;
+    next.push({ id, tier: 1 });
+    return next;
+  }
   let target: WeaponSlot | undefined;
   for (const w of next) {
     if (w.id === id && w.tier < MAX_TIER && (!target || w.tier < target.tier)) target = w;
   }
-  if (target) {
-    target.tier++;
-    return next;
-  }
-  if (next.length >= maxLinks) return null;
-  next.push({ id, tier: 1 });
+  if (!target) return null;
+  target.tier++;
   return next;
+}
+
+/** The ways a weapon offer can be bought right now (empty if none). */
+export function weaponBuyModes(weapons: readonly WeaponSlot[], id: WeaponId, maxLinks = MAX_LINKS): ('link' | 'upgrade')[] {
+  return (['link', 'upgrade'] as const).filter((m) => applyWeaponPurchase(weapons, id, maxLinks, m) !== null);
 }
 
 export function canBuy(
@@ -140,11 +157,13 @@ export function canBuy(
   weapons: readonly WeaponSlot[],
   items: readonly string[] = [],
   maxLinks = MAX_LINKS,
+  mode: WeaponBuyMode = 'auto',
 ): { ok: boolean; reason?: string } {
   if (offer.type === 'item' && isItemMaxed(items, offer.id)) return { ok: false, reason: 'Maxed out' };
   if (crumbs < offer.price) return { ok: false, reason: 'Not enough crumbs' };
-  if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId, maxLinks) === null) {
+  if (offer.type === 'weapon' && applyWeaponPurchase(weapons, offer.id as WeaponId, maxLinks, mode) === null) {
     const owned = weapons.some((w) => w.id === offer.id);
+    if (mode === 'upgrade') return { ok: false, reason: owned ? 'Every copy is maxed' : 'Nothing to upgrade' };
     return { ok: false, reason: owned ? 'Maxed out · no free links' : 'No free links' };
   }
   return { ok: true };

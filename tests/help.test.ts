@@ -74,9 +74,14 @@ describe('tooltips', () => {
     const t = weaponTooltip(WEAPONS.toothpick, 1);
     expect(t.title).toBe('Toothpick I');
     expect(t.lines.join('\n')).toContain('DMG 7');
-    expect(t.lines.at(-1)).toMatch(/^Next tier: DMG 7 → 10\.5/);
-    expect(weaponTooltip(WEAPONS.toothpick, MAX_TIER).lines.at(-1)).toBe('Max tier');
+    expect(t.lines).toContainEqual(expect.stringMatching(/^Next tier: DMG 7 → 10\.5/));
+    expect(weaponTooltip(WEAPONS.toothpick, MAX_TIER).lines).toContain('Max tier');
     expect(weaponTooltip(WEAPONS.mustard, 2).lines.join('\n')).toContain('Poison');
+    // Stack bonuses: 4 copies have the first two.
+    const four = weaponTooltip(WEAPONS.toothpick, 1, 4).lines;
+    expect(four).toContain('Links with Toothpick: 4');
+    expect(four.filter((l) => l.startsWith('✓')).length).toBe(2);
+    expect(four.at(-1)).toMatch(/^· 6 links: /);
   });
 
   it('an item shows its effect, stack count and pairing', () => {

@@ -81,8 +81,13 @@ const BASICS: HelpEntry[] = [
   },
   {
     id: 'mech:poison', section: 'basics', title: 'Poison',
-    body: 'Mustard poisons what it hits: the enemy keeps taking damage for a few seconds. Up to 3 poison stacks add up on one enemy.',
+    body: 'Mustard poisons what it hits: the enemy keeps taking damage for 4 seconds. Poison is slow but stacks: up to 3 doses add up on one enemy. It does not spread.',
     known: seen('weapon:mustard'),
+  },
+  {
+    id: 'mech:burn', section: 'basics', title: 'Fire',
+    body: 'A burning enemy takes heavy damage for 2 seconds. Fire does not stack: a new flame only refreshes the old one. When a burning enemy dies, the fire jumps to the enemies around it.',
+    known: seen('mech:burn'),
   },
   {
     id: 'mech:explosions', section: 'basics', title: 'Explosions',
@@ -102,8 +107,12 @@ const SHOP: HelpEntry[] = [
     body: 'Between waves you spend crumbs on links (weapons) and items. Each card shows exactly what buying it would change for you right now. Hover over (or select) your links and items at the bottom to see what they do.',
   },
   {
-    id: 'shop:upgrade', section: 'shop', title: 'Upgrading links',
-    body: `Buying a weapon you already carry upgrades that link instead of adding a new one: more damage and faster shots, up to tier ${['I', 'II', 'III', 'IV'][MAX_TIER - 1]}. Spread weapons also get more pellets.`,
+    id: 'shop:upgrade', section: 'shop', title: 'New link or upgrade',
+    body: `Any link can hold any weapon. Buying a weapon you already carry adds another link with it by default. Flip the card to Upgrade (▲▼, the D-pad, or tap) to raise one copy a tier instead: more damage and faster shots, up to tier ${['I', 'II', 'III', 'IV'][MAX_TIER - 1]}. Spread weapons also get more pellets.`,
+  },
+  {
+    id: 'shop:stacks', section: 'shop', title: 'Stack bonuses',
+    body: 'Carry the same weapon on 2, 4 or 6 links to unlock its stack bonuses. They add up and boost every copy. A shop card shows the next bonus it would reach, and a link\'s tooltip lists all three.',
   },
   {
     id: 'shop:reroll', section: 'shop', title: 'Reroll',
@@ -131,7 +140,7 @@ const EVENT_TEXT: Record<EventKind, string> = {
   basket: `A picnic basket lands somewhere in the arena. Stand inside its circle for ${BASKET_OPEN_SEC} seconds to open it: a free item and a few crumbs. Leaving the circle drains the progress, and the basket disappears if you take too long.`,
   golden: `A golden hot dog runs around the arena for ${GOLDEN_LIFETIME_SEC} seconds and runs away from you. Touch it with your head to catch it for a pile of crumbs. A dash helps you close the gap.`,
   happy: `For ${HAPPY_HOUR_SEC} seconds every enemy drops double crumbs and your links fire 30% faster. Nothing to do but enjoy it.`,
-  bounty: `The chef wants a number of kills within ${BOUNTY_SEC} seconds. The counter at the top shows how many you have. Make it in time for a crumb bonus; miss it and nothing happens.`,
+  bounty: `The chef wants a number of kills within ${BOUNTY_SEC} seconds (less if the wave is nearly over: the bounty always ends before the wave does, and asks for fewer kills). The counter at the top shows how many you have. Make it in time for a crumb bonus; miss it and nothing happens.`,
   elite: `A big glowing enemy with ${ELITE_HP_MULT}× the usual health. Killing it drops a pile of crumbs and a condiment.`,
   stampede: 'Arrows flash on one side of the arena, then a wall of forks charges across. Get to the gap in the line, or dash through the forks.',
   flare: 'Lanes of the grill light up, then burn for a few seconds. Get out of the marked lanes before they catch fire.',

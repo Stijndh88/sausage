@@ -15,8 +15,9 @@ import { maxLinksFor, runStats } from '../state/run';
 import { computeStats } from '../state/stats';
 import { statChanges, weaponStatLine } from '../systems/statText';
 import {
-  applyWeaponPurchase, canBuy, generateOffers, rerollCost, shopRng, type Offer, type ShopContext,
+  applyWeaponPurchase, canBuy, generateOffers, rerollCost, shopRng, weaponBuyModes, type Offer, type ShopContext,
 } from '../systems/Economy';
+import { nextStack, stackCounts, stackLevel, STACK_THRESHOLDS } from '../data/stacks';
 import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
@@ -35,9 +36,9 @@ const ROW_Y = 500;
 /** Between waves: spend crumbs on new links (weapons) or passive items. */
 /** The how-to line under the shop, for the device in use. */
 const SHOP_HELP: Record<InputMode, string> = {
-  keyboard: '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · ◄► pick a card · ↓ your links and items (or hover)',
-  pad: '◄► pick a card · (A) buy · (Y) keep for next shop · (X) reroll · (Start) next wave · ↓ your links and items',
-  touch: 'Tap Buy to buy · tap Keep to save a card for the next shop · tap a link or item for info',
+  keyboard: '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · ◄► pick a card · ▲▼ new link or upgrade · Tab / hover: your links and items',
+  pad: '◄► pick a card · ▲▼ new link or upgrade · (A) buy · (Y) keep · (X) reroll · (Start) next wave · (LB/RB) your links and items',
+  touch: 'Tap Buy to buy · tap Keep to save it · tap New link / Upgrade to choose · tap a link or item for info',
 };
 
 export class ShopScene extends Phaser.Scene {
@@ -56,7 +57,9 @@ export class ShopScene extends Phaser.Scene {
   private freeRerolls = 0;
   /** Every reroll in this shop, free ones included (seeds the next roll). */
   private rerollsDone = 0;
-  /** Info on your links and items: hover / tap, or ↓ then ◄► with keys or a controller. */
+  /** Weapon cards set to "upgrade a copy" instead of the default "new link". */
+  private upgradeMode = new Set<number>();
+  /** Info on your links and items: hover / tap, or Tab (LB/RB) then ◄► with keys or a controller. */
   private tooltip!: Tooltip;
   private targets: { content: () => TooltipContent; x: number; y: number }[] = [];
   /** -1 = focus is on the offer cards; otherwise the link/item whose tooltip is open. */
@@ -77,6 +80,7 @@ export class ShopScene extends Phaser.Scene {
     this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, 0), this.run.wave + 1, lockedOffers, undefined, this.run.weapons, this.shopContext());
     this.locked = new Set(lockedOffers.map((_, i) => i));
     this.run.lockedOffers = [];
+    this.upgradeMode.clear();
   }
 
   create(): void {
@@ -97,8 +101,10 @@ export class ShopScene extends Phaser.Scene {
     onKeyPress(kb, 'ENTER', () => this.next(), ready);
     onKeyPress(kb, 'LEFT', () => this.moveFocus(-1), ready);
     onKeyPress(kb, 'RIGHT', () => this.moveFocus(1), ready);
-    onKeyPress(kb, 'DOWN', () => this.toLoadout(true), ready);
-    onKeyPress(kb, 'UP', () => this.toLoadout(false), ready);
+    onKeyPress(kb, 'UP', () => this.upDown(), ready);
+    onKeyPress(kb, 'DOWN', () => this.upDown(), ready);
+    onKeyPress(kb, 'TAB', () => this.browseLoadout(1), ready);
+    kb.addCapture('TAB');
     this.tooltip = new Tooltip(this, 50);
 
     this.render();
@@ -148,21 +154,26 @@ export class ShopScene extends Phaser.Scene {
     add(this.add.text(40, 548, `LINKS ${run.weapons.length}/${maxLinksFor(run)}`, { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
     // The Kielbasa's 8 links need a tighter row to stay clear of the item list.
     const linkStep = run.weapons.length > 7 ? 90 : 104;
+    const counts = stackCounts(run.weapons);
+    const stacks = [...counts].filter(([, n]) => n >= STACK_THRESHOLDS[0]).map(([id, n]) => `${WEAPONS[id].name.split(' ')[0]} ×${n} (${stackLevel(n)}/${STACK_THRESHOLDS.length})`);
+    if (stacks.length) {
+      add(this.add.text(160, 548, `STACKS  ${stacks.join('  ·  ')}`, { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#ffd23f' }));
+    }
     run.weapons.forEach((w, i) => {
       const x = 60 + i * linkStep;
       add(this.add.image(x, 600, 'sausage-link').setScale(1.6));
       add(this.add.image(x, 600, WEAPONS[w.id].icon).setScale(1.5));
       add(this.add.text(x, 634, `${WEAPONS[w.id].name}\n${tierLabel(w.tier)}`, { fontFamily: FONT, fontSize: '12px', color: '#ffffff', align: 'center' }).setOrigin(0.5, 0));
-      this.addTarget(add(this.add.zone(x, 620, linkStep - 8, 84)), () => weaponTooltip(WEAPONS[w.id], w.tier), x, 584);
+      this.addTarget(add(this.add.zone(x, 620, linkStep - 8, 84)), () => weaponTooltip(WEAPONS[w.id], w.tier, counts.get(w.id) ?? 1), x, 584);
     });
     add(this.add.text(780, 548, 'ITEMS', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
-    const counts = new Map<string, number>();
-    for (const id of run.items) if (ITEMS[id]) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const itemCounts = new Map<string, number>();
+    for (const id of run.items) if (ITEMS[id]) itemCounts.set(id, (itemCounts.get(id) ?? 0) + 1);
     // One text per item, flowed into lines by hand, so each one can be hovered for its tooltip.
-    if (!counts.size) add(this.add.text(780, 574, 'None yet', { fontFamily: FONT, fontSize: '14px', color: '#ffffff' }));
+    if (!itemCounts.size) add(this.add.text(780, 574, 'None yet', { fontFamily: FONT, fontSize: '14px', color: '#ffffff' }));
     let ix = 780;
     let iy = 574;
-    for (const [id, n] of counts) {
+    for (const [id, n] of itemCounts) {
       const t = add(this.add.text(ix, iy, `${ITEMS[id].name}${n > 1 ? ` ×${n}` : ''}`, { fontFamily: FONT, fontSize: '14px', color: '#ffffff' }));
       if (ix > 780 && ix + t.width > 1240) {
         ix = 780;
@@ -198,7 +209,7 @@ export class ShopScene extends Phaser.Scene {
     const rarity = item ? RARITIES[item.rarity] : null;
     // Items are framed by rarity (so colour always means rarity); weapons by their own colour.
     const frame = rarity ? rarity.color : color;
-    const check = canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items, maxLinksFor(this.run));
+    const check = canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items, maxLinksFor(this.run), this.modeFor(i));
 
     g.fillStyle(0x000000, 0.4).fillRoundedRect(left + 4, top + 6, CARD_W, CARD_H, 14);
     g.fillStyle(0x2a1d16, 1).fillRoundedRect(left, top, CARD_W, CARD_H, 14);
@@ -219,14 +230,26 @@ export class ShopScene extends Phaser.Scene {
     // What buying this would actually change.
     let subtitle = isWeapon ? 'WEAPON · new link' : `${rarity!.label.toUpperCase()} ITEM`;
     let stats = '';
+    let choice: ('link' | 'upgrade')[] = [];
     if (isWeapon) {
-      const after = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run));
+      const id = offer.id as WeaponId;
+      const max = maxLinksFor(this.run);
+      choice = weaponBuyModes(this.run.weapons, id, max);
+      const mode = this.modeFor(i);
+      const after = applyWeaponPurchase(this.run.weapons, id, max, mode);
       const changed = after?.find((w, idx) => idx < this.run.weapons.length && w.tier !== this.run.weapons[idx].tier);
       if (changed) {
         subtitle = `WEAPON · upgrade to ${tierLabel(changed.tier)}`;
         stats = weaponStatLine(def!, changed.tier, changed.tier - 1);
       } else {
         stats = weaponStatLine(def!, 1);
+        // Stacking: say what another copy of this weapon unlocks.
+        const have = stackCounts(this.run.weapons).get(id) ?? 0;
+        const reached = STACK_THRESHOLDS.find((t) => t === have + 1);
+        const upNext = nextStack(id, have);
+        if (have > 0) subtitle = `WEAPON · new link (×${have + 1})`;
+        if (have > 0 && reached) stats += `\nStack ×${reached}: ${nextStack(id, have)!.text}!`;
+        else if (have > 0 && upNext) stats += `\nStack ×${upNext.at}: ${upNext.text}`;
       }
     } else {
       const base = runBaseStats(this.run);
@@ -234,7 +257,19 @@ export class ShopScene extends Phaser.Scene {
       stats = lines.length ? lines.join('\n') : 'No effect (maxed)';
     }
     add(this.add.text(x, top + 100, def?.name ?? item!.name, { fontFamily: FONT, fontSize: '21px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5));
-    add(this.add.text(x, top + 124, subtitle, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: rarity ? rarity.css : '#c8a890' }).setOrigin(0.5));
+    if (choice.length === 2) {
+      // You own it and have a free link: pick "New link" (stack it) or "Upgrade" (raise a copy's tier).
+      const up = this.upgradeMode.has(i);
+      const seg = (label: string, sx: number, on: boolean, toUpgrade: boolean) => add(new Button(this, sx, top + 124, label, {
+        width: 106, height: 22, fill: on ? 0x8a5a2a : 0x3a2a20, hover: 0x9a6a3a, fontSize: 12,
+      }, () => this.setMode(i, toUpgrade)));
+      seg('New link', x - 56, !up, false);
+      const target = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run), 'upgrade')!
+        .find((w, idx) => w.tier !== this.run.weapons[idx]?.tier);
+      seg(`Upgrade → ${tierLabel(target?.tier ?? 2)}`, x + 56, up, true);
+    } else {
+      add(this.add.text(x, top + 124, subtitle, { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: rarity ? rarity.css : '#c8a890' }).setOrigin(0.5));
+    }
     add(this.add.text(x, top + 140, def?.desc ?? item!.desc, {
       fontFamily: FONT, fontSize: '14px', color: '#e8d8c8', align: 'center', wordWrap: { width: CARD_W - 28 },
     }).setOrigin(0.5, 0));
@@ -294,7 +329,8 @@ export class ShopScene extends Phaser.Scene {
     }
     for (const b of this.pad.poll(this)) {
       if (b === 'left' || b === 'right') this.moveFocus(b === 'left' ? -1 : 1);
-      else if (b === 'up' || b === 'down') this.toLoadout(b === 'down');
+      else if (b === 'up' || b === 'down') this.upDown();
+      else if (b === 'lb' || b === 'rb') this.browseLoadout(b === 'lb' ? -1 : 1);
       else if (b === 'a') { if (this.loadoutFocus < 0) this.buy(this.focus); }
       else if (b === 'y') { if (this.loadoutFocus < 0) this.toggleLock(this.focus); }
       else if (b === 'x') this.reroll();
@@ -304,6 +340,7 @@ export class ShopScene extends Phaser.Scene {
 
   private moveFocus(d: number): void {
     if (this.loadoutFocus >= 0) {
+      // ◄► wrap around your links and items; ↑↓ or Tab past the end go back to the cards.
       const n = this.targets.length;
       this.loadoutFocus = (this.loadoutFocus + d + n) % n;
       audio.play('click');
@@ -315,12 +352,32 @@ export class ShopScene extends Phaser.Scene {
     this.render();
   }
 
-  /** ↓ moves keyboard/controller focus from the cards to your links and items; ↑ goes back. */
-  private toLoadout(down: boolean): void {
-    if (down === this.loadoutFocus >= 0 || (down && !this.targets.length)) return;
-    this.loadoutFocus = down ? 0 : -1;
+  /** ↑↓: back to the cards from your links and items, otherwise switch a weapon card's buy mode. */
+  private upDown(): void {
+    if (this.loadoutFocus >= 0) {
+      this.loadoutFocus = -1;
+      audio.play('click');
+      this.render();
+    } else {
+      this.toggleMode(this.focus);
+    }
+  }
+
+  /** Tab / LB / RB: step through your links and items (showing each tooltip), then back to the cards. */
+  private browseLoadout(d: number): void {
+    const n = this.targets.length;
+    if (!n) return;
+    const wasOnCards = this.loadoutFocus < 0;
+    const next = wasOnCards ? (d > 0 ? 0 : n - 1) : this.loadoutFocus + d;
     audio.play('click');
-    this.render();
+    if (next < 0 || next >= n) {
+      this.loadoutFocus = -1;
+      this.render();
+      return;
+    }
+    this.loadoutFocus = next;
+    if (wasOnCards) this.render(); // drop the card's focus ring (render re-shows the tooltip)
+    else this.showLoadout();
   }
 
   private showLoadout(): void {
@@ -333,11 +390,36 @@ export class ShopScene extends Phaser.Scene {
     this.tooltip.attach(target, content, x, y);
   }
 
+  /** How a weapon card buys: 'link' (default) or 'upgrade' when the player picked that. */
+  private modeFor(i: number): 'auto' | 'link' | 'upgrade' {
+    const offer = this.offers[i];
+    if (!offer || offer.type !== 'weapon') return 'auto';
+    const modes = weaponBuyModes(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run));
+    if (modes.length < 2) return 'auto';
+    return this.upgradeMode.has(i) ? 'upgrade' : 'link';
+  }
+
+  private setMode(i: number, upgrade: boolean): void {
+    if (upgrade) this.upgradeMode.add(i);
+    else this.upgradeMode.delete(i);
+    this.render();
+  }
+
+  /** ▲▼ on a weapon card you could either stack or upgrade. */
+  private toggleMode(i: number): void {
+    const offer = this.offers[i];
+    if (!offer || offer.type !== 'weapon') return;
+    if (weaponBuyModes(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run)).length < 2) return;
+    audio.play('click');
+    this.setMode(i, !this.upgradeMode.has(i));
+  }
+
   private buy(i: number): void {
     if (this.leaving) return;
     const offer = this.offers[i];
     if (!offer) return;
-    if (!canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items, maxLinksFor(this.run)).ok) {
+    const mode = this.modeFor(i);
+    if (!canBuy(offer, this.run.crumbs, this.run.weapons, this.run.items, maxLinksFor(this.run), mode).ok) {
       audio.play('deny');
       return;
     }
@@ -345,7 +427,7 @@ export class ShopScene extends Phaser.Scene {
     markSeen(`${offer.type}:${offer.id}`);
     this.run.crumbs -= offer.price;
     if (offer.type === 'weapon') {
-      this.run.weapons = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run))!;
+      this.run.weapons = applyWeaponPurchase(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run), mode)!;
       if (this.run.weapons.some((w) => w.id === offer.id && w.tier === MAX_TIER)) tally(this.run, 'tier4', 1, 'max');
       tally(this.run, 'maxLinks', this.run.weapons.length, 'max');
     } else {
@@ -354,6 +436,7 @@ export class ShopScene extends Phaser.Scene {
     }
     this.offers[i] = null;
     this.locked.delete(i);
+    this.upgradeMode.delete(i);
     this.cameras.main.flash(120, 255, 220, 150);
     this.render();
   }
@@ -383,6 +466,7 @@ export class ShopScene extends Phaser.Scene {
     const keep = [...this.locked].map((i) => this.offers[i]).filter((o): o is Offer => !!o);
     this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.rerollsDone), this.run.wave + 1, keep, undefined, this.run.weapons, this.shopContext());
     this.locked = new Set(keep.map((_, i) => i));
+    this.upgradeMode.clear();
     this.render();
   }
 
