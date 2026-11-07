@@ -378,6 +378,62 @@ export function generateTextures(scene: Phaser.Scene): void {
     g.lineStyle(3, 0xff2a2a, 1).lineBetween(46, 120, 74, 120);
   });
 
+  // Kitchen boss: a hand-cranked meat grinder seen from above, outlet (its front) pointing up.
+  make(scene, 'enemy-grinder', 120, 130, (g) => {
+    // Outlet tube with ground meat squeezing out.
+    g.fillStyle(0x2a120a, 1).fillRoundedRect(42, 2, 36, 46, 8);
+    g.fillStyle(0x9aa6b2, 1).fillRoundedRect(45, 5, 30, 42, 6);
+    g.fillStyle(0xe86a7a, 1).fillCircle(52, 9, 5).fillCircle(60, 6, 5).fillCircle(68, 9, 5);
+    g.fillStyle(0xffb0b8, 1).fillCircle(52, 8, 2).fillCircle(60, 5, 2).fillCircle(68, 8, 2);
+    // Crank arm and knob off to the right.
+    g.lineStyle(9, 0x2a120a, 1).lineBetween(88, 84, 116, 58);
+    g.lineStyle(5, 0xc8d0d8, 1).lineBetween(88, 84, 114, 60);
+    g.fillStyle(0x2a120a, 1).fillCircle(113, 58, 8);
+    g.fillStyle(0xb5562a, 1).fillCircle(113, 58, 6);
+    // The hopper body.
+    g.fillStyle(0x2a120a, 1).fillCircle(60, 82, 44);
+    g.fillStyle(0x6f8fa8, 1).fillCircle(60, 82, 41);
+    g.fillStyle(0xa9c3d6, 1).fillCircle(52, 74, 30);
+    g.fillStyle(0x6f8fa8, 1).fillCircle(60, 82, 27);
+    // Mouth full of blades.
+    g.fillStyle(0x1a0a05, 1).fillCircle(60, 86, 20);
+    g.fillStyle(0xe8eef4, 1);
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2 + 0.4;
+      g.fillTriangle(60, 86, 60 + Math.cos(a) * 17, 86 + Math.sin(a) * 17, 60 + Math.cos(a + 0.5) * 17, 86 + Math.sin(a + 0.5) * 17);
+    }
+    g.fillStyle(0x3a3a3a, 1).fillCircle(60, 86, 4);
+    // Angry eyes on the rim.
+    g.fillStyle(0x1a0a05, 1).fillCircle(42, 56, 8).fillCircle(78, 56, 8);
+    g.fillStyle(0xff2a2a, 1).fillCircle(42, 57, 5).fillCircle(78, 57, 5);
+    g.fillStyle(0xffd0d0, 1).fillCircle(42, 57, 1.8).fillCircle(78, 57, 1.8);
+    g.lineStyle(4, 0x1a0a05, 1).lineBetween(32, 44, 50, 50).lineBetween(88, 44, 70, 50);
+  });
+  // Smokehouse boss: a fat barrel smoker, chimney (its front) pointing up, fire in its belly.
+  make(scene, 'enemy-smokey', 120, 130, (g) => {
+    // Smoke from the chimney.
+    g.fillStyle(0x8a8580, 0.9).fillCircle(66, 10, 9).fillCircle(78, 6, 6).fillCircle(56, 4, 4);
+    // Chimney.
+    g.fillStyle(0x2a120a, 1).fillRoundedRect(51, 12, 26, 34, 5);
+    g.fillStyle(0x4a4440, 1).fillRoundedRect(54, 14, 20, 30, 4);
+    // Barrel body.
+    g.fillStyle(0x2a120a, 1).fillRoundedRect(8, 38, 104, 90, 30);
+    g.fillStyle(0x3d3530, 1).fillRoundedRect(11, 41, 98, 84, 27);
+    g.fillStyle(0x58504a, 1).fillRoundedRect(18, 46, 60, 16, 8);
+    // Rusty bands.
+    g.fillStyle(0x8a4a24, 1).fillRect(11, 66, 98, 6).fillRect(11, 104, 98, 6);
+    // Firebox grille with a glowing mouth.
+    g.fillStyle(0x1a0a05, 1).fillRoundedRect(34, 78, 52, 38, 10);
+    g.fillStyle(0xff7a1a, 1).fillRoundedRect(38, 82, 44, 30, 8);
+    g.fillStyle(0xffd060, 1).fillRoundedRect(46, 92, 28, 14, 6);
+    g.lineStyle(3, 0x1a0a05, 1).lineBetween(48, 80, 48, 114).lineBetween(60, 80, 60, 114).lineBetween(72, 80, 72, 114);
+    // Glowing eyes above the firebox.
+    g.fillStyle(0x1a0a05, 1).fillCircle(42, 60, 8).fillCircle(78, 60, 8);
+    g.fillStyle(0xffa020, 1).fillCircle(42, 61, 5).fillCircle(78, 61, 5);
+    g.fillStyle(0xfff0b0, 1).fillCircle(42, 61, 2).fillCircle(78, 61, 2);
+    g.lineStyle(4, 0x1a0a05, 1).lineBetween(30, 48, 50, 54).lineBetween(90, 48, 70, 54);
+  });
+
   // --- Pickups and FX -------------------------------------------------------
   make(scene, 'crumb', 12, 12, (g) => {
     g.fillStyle(0xf6e2b0, 1).fillCircle(6, 6, 6);

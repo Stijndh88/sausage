@@ -82,7 +82,8 @@ on the sausage select screen (up and down).
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
 preferring ranged enemies. Any link can hold any weapon, so you can run 3 or even 6 Onion Rings. Buying a
 weapon you own puts it on a new link by default; switch the card to **Upgrade** (▲▼ or tap) to raise a copy's
-tier instead (I–IV). With full links, buying upgrades. **Stack bonuses:** 2, 4 and 6 links of the same weapon
+tier instead (I–IV). With full links, buying upgrades. **Merge** two links with the same weapon and tier in the
+shop (Merge button, M, or LB/RB then A) to get one link a tier higher and a free link. **Stack bonuses:** 2, 4 and 6 links of the same weapon
 each unlock a bonus for every copy (see `src/data/stacks.ts`), e.g. Onion Ring: +15% range, +1 ring, +25% damage.
 Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 
@@ -224,7 +225,8 @@ background; the sausage faces **right**, enemies face **up**), add its in-game s
 `python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy), then
 `python3 tools/make_portraits.py`, which paints the portraits of the six newer sausages from the cut
 ones until they get their own art. The keys and sizes the art
-must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md).
+must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md); the Kitchen and Smokehouse art is in
+[docs/ART_BRIEF_COURSES.md](docs/ART_BRIEF_COURSES.md).
 
 ## What's next
 See [docs/ROADMAP.md](docs/ROADMAP.md). Not done yet: mid-wave level-ups, elites and wave modifiers,

@@ -527,8 +527,11 @@ export class GameScene extends Phaser.Scene {
     if (this.ending || this.dying) return null;
     const e = new Enemy(this, x, y, kind, kind === 'tongs' ? this.cfg.bossHpMult : this.cfg.hpMult, elite);
     if (this.run.chili >= 1) e.speedMult = 1.15;
+    // Later courses dress their enemies differently once that art exists (enemy-fork-kitchen, ...).
+    const course = courseDef(this.cfg.course);
+    if (course.id !== 'backyard' && kind !== 'tongs') e.useTexture(`${e.def.texture}-${course.id}`);
     if (kind === 'tongs') {
-      const style = courseDef(this.cfg.course).boss;
+      const style = course.boss;
       e.applyStyle({ ...style, name: bossName(this.cfg.course), extraAttack: style.extraAttack || this.run.chili >= 4 });
     }
     this.enemies.add(e);

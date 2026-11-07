@@ -159,6 +159,23 @@ export function applyWeaponPurchase(
   return next;
 }
 
+/**
+ * Merging: two links with the same weapon at the same tier become one link a tier higher,
+ * freeing a link. Returns the other link that link `i` would merge with, or -1.
+ */
+export function mergePartner(weapons: readonly WeaponSlot[], i: number): number {
+  const w = weapons[i];
+  if (!w || w.tier >= MAX_TIER) return -1;
+  return weapons.findIndex((o, j) => j !== i && o.id === w.id && o.tier === w.tier);
+}
+
+/** Merges link `i` with its partner: link `i` goes up a tier, the partner's link is freed. Null if it can't. */
+export function mergeLinks(weapons: readonly WeaponSlot[], i: number): WeaponSlot[] | null {
+  const j = mergePartner(weapons, i);
+  if (j < 0) return null;
+  return weapons.filter((_, k) => k !== j).map((w) => (w === weapons[i] ? { ...w, tier: w.tier + 1 } : { ...w }));
+}
+
 /** The ways a weapon offer can be bought right now (empty if none). */
 export function weaponBuyModes(weapons: readonly WeaponSlot[], id: WeaponId, maxLinks = MAX_LINKS): ('link' | 'upgrade')[] {
   return (['link', 'upgrade'] as const).filter((m) => applyWeaponPurchase(weapons, id, maxLinks, m) !== null);

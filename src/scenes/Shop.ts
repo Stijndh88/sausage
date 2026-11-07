@@ -15,7 +15,7 @@ import { maxLinksFor, runStats } from '../state/run';
 import { computeStats } from '../state/stats';
 import { statChanges, weaponStatLine } from '../systems/statText';
 import {
-  applyWeaponPurchase, canBuy, generateOffers, rerollCost, shopRng, weaponBuyModes, type Offer, type ShopContext,
+  applyWeaponPurchase, canBuy, mergeLinks, mergePartner, generateOffers, rerollCost, shopRng, weaponBuyModes, type Offer, type ShopContext,
 } from '../systems/Economy';
 import { nextStack, stackCounts, stackLevel, STACK_THRESHOLDS } from '../data/stacks';
 import { Button } from '../ui/Button';
@@ -36,9 +36,9 @@ const ROW_Y = 500;
 /** Between waves: spend crumbs on new links (weapons) or passive items. */
 /** The how-to line under the shop, for the device in use. */
 const SHOP_HELP: Record<InputMode, string> = {
-  keyboard: '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · ◄► pick a card · ▲▼ new link or upgrade · Tab / hover: your links and items',
-  pad: '◄► pick a card · ▲▼ new link or upgrade · (A) buy · (Y) keep · (X) reroll · (Start) next wave · (LB/RB) your links and items',
-  touch: 'Tap Buy to buy · tap Keep to save it · tap New link / Upgrade to choose · tap a link or item for info',
+  keyboard: '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · ◄► pick a card · ▲▼ new link or upgrade · M merge · Tab: your links',
+  pad: '◄► card · ▲▼ new link or upgrade · (A) buy · (Y) keep · (X) reroll · (Start) next wave · (LB/RB) your links, (A) merge',
+  touch: 'Tap Buy to buy · tap Keep to save it · tap New link / Upgrade to choose · tap Merge to join twin links',
 };
 
 export class ShopScene extends Phaser.Scene {
@@ -104,6 +104,7 @@ export class ShopScene extends Phaser.Scene {
     onKeyPress(kb, 'UP', () => this.upDown(), ready);
     onKeyPress(kb, 'DOWN', () => this.upDown(), ready);
     onKeyPress(kb, 'TAB', () => this.browseLoadout(1), ready);
+    onKeyPress(kb, 'M', () => this.merge(this.loadoutFocus >= 0 && this.loadoutFocus < this.run.weapons.length ? this.loadoutFocus : -1), ready);
     kb.addCapture('TAB');
     this.tooltip = new Tooltip(this, 50);
 
@@ -165,6 +166,12 @@ export class ShopScene extends Phaser.Scene {
       add(this.add.image(x, 600, WEAPONS[w.id].icon).setScale(1.5));
       add(this.add.text(x, 634, `${WEAPONS[w.id].name}\n${tierLabel(w.tier)}`, { fontFamily: FONT, fontSize: '12px', color: '#ffffff', align: 'center' }).setOrigin(0.5, 0));
       this.addTarget(add(this.add.zone(x, 620, linkStep - 8, 84)), () => weaponTooltip(WEAPONS[w.id], w.tier, counts.get(w.id) ?? 1), x, 584);
+      // Merge: the first of each pair with the same weapon and tier gets the button.
+      const j = mergePartner(run.weapons, i);
+      if (j > i) {
+        const btn = add(new Button(this, x, 680, '', { width: linkStep - 12, height: 22, fill: 0x8a5a2a, hover: 0xaa7a3a, fontSize: 12 }, () => this.merge(i)));
+        bindPrompt(btn, () => `Merge → ${tierLabel(w.tier + 1)}${getInputMode() === 'keyboard' ? ' (M)' : ''}`);
+      }
     });
     add(this.add.text(780, 548, 'ITEMS', { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
     const itemCounts = new Map<string, number>();
@@ -332,7 +339,10 @@ export class ShopScene extends Phaser.Scene {
       if (b === 'left' || b === 'right') this.moveFocus(b === 'left' ? -1 : 1);
       else if (b === 'up' || b === 'down') this.upDown();
       else if (b === 'lb' || b === 'rb') this.browseLoadout(b === 'lb' ? -1 : 1);
-      else if (b === 'a') { if (this.loadoutFocus < 0) this.buy(this.focus); }
+      else if (b === 'a') {
+        if (this.loadoutFocus < 0) this.buy(this.focus);
+        else if (this.loadoutFocus < this.run.weapons.length) this.merge(this.loadoutFocus);
+      }
       else if (b === 'y') { if (this.loadoutFocus < 0) this.toggleLock(this.focus); }
       else if (b === 'x') this.reroll();
       else if (b === 'start') this.next();
@@ -413,6 +423,28 @@ export class ShopScene extends Phaser.Scene {
     if (weaponBuyModes(this.run.weapons, offer.id as WeaponId, maxLinksFor(this.run)).length < 2) return;
     audio.play('click');
     this.setMode(i, !this.upgradeMode.has(i));
+  }
+
+  /**
+   * Merges link i with its twin (same weapon, same tier) into one link a tier higher.
+   * i = -1 merges the first pair there is. Free: it trades a link for a tier.
+   */
+  private merge(i: number): void {
+    if (this.leaving) return;
+    const w = this.run.weapons;
+    const at = i >= 0 ? i : w.findIndex((_, k) => mergePartner(w, k) > k);
+    // The merged weapon stays on the front link of the pair.
+    const next = at >= 0 && mergePartner(w, at) >= 0 ? mergeLinks(w, Math.min(at, mergePartner(w, at))) : null;
+    if (!next) {
+      audio.play('deny');
+      return;
+    }
+    audio.play('buy');
+    this.run.weapons = next;
+    if (next.some((x) => x.tier === MAX_TIER)) tally(this.run, 'tier4', 1, 'max');
+    this.upgradeMode.clear();
+    if (this.loadoutFocus >= this.run.weapons.length) this.loadoutFocus = -1;
+    this.render();
   }
 
   private buy(i: number): void {
