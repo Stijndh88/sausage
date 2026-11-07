@@ -54,9 +54,11 @@ export class Hud {
       .setOrigin(0.5)
       .setDepth(52);
 
-    scene.add.image(GAME_W - 150, HUD_H / 2, 'crumb').setScale(2).setDepth(51);
+    // Crumbs are the money you spend in the shop.
+    scene.add.text(GAME_W - 150, 2, 'CRUMBS', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#c8a890' }).setDepth(51);
+    scene.add.image(GAME_W - 150, HUD_H / 2 + 4, 'crumb').setScale(2).setDepth(51);
     this.crumbText = scene.add
-      .text(GAME_W - 132, HUD_H / 2, '0', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#f0c070' })
+      .text(GAME_W - 132, HUD_H / 2 + 4, '0', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#f0c070' })
       .setOrigin(0, 0.5)
       .setDepth(51);
 

@@ -664,7 +664,9 @@ export class GameScene extends Phaser.Scene {
     this.run.crumbs += banked;
     this.run.crumbsEarned += banked;
     audio.play('waveClear');
-    this.banner('WAVE CLEARED!', floor ? `Swept up ${banked} of ${floor} crumbs left on the floor` : 'Every crumb collected!');
+    this.banner('WAVE CLEARED!', floor
+      ? `You left ${floor} crumb${floor === 1 ? '' : 's'} on the floor: you get half (+${banked})`
+      : 'You grabbed every crumb!');
     this.time.delayedCall(1700, () => this.scene.start('Shop', { run: this.run }));
   }
 
