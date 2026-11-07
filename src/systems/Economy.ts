@@ -47,7 +47,7 @@ function itemPool(rarity: Rarity, owned: readonly string[]): string[] {
 }
 
 /** Rolls a rarity (by wave and luck), falling back to lower rarities when a pool is empty. */
-function rollItem(rng: Rng, wave: number, luck: number, owned: readonly string[], used: Set<string>): string | null {
+export function rollItem(rng: Rng, wave: number, luck: number, owned: readonly string[], used: Set<string>): string | null {
   let rarity = pickWeighted(rng, rarityWeights(wave, luck));
   for (let r = RARITY_ORDER.indexOf(rarity); r >= 0; r--) {
     rarity = RARITY_ORDER[r];

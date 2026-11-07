@@ -1,6 +1,7 @@
 # Design: why you play one more run
 
 Status: **proposal**, waiting for approval before it's built.
+Section 4 (events at marked times) is built: see `src/data/events.ts`. The Escape Hatch and Tasting Spoon wait for the doggy bag.
 
 ## The problem
 Right now a run ends and nothing carries over except a high score. One good run unlocks every
