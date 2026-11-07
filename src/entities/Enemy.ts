@@ -21,6 +21,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   hp: number;
   readonly maxHp: number;
   dead = false;
+  /** Elites (timed event): more HP, bigger, glowing. */
+  readonly elite: boolean;
+  private readonly baseScale: number;
+  private aura: Phaser.GameObjects.Image | null = null;
 
   private kbX = 0;
   private kbY = 0;
@@ -37,15 +41,27 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private strafeDir = 1;
   private born = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, kind: EnemyKind, hpMult: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, kind: EnemyKind, hpMult: number, elite?: { hpMult: number; scale: number }) {
     const def = ENEMIES[kind];
     super(scene, x, y, def.texture);
     this.def = def;
-    this.maxHp = Math.round(def.hp * hpMult);
+    this.elite = !!elite;
+    this.baseScale = elite?.scale ?? 1;
+    this.maxHp = Math.round(def.hp * hpMult * (elite?.hpMult ?? 1));
     this.hp = this.maxHp;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(kind === 'tongs' ? 4 : 5);
+    if (elite) {
+      this.aura = scene.add.image(x, y, 'ring').setDepth(4).setTint(0xd070ff).setAlpha(0.8)
+        .setScale((def.radius * 2 * elite.scale * 1.3) / 64);
+    }
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.aura?.destroy();
+    this.aura = null;
+    super.destroy(fromScene);
   }
 
   /** Call after adding to the physics group (groups reset body settings). */
@@ -63,8 +79,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.mode = this.def.kind === 'hotsauce' ? 'idle' : 'move';
     this.nextSummonAt = now + 5000;
     this.strafeDir = Math.random() < 0.5 ? -1 : 1;
-    this.setScale(0.2);
-    this.scene.tweens.add({ targets: this, scale: 1, duration: 180, ease: 'Back.Out' });
+    this.setScale(0.2 * this.baseScale);
+    this.scene.tweens.add({ targets: this, scale: this.baseScale, duration: 180, ease: 'Back.Out' });
   }
 
   get isBoss(): boolean {
@@ -218,6 +234,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.y = Phaser.Math.Clamp(this.y, a.top, a.bottom);
 
     this.updateTint(now);
+    if (this.aura) {
+      this.aura.setPosition(this.x, this.y).setRotation(now / 400).setVisible(!this.dead);
+      this.aura.setAlpha(0.55 + 0.3 * Math.sin(now / 120));
+    }
     return poisonKill;
   }
 
@@ -300,6 +320,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.setTint(Math.floor(now / 80) % 2 ? 0xff5040 : 0xffffff);
     } else if (this.poisons.length) {
       this.setTint(0xc8ff6a);
+    } else if (this.elite) {
+      this.setTint(0xffd0ff);
     } else {
       this.clearTint();
     }

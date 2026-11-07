@@ -139,8 +139,81 @@ function generateItemIcons(scene: Phaser.Scene): void {
   });
 }
 
+/** Pixels per in-game pixel for the event props and track icons (shown with setDisplaySize). */
+export const EVENT_TEX_SCALE = 2;
+
+/** Props for timed events (see data/events.ts) and their icons on the HUD event track. */
+function generateEventTextures(scene: Phaser.Scene): void {
+  const k = EVENT_TEX_SCALE;
+  const scaled = (key: string, w: number, h: number, draw: Draw) =>
+    make(scene, key, w * k, h * k, (g) => { g.scaleCanvas(k, k); draw(g); });
+
+  const basket = (g: Phaser.GameObjects.Graphics, w: number, h: number) => {
+    // Handle, wicker body, red-and-white checked cloth.
+    g.lineStyle(h * 0.1, 0x7a4a20, 1).beginPath();
+    g.arc(w / 2, h * 0.45, w * 0.3, Math.PI, 0, false).strokePath();
+    g.fillStyle(0x5a3414, 1).fillRoundedRect(w * 0.06, h * 0.42, w * 0.88, h * 0.54, h * 0.1);
+    g.fillStyle(0xb87a3a, 1).fillRoundedRect(w * 0.1, h * 0.46, w * 0.8, h * 0.46, h * 0.08);
+    g.lineStyle(Math.max(1, h * 0.05), 0x7a4a20, 1);
+    for (let i = 1; i < 4; i++) g.lineBetween(w * 0.1, h * (0.46 + 0.115 * i), w * 0.9, h * (0.46 + 0.115 * i));
+    const cell = w * 0.8 / 6;
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle(i % 2 ? 0xffffff : 0xe0242c, 1).fillRect(w * 0.1 + i * cell, h * 0.38, cell, h * 0.12);
+    }
+  };
+  scaled('evt-basket', 52, 44, (g) => basket(g, 52, 44));
+  scaled('evt-arrow', 28, 28, (g) => {
+    g.fillStyle(0x1a0a05, 1).fillTriangle(26, 14, 4, 2, 4, 26);
+    g.fillStyle(0xffffff, 1).fillTriangle(22, 14, 7, 6, 7, 22);
+  });
+
+  const icon = (key: string, draw: Draw) => scaled(`evt-icon-${key}`, 18, 18, (g) => {
+    g.fillStyle(0x1a0f0a, 1).fillCircle(9, 9, 9);
+    draw(g);
+  });
+  icon('basket', (g) => basket(g, 18, 18));
+  icon('golden', (g) => {
+    g.fillStyle(0xb8860b, 1).fillRoundedRect(2, 6, 14, 7, 3.5);
+    g.fillStyle(0xffd23f, 1).fillRoundedRect(3, 7, 12, 5, 2.5);
+    g.fillStyle(0xffffff, 0.8).fillRect(5, 8, 6, 1);
+  });
+  icon('happy', (g) => {
+    g.fillStyle(0xffb030, 1).fillRect(4, 6, 8, 9);
+    g.lineStyle(1.5, 0xffb030, 1).strokeRect(12, 8, 3, 4);
+    g.fillStyle(0xffffff, 1).fillCircle(6, 5, 2.2).fillCircle(9, 4.5, 2.4).fillCircle(11.5, 5.2, 2);
+  });
+  icon('bounty', (g) => {
+    g.lineStyle(1.6, 0x8fd3ff, 1).strokeCircle(9, 9, 6);
+    g.fillStyle(0x8fd3ff, 1).fillCircle(9, 9, 2.4);
+    g.lineBetween(9, 1, 9, 5).lineBetween(9, 13, 9, 17).lineBetween(1, 9, 5, 9).lineBetween(13, 9, 17, 9);
+  });
+  icon('elite', (g) => {
+    const pts: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 3 : 7.5;
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      pts.push(new Phaser.Math.Vector2(9 + Math.cos(a) * r, 9.5 + Math.sin(a) * r));
+    }
+    g.fillStyle(0xd070ff, 1).fillPoints(pts, true);
+  });
+  icon('stampede', (g) => {
+    g.lineStyle(1.6, 0xff6a5a, 1);
+    g.lineBetween(9, 9, 9, 16);
+    g.lineBetween(6, 3, 6, 9).lineBetween(9, 3, 9, 9).lineBetween(12, 3, 12, 9).lineBetween(6, 9, 12, 9);
+  });
+  icon('flare', (g) => {
+    g.fillStyle(0xff5a00, 1).fillCircle(9, 11.5, 4.5).fillTriangle(4.6, 11, 13.4, 11, 9, 2);
+    g.fillStyle(0xffd060, 1).fillCircle(9, 12.5, 2.4).fillTriangle(6.8, 12, 11.2, 12, 9, 6.5);
+  });
+  icon('rain', (g) => {
+    g.fillStyle(0xe0242c, 1).fillCircle(9, 11, 4.5).fillTriangle(4.6, 10, 13.4, 10, 9, 2.5);
+    g.fillStyle(0xffffff, 0.7).fillCircle(7.5, 11, 1.2);
+  });
+}
+
 export function generateTextures(scene: Phaser.Scene): void {
   generateItemIcons(scene);
+  generateEventTextures(scene);
   // --- The sausage ---------------------------------------------------------
   // Head faces right (angle 0). White tints well, so the heat tint is applied at runtime.
   make(scene, 'sausage-head', 48, 30, (g) => {

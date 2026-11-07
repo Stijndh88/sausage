@@ -52,6 +52,21 @@ waves and with more Luck. Every card shows exactly what it would change ("Damage
 "Keep" holds an offer through rerolls and into the next shop (re-priced for that wave).
 Crumbs left on the floor when a wave ends are swept up at half value.
 
+**Events.** Every wave except the boss has 1–3 events at set seconds. The line under the wave timer shows
+an icon at each one, and an icon pulses 3 seconds before its event. A wave never has two hazards, and it
+always has at least one event that pays something.
+
+| Event | From wave | What happens |
+|---|---|---|
+| Picnic Basket | 1 | Stand in its circle for 3 s to open it: a free random item and some crumbs. It vanishes after 16 s. |
+| Golden Hot Dog | 1 | A golden runner flees from you; catch it within 10 s for a pile of crumbs. |
+| Happy Hour | 2 | 15 s of double crumbs and +30% fire rate. |
+| Chef's Bounty | 2 | Kill a number of enemies within 20 s for a crumb bonus. |
+| Fork Stampede | 2 | Arrows warn you; then a wall of forks charges across the arena. Dodge, or dash through the gap. |
+| Elite | 3 | A big, glowing enemy with 6× HP; drops a pile of crumbs and a condiment packet. |
+| Grease Flare-up | 4 | Two lanes flash for 2 s, then burn for 3.5 s. |
+| Sauce Rain | 5 | Shadows grow where sauce will land, and every other drop aims at you. |
+
 **Settings** (from the menu or the pause menu): volumes, screen shake, reduce flashing, reduce motion
 (defaults to your OS setting) and damage numbers. Settings, unlocks and best runs are saved in the browser.
 
