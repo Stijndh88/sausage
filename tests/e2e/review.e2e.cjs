@@ -124,15 +124,15 @@ module.exports = {
       },
     },
     {
-      name: 'review: boss death from several sources triggers exactly one Victory',
+      name: 'review: boss death from several sources triggers exactly one choice screen',
       timeoutMs: 30000,
       fn: async ({ g }) => {
-        await setup(g, { wave: 10 });
+        await setup(g, { wave: 7 });
         const r = await g.evaluate(() => {
           const s = window.__rv.scene();
           let starts = 0;
           const orig = s.scene.start.bind(s.scene);
-          s.scene.start = (k, d) => { if (k === 'Victory') starts++; return orig(k, d); };
+          s.scene.start = (k, d) => { if (k === 'Choice') starts++; return orig(k, d); };
           window.__victoryStarts = () => starts;
           const boss = window.__rv.spawn('tongs', s.head.x, s.head.y - 200);
           boss.hp = 1;
@@ -140,11 +140,11 @@ module.exports = {
           s.explode(boss.x, boss.y, 100, 100);
           s.damageEnemy(boss, 10, 0, 0, 0);
           s.killEnemy(boss); // even a direct second kill call must not re-run win()
-          return { kills: s.run.kills, ending: s.ending, banners: window.__rv.texts().filter((t) => t.includes('ESCAPED')).length };
+          return { kills: s.run.kills, ending: s.ending, banners: window.__rv.texts().filter((t) => t.includes('BOSS DEFEATED')).length };
         });
         assert.equal(r.ending, true);
         assert.equal(r.banners, 1);
-        await g.waitForScene('Victory', 15000);
+        await g.waitForScene('Choice', 15000);
         await g.wait(300);
         // The scene object was shut down; read the counter we left on window.
         assert.equal(await g.evaluate(() => window.__victoryStarts()), 1);
@@ -154,7 +154,7 @@ module.exports = {
       name: 'review: pending boss bullet callbacks do not leak into a restarted Game scene',
       timeoutMs: 30000,
       fn: async ({ g }) => {
-        await setup(g, { wave: 10 });
+        await setup(g, { wave: 7 });
         await g.evaluate(() => {
           const s = window.__rv.scene();
           const boss = window.__rv.spawn('tongs', s.head.x, s.head.y - 250);
@@ -282,7 +282,7 @@ module.exports = {
       name: 'review: killing the boss with a pickle while paused soft-locks the game (stuck on PAUSED)',
       timeoutMs: 30000,
       fn: async ({ page, g }) => {
-        await setup(g, { wave: 10 });
+        await setup(g, { wave: 7 });
         await g.evaluate(() => {
           const s = window.__rv.scene();
           const boss = window.__rv.spawn('tongs', s.head.x + 170, s.head.y);
@@ -298,7 +298,7 @@ module.exports = {
         // Once fixed, the pickle resolves after the pause; finish the boss off either way.
         await gameMs(g, 800);
         await g.evaluate(() => { const s = window.__rv.scene(); if (!s.boss.dead) s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
-        await g.waitForScene('Victory', 15000);
+        await g.takeHome(15000);
       },
     },
     {
@@ -348,7 +348,7 @@ module.exports = {
       name: 'review: player bullets still in flight after charring cannot trigger win()',
       timeoutMs: 30000,
       fn: async ({ g }) => {
-        await setup(g, { wave: 10 });
+        await setup(g, { wave: 7 });
         await g.evaluate(() => {
           const s = window.__rv.scene();
           const boss = window.__rv.spawn('tongs', s.head.x + 150, s.head.y);
@@ -368,7 +368,7 @@ module.exports = {
           return { dying: s.dying, ending: s.ending, bossDead: s.boss.dead, texts: window.__rv.texts() };
         });
         assert.equal(r.dying, true);
-        assert.ok(!r.texts.some((t) => t.includes('ESCAPED')), `victory banner shown over the death screen: ${JSON.stringify(r.texts)}`);
+        assert.ok(!r.texts.some((t) => t.includes('BOSS DEFEATED')), `victory banner shown over the death screen: ${JSON.stringify(r.texts)}`);
         assert.equal(r.ending, false, 'win() ran after the sausage died');
       },
     },
@@ -376,7 +376,7 @@ module.exports = {
       name: 'review: boss delayed attacks stop when the sausage chars',
       timeoutMs: 30000,
       fn: async ({ g }) => {
-        await setup(g, { wave: 10 });
+        await setup(g, { wave: 7 });
         await g.evaluate(() => {
           const s = window.__rv.scene();
           const boss = window.__rv.spawn('tongs', s.head.x, s.head.y - 250);

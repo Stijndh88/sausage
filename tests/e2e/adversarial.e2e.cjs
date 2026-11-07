@@ -25,7 +25,7 @@ const SHOP = {
   next: [GAME_W / 2 + 150, 500],
 };
 const STARTING_CRUMBS = 8;
-const END = { again: [GAME_W / 2 - 150, 600], menu: [GAME_W / 2 + 150, 600] };
+const END = { again: [GAME_W / 2 - 300, 650], menu: [GAME_W / 2 + 280, 650] };
 
 // ---------------------------------------------------------------------------- helpers
 
@@ -186,22 +186,27 @@ tests.push({
 });
 
 tests.push({
-  name: 'victory banner: mashing keys while the boss dies → Victory, then Enter starts a clean run',
+  name: 'boss banner: mashing keys while the boss dies → the choice (never skipped), then take it home → Victory, then Enter starts a clean run',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
-    await g.startRun({ seed: 5, wave: 10 });
+    await g.startRun({ seed: 5, wave: 7 });
     await g.godMode();
     await waitForBoss(page);
     await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
     const keys = ['Escape', 'p', 'Space', '4', 'r'];
     let i = 0;
-    while (!(await g.activeScenes()).includes('Victory')) {
+    while (!(await g.activeScenes()).includes('Choice')) {
       const scenes = await g.activeScenes();
       assert.ok(!scenes.includes('GameOver'), 'won, but ended on GameOver');
       await page.keyboard.press(keys[i++ % keys.length]);
       await g.wait(40);
-      assert.ok(i < 2000, 'Victory never appeared');
+      assert.ok(i < 2000, 'the choice never appeared');
     }
+    // Mashing the same keys on the choice screen must not pick anything.
+    for (let j = 0; j < 20; j++) { await page.keyboard.press(keys[j % keys.length]); await g.wait(40); }
+    assert.deepEqual(await g.activeScenes(), ['Choice']);
+    await page.keyboard.press('1');
+    await g.waitForScene('Victory', 5000);
     await g.wait(300);
     assert.deepEqual(await g.activeScenes(), ['Victory']);
     await page.keyboard.press('Enter');
@@ -569,10 +574,12 @@ tests.push({
 
 // ======================= Every wave with fixed seeds =======================
 
-for (let wave = 1; wave <= 10; wave++) {
+// The Backyard (1-6 and the Tongs at 7), plus the first Kitchen wave and the Kitchen boss.
+for (const wave of [1, 2, 3, 4, 5, 6, 7, 8, 13]) {
   const seed = 1000 + wave * 7;
+  const isBoss = wave === 7 || wave === 13;
   tests.push({
-    name: `wave ${wave} (seed ${seed}): spawns, kills, enemies stay in the arena, ${wave === 10 ? 'boss cannot be skipped by the timer' : 'wave can be cleared'}`,
+    name: `wave ${wave} (seed ${seed}): spawns, kills, enemies stay in the arena, ${isBoss ? 'boss cannot be skipped by the timer' : 'wave can be cleared'}`,
     timeoutMs: 90000,
     fn: async ({ page, g }) => {
       await g.startRun({ seed, wave, weapons: STRONG.map((w) => ({ ...w })) });
@@ -595,7 +602,7 @@ for (let wave = 1; wave <= 10; wave++) {
       assert.equal(s.wave, wave);
       assert.ok(!s.dying && !s.ending);
       assert.equal(await g.evaluate(() => window.__outside), 0, 'no enemy left the arena');
-      if (wave === 10) {
+      if (isBoss) {
         await waitForBoss(page);
         await g.fastForwardWave();
         await frames(page, 60);
@@ -813,12 +820,12 @@ tests.push({
   name: 'BUG end of run: a dead sausage cannot also "escape" when an in-flight bullet kills the boss',
   timeoutMs: 90000,
   fn: async ({ page, g }) => {
-    await g.startRun({ seed: 111, wave: 10 });
+    await g.startRun({ seed: 111, wave: 7 });
     await waitForBoss(page);
     await g.evaluate(() => {
       const s = window.__game.scene.getScene('Game');
       window.__banners = new Set();
-      s.events.on('postupdate', () => { for (const o of s.children.list) if (o.type === 'Text' && /ESCAPED|CHARRED!/.test(o.text)) window.__banners.add(o.text); });
+      s.events.on('postupdate', () => { for (const o of s.children.list) if (o.type === 'Text' && /BOSS DEFEATED!|SKEWERED!/.test(o.text)) window.__banners.add(o.text); });
       s.boss.hp = 1;
       // A toothpick is already flying at the boss…
       const b = s.playerBullets.get(s.boss.x, s.boss.y + 70);
@@ -826,9 +833,9 @@ tests.push({
       // …when the sausage chars.
       s.takeDamage(500, 'test');
     });
-    await waitFor(page, () => window.__game.scene.isActive('GameOver') || window.__game.scene.isActive('Victory'), null, 60000);
+    await waitFor(page, () => window.__game.scene.isActive('GameOver') || window.__game.scene.isActive('Choice'), null, 60000);
     const banners = await g.evaluate(() => [...window.__banners]);
-    assert.ok(!(banners.includes('CHARRED!') && banners.includes('YOU ESCAPED THE BBQ!')), `contradicting banners: ${banners.join(' + ')}`);
+    assert.ok(!(banners.includes('SKEWERED!') && banners.includes('BOSS DEFEATED!')), `contradicting banners: ${banners.join(' + ')}`);
   },
 });
 

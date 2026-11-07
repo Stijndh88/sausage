@@ -26,7 +26,7 @@ export class ChoiceScene extends Phaser.Scene {
   private run!: RunState;
   private hp = 0;
   private stage: Stage = 'choose';
-  private focus = 1;
+  private focus = 0;
   private ui: Phaser.GameObjects.GameObject[] = [];
   private buttons: Button[] = [];
   private leaving = false;
@@ -43,7 +43,7 @@ export class ChoiceScene extends Phaser.Scene {
     this.run = data.run;
     this.hp = data.hp ?? 0;
     this.stage = 'choose';
-    this.focus = 1;
+    this.focus = 0;
     this.leaving = false;
     this.items = secondsItems(this.run);
     this.menus = menuOptions(this.run);
