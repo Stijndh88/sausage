@@ -18,7 +18,7 @@ const BOSS_BAR_Y = 34;
 /** Event track: a thin line under the wave timer with an icon at each event's second. */
 const TRACK_CX = GAME_W / 2 + 80;
 const TRACK_W = 380;
-const TRACK_Y = 55;
+const TRACK_Y = 56;
 const TRACK_ICON = 16;
 /** Upcoming events pulse on the track for this long before they start. */
 const TRACK_WARN_SEC = 3;
@@ -73,13 +73,13 @@ export class Hud {
       .setDepth(51);
 
     scene.add
-      .text(GAME_W / 2 + 80, 12, wave >= TOTAL_WAVES ? 'FINAL WAVE' : `WAVE ${wave}/${TOTAL_WAVES}`, {
-        fontFamily: FONT, fontSize: '16px', color: '#c8a890',
+      .text(GAME_W / 2 + 80, 10, wave >= TOTAL_WAVES ? 'FINAL WAVE' : `WAVE ${wave}/${TOTAL_WAVES}`, {
+        fontFamily: FONT, fontSize: '14px', color: '#c8a890',
       })
       .setOrigin(0.5, 0.5)
       .setDepth(51);
     this.timerText = scene.add
-      .text(GAME_W / 2 + 80, 34, '', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffffff' })
+      .text(GAME_W / 2 + 80, 35, '', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5, 0.5)
       .setDepth(51);
 
