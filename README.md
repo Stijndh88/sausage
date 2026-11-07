@@ -120,9 +120,9 @@ fire); what hurt you most; where your crumbs went; and damage per wave.
 (a closed tab, or a crash) on the device, and uploads each one once to the game's own Supabase project
 with a random player id (nothing else about the player), so balance problems and bugs can be spotted
 from real play. **Settings → Share play data** turns uploading off; **Save** downloads the local copy as
-JSON (in the console it's `window.__telemetry`). Uploading needs `VITE_PLAY_DATA_URL` and
-`VITE_PLAY_DATA_KEY` (the project URL and publishable key) at build time, and is skipped on localhost
-unless the page has `?playdata=1`. The tables and insert-only rules are in `supabase/play_data.sql`.
+JSON (in the console it's `window.__telemetry`). It goes to the "wurst" Supabase project (URL and
+publishable key in `src/state/playDataSync.ts`; `VITE_PLAY_DATA_URL` / `VITE_PLAY_DATA_KEY` override
+them) and is skipped on localhost unless the page has `?playdata=1`. The tables and insert-only rules are in `supabase/play_data.sql`.
 See `src/state/telemetry.ts` and `src/state/playDataSync.ts`.
 
 ## Running it
