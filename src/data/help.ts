@@ -2,7 +2,7 @@ import { ITEMS, ITEM_IDS } from './items';
 import { RARITIES } from './rarity';
 import { WEAPONS, WEAPON_IDS, MAX_TIER } from './weapons';
 import {
-  BASKET_OPEN_SEC, BOUNTY_SEC, ELITE_HP_MULT, EVENTS, GOLDEN_LIFETIME_SEC, HAPPY_HOUR_SEC, type EventKind,
+  BASKET_OPEN_SEC, BOUNTY_SEC, ELITE_HP_MULT, EVENTS, GOBLIN_BONUS_SPICE, GOBLIN_LIFETIME_SEC, GOLDEN_LIFETIME_SEC, HAPPY_HOUR_SEC, type EventKind,
 } from './events';
 import { BAIL_KEEP, DEATH_KEEP_AFTER_PUSH, DEATH_KEEP_BEFORE_PUSH, ESCAPE_BONUS, EVENT_SPICE } from '../state/meta';
 import type { SaveData } from '../state/save';
@@ -139,6 +139,7 @@ const SHOP: HelpEntry[] = [
 const EVENT_TEXT: Record<EventKind, string> = {
   basket: `A picnic basket lands somewhere in the arena. Stand inside its circle for ${BASKET_OPEN_SEC} seconds to open it: a free item and a few crumbs. Leaving the circle drains the progress, and the basket disappears if you take too long.`,
   golden: `A golden hot dog runs around the arena for ${GOLDEN_LIFETIME_SEC} seconds and runs away from you. Touch it with your head to catch it for a pile of crumbs. A dash helps you close the gap.`,
+  goblin: `A rare loot goblin hugging a pot of gold runs from you for ${GOBLIN_LIFETIME_SEC} seconds. It never hurts you. Shoot it: it spills crumbs as it gets hurt, and killing it drops a big pile of crumbs, ${GOBLIN_BONUS_SPICE} extra Spice, a condiment and sometimes an item. If time runs out it vanishes with the loot.`,
   happy: `For ${HAPPY_HOUR_SEC} seconds every enemy drops double crumbs and your links fire 30% faster. Nothing to do but enjoy it.`,
   bounty: `The chef wants a number of kills within ${BOUNTY_SEC} seconds (less if the wave is nearly over: the bounty always ends before the wave does, and asks for fewer kills). The counter at the top shows how many you have. Make it in time for a crumb bonus; miss it and nothing happens.`,
   elite: `A big glowing enemy with ${ELITE_HP_MULT}× the usual health. Killing it drops a pile of crumbs and a condiment.`,
@@ -150,7 +151,7 @@ const EVENT_TEXT: Record<EventKind, string> = {
 const EVENT_ENTRIES: HelpEntry[] = [
   {
     id: 'event:about', section: 'events', title: 'About events',
-    body: `Events happen at set times during a wave. The track under the timer shows what is coming and when. Winning one (opening the basket, catching the hot dog, meeting the bounty, killing the elite, or getting through a hazard without a hit) also puts ${EVENT_SPICE} Spice in your doggy bag.`,
+    body: `Events happen at set times during a wave. The track under the timer shows what is coming and when. Winning one (opening the basket, catching the hot dog, killing the loot goblin, meeting the bounty, killing the elite, or getting through a hazard without a hit) also puts ${EVENT_SPICE} Spice in your doggy bag.`,
     known: (s) => s.seen.some((id) => id.startsWith('event:')),
   },
   ...(Object.keys(EVENTS) as EventKind[]).map((k): HelpEntry => ({

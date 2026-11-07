@@ -236,7 +236,8 @@ export class GameScene extends Phaser.Scene {
         let total = 0;
         let turrets = 0;
         for (const e of this.enemyList()) {
-          if (e.dead) continue;
+          // The loot goblin doesn't take a spawn slot.
+          if (e.dead || e.def.kind === 'goblin') continue;
           total++;
           if (e.def.kind === 'hotsauce') turrets++;
         }
@@ -260,7 +261,7 @@ export class GameScene extends Phaser.Scene {
       if (enemy.dead || this.dying || this.ending) return;
       enemy.shove(this.head.x, this.head.y, 260);
       this.applyThorns(enemy);
-      if (this.head.invulnerable) return;
+      if (this.head.invulnerable || enemy.def.contactDamage <= 0) return;
       this.takeDamage(enemy.def.contactDamage, enemy.label);
     });
     this.physics.add.collider(this.enemies, this.enemies);
@@ -293,6 +294,8 @@ export class GameScene extends Phaser.Scene {
       player: () => this.head,
       hurt: (dmg, source) => this.takeDamage(dmg, source),
       spawnElite: (kind, x, y, elite) => this.spawnEnemy(kind, x, y, elite),
+      spawnGoblin: (x, y) => this.spawnEnemy('goblin', x, y),
+      despawn: (e) => this.despawnEnemy(e as Enemy),
       spawnCrumbs: (x, y, n) => this.pickups.spawnCrumbs(x, y, n),
       spawnCondiment: (x, y) => { if (!this.rules.noCondimentHeal) this.pickups.spawnCondiment(x, y); },
       grantItem: () => this.grantRandomItem(),
@@ -305,7 +308,7 @@ export class GameScene extends Phaser.Scene {
         this.run.eventsWon[r.kind] = (this.run.eventsWon[r.kind] ?? 0) + 1;
         tally(this.run, 'eventsWon');
         // Events pay Spice into the doggy bag too (Treasure Nose adds to it).
-        this.addSpice(EVENT_SPICE * (1 + this.run.mods.bossBonus));
+        this.addSpice((EVENT_SPICE + r.spice) * (1 + this.run.mods.bossBonus));
       },
     });
     this.hud.setEvents(schedule, this.cfg.durationSec);
@@ -518,8 +521,8 @@ export class GameScene extends Phaser.Scene {
     return this.enemies.getChildren() as Enemy[];
   }
 
-  private spawnEnemy(kind: EnemyKind, x: number, y: number, elite?: { hpMult: number; scale: number }): void {
-    if (this.ending || this.dying) return;
+  private spawnEnemy(kind: EnemyKind, x: number, y: number, elite?: { hpMult: number; scale: number }): Enemy | null {
+    if (this.ending || this.dying) return null;
     const e = new Enemy(this, x, y, kind, kind === 'tongs' ? this.cfg.bossHpMult : this.cfg.hpMult, elite);
     if (this.run.chili >= 1) e.speedMult = 1.15;
     if (kind === 'tongs') {
@@ -533,6 +536,16 @@ export class GameScene extends Phaser.Scene {
       this.shake(400, 0.01);
       audio.play('bossRoar');
     }
+    return e;
+  }
+
+  /** Off the field with no kill, crumbs or Spice (the loot goblin escaping). */
+  private despawnEnemy(e: Enemy): void {
+    if (e.dead) return;
+    e.dead = true;
+    e.disableBody(true, true);
+    this.tweens.killTweensOf(e);
+    this.graveyard.push(e);
   }
 
   private onBulletHit(a: unknown, b: unknown): void {
@@ -629,7 +642,7 @@ export class GameScene extends Phaser.Scene {
     while (this.killTimes.length && this.killTimes[0] < this.gameTime - 10_000) this.killTimes.shift();
     tally(this.run, 'killBurst', this.killTimes.length, 'max');
     if (!e.isBoss) this.addSpice(e.def.crumbs * KILL_SPICE_PER_CRUMB);
-    this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
+    this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'goblin' ? 0xffd23f : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
     const crumbs = rollCrumbs(this.rng, e.def.crumbs * this.cfg.crumbMult, this.stats.crumbMult * this.timedEvents.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
@@ -763,7 +776,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     for (const e of this.enemyList()) {
-      if (e.dead) continue;
+      if (e.dead || e.def.contactDamage <= 0) continue;
       for (const p of this.chain.positions) {
         if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.radius + r) {
           e.shove(p.x, p.y, 260);

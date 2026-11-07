@@ -122,6 +122,68 @@ module.exports = {
       },
     },
     {
+      name: 'events: shooting down the loot goblin pays crumbs and bonus Spice',
+      fn: async ({ g, page }) => {
+        await setup(g, page);
+        await g.godMode();
+        await g.evaluate(() => { window.__game.scene.getScene('Game').director.nextSpawnMs = 1e12; });
+        await trigger(g, 'goblin');
+        await g.waitGameMs(300);
+        const info = await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Game');
+          const gob = s.enemyList().find((e) => e.def.kind === 'goblin' && !e.dead);
+          return gob ? { hp: gob.hp, x: gob.x, y: gob.y, bag: s.run.bag } : null;
+        });
+        assert.ok(info, 'a loot goblin is on the field');
+        // It runs: a moment later it has moved.
+        await g.waitGameMs(500);
+        const moved = await g.evaluate((p) => {
+          const gob = window.__game.scene.getScene('Game').enemyList().find((e) => e.def.kind === 'goblin' && !e.dead);
+          return Math.hypot(gob.x - p.x, gob.y - p.y);
+        }, info);
+        assert.ok(moved > 20, `the goblin moved ${moved}px`);
+        // Take most of its HP (it spills crumbs), then finish it.
+        await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Game');
+          window.__spilt = 0;
+          const orig = s.pickups.spawnCrumbs.bind(s.pickups);
+          s.pickups.spawnCrumbs = (x, y, n) => { window.__spilt += n; orig(x, y, n); };
+          const gob = s.enemyList().find((e) => e.def.kind === 'goblin' && !e.dead);
+          s.damageEnemy(gob, gob.maxHp * 0.7, gob.x, gob.y + 10, 0);
+        });
+        await g.waitGameMs(100);
+        const spilt = await g.evaluate(() => window.__spilt);
+        assert.equal(spilt, 6, 'it spills 2 crumbs per 20% of HP lost');
+        await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Game');
+          const gob = s.enemyList().find((e) => e.def.kind === 'goblin' && !e.dead);
+          s.damageEnemy(gob, gob.maxHp, gob.x, gob.y + 10, 0);
+        });
+        await g.waitGameMs(100);
+        const l = await log(g);
+        assert.deepEqual(l.map((r) => [r.kind, r.success]), [['goblin', true]]);
+        assert.ok(l[0].crumbs > 0 && l[0].spice > 0);
+        const bag = await g.evaluate(() => window.__game.scene.getScene('Game').run.bag);
+        assert.ok(bag > info.bag, 'Spice went into the doggy bag');
+      },
+    },
+    {
+      name: 'events: a loot goblin you ignore escapes without a kill',
+      timeoutMs: 60000,
+      fn: async ({ g, page }) => {
+        await setup(g, page);
+        await g.godMode();
+        await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.director.nextSpawnMs = 1e12; s.weapons.update = () => {}; });
+        const kills = await g.evaluate(() => window.__game.scene.getScene('Game').run.kills);
+        await trigger(g, 'goblin');
+        await g.waitGameMs(12500);
+        assert.deepEqual((await log(g)).map((r) => [r.kind, r.success]), [['goblin', false]]);
+        const left = await g.evaluate(() => window.__game.scene.getScene('Game').enemyList().filter((e) => e.def.kind === 'goblin' && !e.dead).length);
+        assert.equal(left, 0);
+        assert.equal(await g.evaluate(() => window.__game.scene.getScene('Game').run.kills), kills);
+      },
+    },
+    {
       name: 'events: happy hour speeds up shots and doubles crumbs, then ends',
       timeoutMs: 60000,
       fn: async ({ g, page }) => {
@@ -214,7 +276,7 @@ module.exports = {
       fn: async ({ g, page }) => {
         await setup(g, page);
         await g.godMode();
-        for (const k of ['basket', 'golden', 'happy', 'bounty', 'stampede', 'flare', 'rain']) await trigger(g, k);
+        for (const k of ['basket', 'golden', 'goblin', 'happy', 'bounty', 'stampede', 'flare', 'rain']) await trigger(g, k);
         await g.waitGameMs(500);
         await g.fastForwardWave();
         await g.waitForScene('Shop', 5000);

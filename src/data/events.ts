@@ -6,7 +6,7 @@ import { waveConfig } from './waves';
  * Hellforged's beacons and elite timers): each wave rolls its events up front from the run seed,
  * and the HUD shows them on a track under the timer, so you can see them coming and plan.
  */
-export type EventKind = 'basket' | 'golden' | 'happy' | 'bounty' | 'elite' | 'stampede' | 'flare' | 'rain';
+export type EventKind = 'basket' | 'golden' | 'happy' | 'bounty' | 'elite' | 'stampede' | 'flare' | 'rain' | 'goblin';
 
 export type EventCategory = 'treasure' | 'chase' | 'buff' | 'quest' | 'fight' | 'hazard';
 
@@ -38,6 +38,10 @@ export const EVENTS: Record<EventKind, EventDef> = {
   happy: {
     kind: 'happy', name: 'HAPPY HOUR', hint: 'Double crumbs and +30% fire rate for 15 s',
     category: 'buff', minWave: 2, weight: 2, color: 0xffa03a, warnMs: 0,
+  },
+  goblin: {
+    kind: 'goblin', name: 'LOOT GOBLIN', hint: 'Shoot it before it escapes! It spills crumbs as it runs.',
+    category: 'chase', minWave: 2, weight: 1.2, color: 0xb4e04a, warnMs: 0,
   },
   bounty: {
     kind: 'bounty', name: "CHEF'S BOUNTY", hint: 'Kill enough enemies in time for a crumb bonus',
@@ -136,6 +140,17 @@ export const GOLDEN_LIFETIME_SEC = 10;
 /** The golden hot dog runs at this fraction of the base sausage speed: catchable, with a dash or two. */
 export const GOLDEN_SPEED_FRACTION = 0.82;
 export const goldenCrumbs = (wave: number) => 6 + 2 * wave;
+
+/** The loot goblin is rare (low weight) and gets away after this long. */
+export const GOBLIN_LIFETIME_SEC = 12;
+/** Every time it loses this fraction of its HP, it spills a few crumbs. */
+export const GOBLIN_SPILL_STEP = 0.2;
+export const GOBLIN_SPILL_CRUMBS = 2;
+export const goblinCrumbs = (wave: number) => 12 + 3 * wave;
+/** Spice on top of the usual event Spice (before the multiplier): it's the loot goblin. */
+export const GOBLIN_BONUS_SPICE = 12;
+/** Chance its pot also holds an item. */
+export const GOBLIN_ITEM_CHANCE = 0.35;
 
 export const HAPPY_HOUR_SEC = 15;
 export const HAPPY_FIRE_RATE = 1.3;

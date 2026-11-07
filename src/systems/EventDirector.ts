@@ -4,9 +4,10 @@ import { audio } from '../audio/Audio';
 import type { EnemyKind } from '../data/enemies';
 import {
   BASKET_LIFETIME_SEC, BASKET_OPEN_SEC, BASKET_RADIUS, ELITE_HP_MULT, ELITE_SCALE, EVENTS,
-  FLARE_BURN_SEC, FLARE_DAMAGE, FLARE_LANE, GOLDEN_LIFETIME_SEC, GOLDEN_SPEED_FRACTION, HAPPY_CRUMB_MULT,
+  FLARE_BURN_SEC, FLARE_DAMAGE, FLARE_LANE, GOBLIN_BONUS_SPICE, GOBLIN_ITEM_CHANCE, GOBLIN_LIFETIME_SEC,
+  GOBLIN_SPILL_CRUMBS, GOBLIN_SPILL_STEP, GOLDEN_LIFETIME_SEC, GOLDEN_SPEED_FRACTION, HAPPY_CRUMB_MULT,
   HAPPY_FIRE_RATE, HAPPY_HOUR_SEC, RAIN_DAMAGE, RAIN_DROPS, RAIN_RADIUS, RAIN_SEC, STAMPEDE_DAMAGE, STAMPEDE_SPEED,
-  type EventKind, type ScheduledEvent, bountyCrumbs, bountySeconds, bountyTarget, eliteCrumbs, goldenCrumbs,
+  type EventKind, type ScheduledEvent, bountyCrumbs, bountySeconds, bountyTarget, eliteCrumbs, goblinCrumbs, goldenCrumbs,
 } from '../data/events';
 import type { WaveConfig } from '../data/waves';
 import { BASE_SPEED } from '../entities/SausageHead';
@@ -19,6 +20,10 @@ export interface EventHooks {
   /** A hazard hit the sausage (goes through dodge, armor and i-frames like any hit). */
   hurt(damage: number, source: string): void;
   spawnElite(kind: EnemyKind, x: number, y: number, elite: { hpMult: number; scale: number }): void;
+  /** Spawns the loot goblin (a real enemy you can shoot). Null if the wave is already ending. */
+  spawnGoblin(x: number, y: number): FleeingEnemy | null;
+  /** Takes an enemy off the field without a kill (the loot goblin escaping). */
+  despawn(e: FleeingEnemy): void;
   spawnCrumbs(x: number, y: number, count: number): void;
   spawnCondiment(x: number, y: number): void;
   /** Adds a random item (rolled for this wave) to the run. Returns its name and colour, or null. */
@@ -34,6 +39,15 @@ export interface EventHooks {
   onEventDone(result: EventResult): void;
 }
 
+/** What the director needs to know about the loot goblin (an Enemy). */
+export interface FleeingEnemy {
+  x: number;
+  y: number;
+  hp: number;
+  readonly maxHp: number;
+  dead: boolean;
+}
+
 /**
  * How an event ended. `success`: basket opened, golden hot dog caught, bounty met, elite killed,
  * Happy Hour lived through, or a hazard dodged without being hit. `crumbs`: the crumb reward dropped.
@@ -42,6 +56,8 @@ export interface EventResult {
   kind: EventKind;
   success: boolean;
   crumbs: number;
+  /** Spice on top of the usual event Spice (before the multiplier). */
+  spice: number;
   wave: number;
 }
 
@@ -137,9 +153,9 @@ export class EventDirector {
   }
 
   /** Pays out (crumbs dropped at x,y) and reports the result. All event rewards go through here. */
-  private finish(kind: EventKind, success: boolean, crumbs = 0, x = 0, y = 0): void {
+  private finish(kind: EventKind, success: boolean, crumbs = 0, x = 0, y = 0, spice = 0): void {
     if (crumbs > 0) this.hooks.spawnCrumbs(x, y, crumbs);
-    this.hooks.onEventDone({ kind, success, crumbs, wave: this.cfg.wave });
+    this.hooks.onEventDone({ kind, success, crumbs, spice, wave: this.cfg.wave });
   }
 
   stop(): void {
@@ -181,6 +197,7 @@ export class EventDirector {
     switch (kind) {
       case 'basket': return this.basket(t0);
       case 'golden': return this.golden(t0);
+      case 'goblin': return this.goblin(t0);
       case 'happy': return this.happy(t0);
       case 'bounty': return this.bounty(t0);
       case 'elite': return this.elite(t0);
@@ -318,6 +335,56 @@ export class EventDirector {
           this.finish('golden', false);
         }
         img.destroy();
+      },
+    };
+    return r;
+  }
+
+  // --- Loot Goblin: a rare enemy that runs off with a pot of loot ----------------------------
+
+  private goblin(t0: number): Running | null {
+    const { x, y } = this.spot(280, 90, 20);
+    const gob = this.hooks.spawnGoblin(x, y);
+    if (!gob) return null;
+    const color = EVENTS.goblin.color;
+    const glow = this.scene.add.image(x, y, 'ring').setDepth(4).setTint(0xffd23f).setScale(0.75).setAlpha(0.6);
+    // Spills a few crumbs each time it loses another GOBLIN_SPILL_STEP of its HP.
+    let spilled = 0;
+    let over = false;
+    const r: Running = {
+      kind: 'goblin',
+      startedMs: t0,
+      tick: (now) => {
+        const lost = 1 - Math.max(0, gob.hp) / gob.maxHp;
+        while (spilled + 1 <= Math.floor(lost / GOBLIN_SPILL_STEP) && !gob.dead) {
+          spilled++;
+          this.hooks.spawnCrumbs(gob.x, gob.y, GOBLIN_SPILL_CRUMBS);
+        }
+        if (gob.dead) {
+          over = true;
+          audio.play('waveClear');
+          this.finish('goblin', true, goblinCrumbs(this.cfg.wave), gob.x, gob.y, GOBLIN_BONUS_SPICE);
+          this.hooks.spawnCondiment(gob.x + 20, gob.y);
+          const item = this.rng() < GOBLIN_ITEM_CHANCE ? this.hooks.grantItem() : null;
+          this.hooks.floatText(gob.x, gob.y - 40, 'LOOT GOBLIN DOWN!', css(color));
+          if (item) this.hooks.floatText(gob.x, gob.y - 66, `+ ${item.name}`, item.color);
+          return true;
+        }
+        glow.setPosition(gob.x, gob.y).setScale(0.75 + Math.sin(now / 90) * 0.1);
+        const left = GOBLIN_LIFETIME_SEC - (now - t0) / 1000;
+        this.setStatus(r, `LOOT GOBLIN ${Math.ceil(Math.max(0, left))}s`);
+        return left <= 0;
+      },
+      cleanup: () => {
+        this.setStatus(r, null);
+        glow.destroy();
+        if (over || this.stopped || gob.dead) return;
+        // Time's up: it vanishes in a puff of smoke, loot and all.
+        const puff = this.scene.add.image(gob.x, gob.y, 'smoke').setDepth(12).setScale(1.5).setAlpha(0.8);
+        this.scene.tweens.add({ targets: puff, scale: 4, alpha: 0, duration: 400, onComplete: () => puff.destroy() });
+        this.hooks.floatText(gob.x, gob.y - 30, 'It got away with the loot...', '#c8a890');
+        this.hooks.despawn(gob);
+        this.finish('goblin', false);
       },
     };
     return r;
