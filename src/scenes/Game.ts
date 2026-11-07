@@ -15,6 +15,11 @@ import { Health } from '../systems/Health';
 import { rollCrumbs } from '../systems/Economy';
 import { mulberry32, randRange, type Rng } from '../systems/rng';
 import { WaveDirector } from '../systems/WaveDirector';
+import { EventDirector } from '../systems/EventDirector';
+import { rollWaveEvents } from '../data/events';
+import { ITEMS } from '../data/items';
+import { RARITIES } from '../data/rarity';
+import { rollItem } from '../systems/Economy';
 import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
 import { onAction } from '../ui/input';
@@ -71,6 +76,8 @@ export class GameScene extends Phaser.Scene {
   private patterns!: BulletPatterns;
   private pickups!: Pickups;
   private director!: WaveDirector;
+  /** Timed events of this wave (see data/events.ts). */
+  private timedEvents!: EventDirector;
   private hud!: Hud;
   /** Held keys by physical position; movement uses the player's bindings (WASD = ZQSD on AZERTY). */
   controls!: PhysicalKeys;
@@ -237,6 +244,23 @@ export class GameScene extends Phaser.Scene {
     this.sizzle.startFollow(this.head);
 
     this.hud = new Hud(this, this.run.wave);
+    // Events get their own seeded streams so they don't change what the spawner rolls.
+    const schedule = rollWaveEvents(mulberry32((this.run.seed ^ (this.run.wave * 0x9e3779b1) ^ 0x5eed) >>> 0), this.run.wave);
+    this.timedEvents = new EventDirector(this, schedule, this.cfg, mulberry32((this.run.seed + this.run.wave * 7717 + 1) >>> 0), this.arena, {
+      player: () => this.head,
+      hurt: (dmg, source) => this.takeDamage(dmg, source),
+      spawnElite: (kind, x, y, elite) => this.spawnEnemy(kind, x, y, elite),
+      spawnCrumbs: (x, y, n) => this.pickups.spawnCrumbs(x, y, n),
+      spawnCondiment: (x, y) => { if (!this.rules.noCondimentHeal) this.pickups.spawnCondiment(x, y); },
+      grantItem: () => this.grantRandomItem(),
+      floatText: (x, y, text, color) => this.floatText(x, y, text, color),
+      blocked: (x, y, r) => this.hotTiles.some((t) => Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(x, y, r), t)),
+      kills: () => this.run.kills,
+      onEventDone: (r) => {
+        if (r.success) this.run.eventsWon[r.kind] = (this.run.eventsWon[r.kind] ?? 0) + 1;
+      },
+    });
+    this.hud.setEvents(schedule, this.cfg.durationSec);
     this.damageNumbers = new DamageNumbers(this);
     // Always there; shows itself whenever the player is playing by touch.
     this.touch = new TouchControls(this, {
@@ -346,8 +370,9 @@ export class GameScene extends Phaser.Scene {
 
     // --- Combat ---
     if (!this.dying && !this.ending) {
-      this.weapons.update(time, this.damageMultNow(), this.stats.fireRateMult);
+      this.weapons.update(time, this.damageMultNow(), this.stats.fireRateMult * this.timedEvents.fireRateMult);
       this.director.update(dtMs);
+      if (!this.director.timeUp) this.timedEvents.update(this.director.elapsedMs, dt);
       this.run.timeSurvivedSec += dt;
     }
     for (const e of this.enemyList()) {
@@ -389,6 +414,7 @@ export class GameScene extends Phaser.Scene {
 
     const dashCharge = this.head.dashCharge(this.stats.dashCooldownMs);
     this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, dashCharge, time);
+    this.hud.updateTrack(this.director.elapsedMs / 1000, time);
     this.touch?.update(dashCharge);
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
     this.damageNumbers.update(time);
@@ -411,9 +437,9 @@ export class GameScene extends Phaser.Scene {
     return this.enemies.getChildren() as Enemy[];
   }
 
-  private spawnEnemy(kind: EnemyKind, x: number, y: number): void {
+  private spawnEnemy(kind: EnemyKind, x: number, y: number, elite?: { hpMult: number; scale: number }): void {
     if (this.ending || this.dying) return;
-    const e = new Enemy(this, x, y, kind, this.cfg.hpMult);
+    const e = new Enemy(this, x, y, kind, this.cfg.hpMult, elite);
     this.enemies.add(e);
     e.setup(this.gameTime);
     if (kind === 'tongs') {
@@ -480,13 +506,14 @@ export class GameScene extends Phaser.Scene {
     this.run.kills++;
     this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
-    const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult);
+    const crumbs = rollCrumbs(this.rng, e.def.crumbs, this.stats.crumbMult * this.timedEvents.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
     if (!this.rules.noCondimentHeal && Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
     this.killPop(e);
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
+    this.timedEvents.onKill(e);
     if (e.isBoss) {
       haptic('bossDown');
       this.win();
@@ -503,6 +530,23 @@ export class GameScene extends Phaser.Scene {
       const healed = this.health.heal(this.stats.condimentHeal);
       this.floatText(this.head.x, this.head.y - 24, `+${Math.round(healed)} HP`, '#7dff9a');
     }
+  }
+
+  /** Picnic Basket reward: a random item rolled like a shop slot, applied right away. */
+  private grantRandomItem(): { name: string; color: string } | null {
+    const id = rollItem(this.rng, this.run.wave, this.stats.luck, this.run.items, new Set());
+    if (!id) return null;
+    this.run.items.push(id);
+    const old = this.stats;
+    this.stats = runStats(this.run);
+    this.health.maxHp = this.stats.maxHp;
+    if (this.stats.maxHp > old.maxHp) this.health.heal(this.stats.maxHp - old.maxHp);
+    this.health.hp = Math.min(this.health.hp, this.health.maxHp);
+    this.health.armor = this.stats.armor;
+    this.health.regenPerSec = this.stats.regenPerSec;
+    this.livesLeft = Math.max(0, this.livesLeft + this.stats.extraLives - old.extraLives);
+    const item = ITEMS[id];
+    return { name: item.name, color: RARITIES[item.rarity].css };
   }
 
   /** A hit on the sausage: dodge roll, armor, i-frames, then death or a Second Skin save. */
@@ -744,6 +788,7 @@ export class GameScene extends Phaser.Scene {
 
   private clearArena(): void {
     this.director.stop();
+    this.timedEvents.stop();
     this.patterns.clear();
     for (const b of this.playerBullets.getChildren() as PlayerBullet[]) if (b.active) b.kill();
   }
