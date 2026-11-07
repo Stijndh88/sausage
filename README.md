@@ -3,6 +3,20 @@
 A roguelite bullet-hell where you play a sausage escaping a backyard BBQ.
 Survive 10 waves of angry utensils and condiments, spend crumbs between waves, and beat **The Grill Master's Tongs**.
 
+## Play it
+**In your browser:** https://stijndh88.github.io/sausage/ (rebuilt automatically on every push).
+
+**On your own computer:** install [Node.js](https://nodejs.org) 20 or newer, then:
+```bash
+git clone https://github.com/Stijndh88/sausage.git
+cd sausage
+git checkout ccr-68a72b4a-nfbezy
+npm install
+npm run dev        # then open http://localhost:5173
+```
+No Git? On GitHub pick the `ccr-68a72b4a-nfbezy` branch, choose **Code → Download ZIP**, unzip it, open a
+terminal in the folder and run `npm install` and `npm run dev`.
+
 ## How to play
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
