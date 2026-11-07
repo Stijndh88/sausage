@@ -293,6 +293,10 @@ module.exports = {
         await g.evaluate(() => window.__game.scene.getScene('Shop').toggleMode(1));
         await checkShopLayout(page, 'stack choice (upgrade)');
 
+        // Merge buttons under twin links, with a full Kielbasa-style row of 8.
+        await g.openShop({ seed: 11, run: { wave: 3, crumbs: 60, weapons: W(['onion', 'onion', 'skewer', 'skewer', 'pepper', 'pepper', 'toothpick', 'toothpick']) } });
+        await checkShopLayout(page, 'merge buttons, 8 links');
+
         await g.openShop({ seed: 21, run: { wave: 8, crumbs: 3, weapons: FULL_LINKS, items: MANY_ITEMS } });
         await setOffers(g, LONG_OFFERS, [2]);
         await checkShopLayout(page, 'full links, many items, long descriptions, unaffordable');
