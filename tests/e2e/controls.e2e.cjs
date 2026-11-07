@@ -48,6 +48,33 @@ function fakePadInSlot(slot) {
   });
 }
 
+/**
+ * Stijn's DualSense setup: the raw DualSense (no browser remapping, axes stuck at -1) in slot 1
+ * and the virtual pad that actually carries the input (Steam / DS4Windows) in slot 2.
+ */
+function fakeDualSensePair() {
+  const mk = (n) => Array.from({ length: n }, () => ({ pressed: false, touched: false, value: 0 }));
+  const ghost = { id: '054c-0ce6-DualSense Wireless Controller', index: 0, connected: true, mapping: '', buttons: mk(14), axes: [-1, -1, -1, -1, -1, -1], get timestamp() { return performance.now(); } };
+  const real = { id: 'Xbox 360 Controller (XInput STANDARD GAMEPAD)', index: 1, connected: true, mapping: 'standard', buttons: mk(17), axes: [0, 0, 0, 0], get timestamp() { return performance.now(); } };
+  const list = [ghost, real, null, null];
+  Object.defineProperty(navigator, 'getGamepads', { value: () => list, configurable: true });
+  window.__padSet = (i, on) => { real.buttons[i] = { pressed: on, touched: on, value: on ? 1 : 0 }; };
+  window.__ghostDrop = () => {
+    ghost.connected = false;
+    list[0] = null;
+    const e = new Event('gamepaddisconnected');
+    e.gamepad = ghost;
+    window.dispatchEvent(e);
+  };
+  window.addEventListener('load', () => {
+    for (const p of [ghost, real]) {
+      const e = new Event('gamepadconnected');
+      e.gamepad = p;
+      setTimeout(() => window.dispatchEvent(e), 300);
+    }
+  });
+}
+
 async function tapPad(g, index) {
   await g.evaluate((i) => window.__padSet(i, true), index);
   await frames(g, 3);
@@ -187,6 +214,48 @@ module.exports = {
         const s = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SETTINGS_KEY));
         assert.equal(s.vibration, false);
         assert.equal(s.dashSide, 'left');
+      },
+    },
+    {
+      name: 'gamepad: a DualSense listed twice (one entry stuck at -1) does not drift, and the real entry plays',
+      fn: async ({ page, g, context }) => {
+        await context.addInitScript(fakeDualSensePair);
+        await reload(page, g);
+        await g.wait(500);
+        await g.startRun({ seed: 2 });
+        await g.godMode();
+        await game(g, () => window.__game.scene.getScene('Game').director.stop());
+        await frames(g, 5);
+        const p0 = await game(g, () => { const h = window.__game.scene.getScene('Game').head; return { x: h.x, y: h.y }; });
+        await g.waitGameMs(800);
+        const p1 = await game(g, () => { const h = window.__game.scene.getScene('Game').head; return { x: h.x, y: h.y }; });
+        assert.ok(Math.hypot(p1.x - p0.x, p1.y - p0.y) < 5, `no drift: ${JSON.stringify(p0)} → ${JSON.stringify(p1)}`);
+        await tapPad(g, 0); // A on the real entry dashes
+        assert.ok((await game(g, () => window.__game.scene.getScene('Game').head.dashCharge(1500))) < 1, 'A dashed');
+        await page.evaluate(() => window.__ghostDrop());
+        await frames(g, 3);
+        assert.equal(await game(g, () => window.__game.scene.getScene('Game').paused), false, 'the unused entry dropping out does not pause');
+        await tapPad(g, 9); // Start pauses
+        assert.equal(await game(g, () => window.__game.scene.getScene('Game').paused), true);
+      },
+    },
+    {
+      name: 'gamepad: Settings → Controller check shows every device live',
+      fn: async ({ page, g, context }) => {
+        await context.addInitScript(fakeDualSensePair);
+        await reload(page, g);
+        await g.wait(500);
+        await tapPad(g, 2); // X: settings (and switches the prompts to the controller)
+        const settingsOpen = await game(g, () => window.__game.scene.getScene('Menu').settingsPanel.isOpen);
+        assert.equal(settingsOpen, true);
+        await game(g, () => { const sp = window.__game.scene.getScene('Menu').settingsPanel; sp.padCheck.show(); });
+        await frames(g, 3);
+        const text = await game(g, () => window.__game.scene.getScene('Menu').settingsPanel.padCheck.text.text);
+        assert.match(text, /DualSense/);
+        assert.match(text, /Xbox 360 Controller/);
+        await tapPad(g, 1); // B closes the check, not the whole settings panel
+        assert.equal(await game(g, () => window.__game.scene.getScene('Menu').settingsPanel.padCheck.isOpen), false);
+        assert.equal(await game(g, () => window.__game.scene.getScene('Menu').settingsPanel.isOpen), true);
       },
     },
   ],

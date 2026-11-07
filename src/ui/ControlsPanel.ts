@@ -29,6 +29,9 @@ export class ControlsPanel {
   capturing: Action | null = null;
   private captureListener: ((e: KeyboardEvent) => void) | null = null;
 
+  /** Opens Settings → Controller check (set by the settings panel). */
+  openPadCheck: (() => void) | null = null;
+
   constructor(private readonly scene: Phaser.Scene, private readonly onClose: () => void) {
     const kb = scene.input.keyboard!;
     const when = (fn: () => void) => () => { if (this.open && !this.capturing) fn(); };
@@ -80,8 +83,13 @@ export class ControlsPanel {
       }));
     });
     const by = top + h - 48;
-    add(new Button(s, GAME_W / 2 - 120, by, 'Reset to defaults', { width: 210, height: 44, fill: 0x5a4a3a, hover: 0x7a6650, fontSize: 16 }, () => this.reset()));
-    add(new Button(s, GAME_W / 2 + 120, by, 'Done (Esc)', { width: 200, height: 44, fill: 0x3c8d3c, hover: 0x2f7a2f }, () => this.hide()));
+    add(new Button(s, GAME_W / 2 - 200, by, 'Reset to defaults', { width: 190, height: 44, fill: 0x5a4a3a, hover: 0x7a6650, fontSize: 16 }, () => this.reset()));
+    add(new Button(s, GAME_W / 2, by, 'Controller check', { width: 190, height: 44, fill: 0x5a4a3a, hover: 0x7a6650, fontSize: 16 }, () => {
+      const open = this.openPadCheck;
+      this.hide();
+      open?.();
+    }));
+    add(new Button(s, GAME_W / 2 + 200, by, 'Done (Esc)', { width: 190, height: 44, fill: 0x3c8d3c, hover: 0x2f7a2f }, () => this.hide()));
     this.note = add(s.add.text(GAME_W / 2, by - 36, '', { fontFamily: FONT, fontSize: '14px', color: '#ff8a70' }).setOrigin(0.5));
     this.focus(this.index);
     this.refresh();
