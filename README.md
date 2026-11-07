@@ -33,6 +33,10 @@ On-screen prompts follow whatever you last touched: key names on a keyboard, (A)
 nothing on a touch screen. Any controller in any slot works; the game pauses if it disconnects,
 and it rumbles when you get hit (phones vibrate on Android). **Settings → Vibration** turns that off,
 and **Settings → Touch: DASH button side** swaps the halves for left-handed play.
+If a controller misbehaves, **Settings → Controller check** (or the button on the Keyboard controls
+screen) shows every device the browser reports and what the game reads from it. A screenshot of it is
+the best bug report. PlayStation pads work with or without the browser's remapping, and a DualSense
+that shows up twice (Steam / DS4Windows) no longer confuses the game.
 
 On a phone, tapping START goes full screen in landscape (Android). On iPhone, use
 **Share → Add to Home Screen** to play full screen without the browser bars.

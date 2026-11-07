@@ -17,6 +17,7 @@ import { loadSave, resetSaveCache, writeSave } from './state/save';
 import { settleRun } from './state/meta';
 import { RENDER_SCALE } from './ui/view';
 import { setInputMode, trackInputMode } from './ui/inputMode';
+import { lostPadMatters } from './ui/pad';
 import { clearTelemetry, exportTelemetry, installErrorCapture, loadTelemetry, resetTelemetryCache, startSession } from './state/telemetry';
 import { startPlayDataSync, syncPlayData } from './state/playDataSync';
 
@@ -106,7 +107,7 @@ window.addEventListener('gamepadconnected', (e) => {
   setInputMode('pad');
   toast(`🎮 Controller connected${e.gamepad?.id ? `: ${e.gamepad.id.replace(/\s*\(.*$/, '').slice(0, 40)}` : ''}`);
 });
-window.addEventListener('gamepaddisconnected', () => toast('🎮 Controller disconnected'));
+window.addEventListener('gamepaddisconnected', (e) => { if (lostPadMatters(e.gamepad)) toast('🎮 Controller disconnected'); });
 
 // Hooks for automated tests (tests/e2e). Harmless in normal play.
 Object.assign(window as unknown as Record<string, unknown>, {

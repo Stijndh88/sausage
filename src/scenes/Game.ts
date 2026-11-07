@@ -29,7 +29,7 @@ import { SettingsPanel } from '../ui/SettingsPanel';
 import { HelpPanel } from '../ui/HelpPanel';
 import { Tutorial } from '../ui/Tutorial';
 import { DamageNumbers } from '../ui/DamageNumbers';
-import { PadPoller } from '../ui/pad';
+import { PadPoller, lostPadMatters } from '../ui/pad';
 import { TouchControls } from '../ui/TouchControls';
 import { haptic } from '../ui/haptics';
 import { getInputMode } from '../ui/inputMode';
@@ -890,8 +890,8 @@ export class GameScene extends Phaser.Scene {
     if (!getSettings().reduceFlashing) this.cameras.main.flash(ms, r, g, b);
   }
 
-  private readonly onPadLost = (): void => {
-    if (getInputMode() === 'pad') this.autoPause();
+  private readonly onPadLost = (e: GamepadEvent): void => {
+    if (getInputMode() === 'pad' && lostPadMatters(e.gamepad)) this.autoPause();
   };
 
   private autoPause(): void {
