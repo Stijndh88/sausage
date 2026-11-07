@@ -142,11 +142,23 @@ export const HAPPY_FIRE_RATE = 1.3;
 export const HAPPY_CRUMB_MULT = 2;
 
 export const BOUNTY_SEC = 20;
-/** Kills needed: scales with how fast the wave spawns enemies. */
-export function bountyTarget(wave: number): number {
+/** A bounty never gets less time than this, and ends at least BOUNTY_END_MARGIN_SEC before the wave does. */
+export const BOUNTY_MIN_SEC = 6;
+export const BOUNTY_END_MARGIN_SEC = 1;
+/**
+ * How long a bounty that starts `atSec` into a wave lasts: BOUNTY_SEC, cut short so its timer never
+ * runs past the wave timer (the wave ending would otherwise cancel it with time still on the clock).
+ */
+export function bountySeconds(atSec: number, durationSec: number): number {
+  const left = durationSec - atSec - BOUNTY_END_MARGIN_SEC;
+  return Math.max(BOUNTY_MIN_SEC, Math.min(BOUNTY_SEC, Math.floor(left)));
+}
+/** Kills needed in `seconds`: scales with how fast the wave spawns enemies (and with the time given). */
+export function bountyTarget(wave: number, seconds = BOUNTY_SEC): number {
   const cfg = waveConfig(wave);
   const perSec = (cfg.batch * 1000) / cfg.spawnIntervalMs;
-  return Math.max(8, Math.round(perSec * BOUNTY_SEC * 0.7));
+  const floor = Math.max(3, Math.round((8 * seconds) / BOUNTY_SEC));
+  return Math.max(floor, Math.round(perSec * seconds * 0.7));
 }
 export const bountyCrumbs = (wave: number) => 8 + 2 * wave;
 

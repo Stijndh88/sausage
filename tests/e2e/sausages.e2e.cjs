@@ -80,7 +80,7 @@ module.exports = {
       },
     },
     {
-      name: 'merguez: any hit sets the enemy burning, and it takes 20% more damage',
+      name: 'merguez: any hit sets the enemy burning (fire, not poison), and it takes 20% more damage',
       fn: async ({ g }) => {
         await g.startRun({ seed: 3, sausage: 'merguez' });
         const r = await g.evaluate(() => {
@@ -90,10 +90,46 @@ module.exports = {
           s.damageEnemy(e, 1, e.x, e.y, 0);
           const hp = s.health.maxHp;
           s.takeDamage(10, 'Fork');
-          return { stacks: e.poisonStacks, lost: hp - s.health.hp };
+          return { stacks: e.poisonStacks, burn: e.burnDpsAt(s.gameTime), lost: hp - s.health.hp };
         });
-        assert.equal(r.stacks, 1);
+        assert.equal(r.stacks, 0);
+        assert.equal(r.burn, 9);
         assert.equal(r.lost, 12);
+      },
+    },
+    {
+      name: 'fire: does not stack, and spreads to nearby enemies when a burning enemy dies; poison does neither',
+      fn: async ({ g }) => {
+        await g.startRun({ seed: 3, sausage: 'merguez' });
+        const r = await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Game');
+          s.spawnEnemy('spatula', 300, 300);
+          const a = s.enemyList().at(-1);
+          s.spawnEnemy('spatula', 340, 300);
+          const near = s.enemyList().at(-1);
+          s.spawnEnemy('spatula', 900, 600);
+          const far = s.enemyList().at(-1);
+          a.hp = a.maxHp = 1000;
+          s.damageEnemy(a, 1, a.x, a.y, 0);
+          s.damageEnemy(a, 1, a.x, a.y, 0);
+          const burnAfterTwo = a.burnDpsAt(s.gameTime);
+          const nearBefore = near.burnDpsAt(s.gameTime);
+          s.killEnemy(a, true);
+          // Poison never spreads.
+          s.spawnEnemy('fork', 600, 300);
+          const p = s.enemyList().at(-1);
+          s.spawnEnemy('fork', 630, 300);
+          const pn = s.enemyList().at(-1);
+          p.poison(5, 4000, s.gameTime);
+          s.killEnemy(p, true);
+          return { burnAfterTwo, nearBefore, near: near.burnDpsAt(s.gameTime), far: far.burnDpsAt(s.gameTime), pnStacks: pn.poisonStacks, pnBurn: pn.burnDpsAt(s.gameTime) };
+        });
+        assert.equal(r.burnAfterTwo, 9, 'two hits keep one flame, not two');
+        assert.equal(r.nearBefore, 0);
+        assert.equal(r.near, 9);
+        assert.equal(r.far, 0);
+        assert.equal(r.pnStacks, 0);
+        assert.equal(r.pnBurn, 0);
       },
     },
     {

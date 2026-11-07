@@ -11,7 +11,8 @@ import { audio } from '../audio/Audio';
 import type { GameClock } from './clock';
 
 const DEG = Math.PI / 180;
-export const POISON_MS = 2500;
+/** Poison lasts long and stacks (up to 3); fire is short, hot, single and spreads (Enemy.ignite). */
+export const POISON_MS = 4000;
 /** A shot this late (at most ~one long frame) keeps its rhythm; later than that it restarts. */
 const MAX_CARRY_MS = 100;
 

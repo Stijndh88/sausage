@@ -95,7 +95,7 @@ const list: TalentDef[] = [
     stats: (s, r) => { s.poisonMult += 0.15 * r; } },
   { id: 'first_bite', jar: 'seasoning', shelf: 2, name: 'First Bite', desc: '+20% damage to unhurt enemies', maxRank: 2,
     stats: (s, r) => { s.firstBite += 0.2 * r; } },
-  { id: 'extra_spicy', jar: 'seasoning', shelf: 3, name: 'Extra Spicy', desc: 'Crits set enemies on fire', maxRank: 1,
+  { id: 'extra_spicy', jar: 'seasoning', shelf: 3, name: 'Extra Spicy', desc: 'Crits set enemies on fire (8 dmg/s, spreads on death)', maxRank: 1,
     trophies: { tong_tip: 2 }, stats: (s, r) => { s.critBurn += 8 * r; } },
   { id: 'double_batch', jar: 'seasoning', shelf: 3, name: 'Double Batch', desc: 'Starting weapon begins at tier II', maxRank: 1,
     trophies: { smoked_brisket: 1 }, mods: (m, r) => { m.starterTier2 += r; } },
