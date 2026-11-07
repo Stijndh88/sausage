@@ -11,13 +11,13 @@ export type CounterId =
   // Summed over all runs.
   | 'kills' | 'crits' | 'dashes' | 'healed' | 'poisonKills' | 'bossKills' | 'hitlessWaves' | 'hitlessBosses'
   | 'escapes' | 'pushes' | 'bigPushes' | 'lowHpEscapes' | 'closeBails' | 'runs' | 'deaths' | 'grillDeaths'
-  | 'crumbsEarned' | 'rerolls' | 'legendaries' | 'tier4' | 'trophies' | 'smokeyKills'
+  | 'crumbsEarned' | 'rerolls' | 'legendaries' | 'tier4' | 'trophies' | 'smokeyKills' | 'eventsWon'
   // Best in a single run.
-  | 'bestCourseReached' | 'bestEscape' | 'killBurst' | 'maxLinks' | 'peakBag' | 'chiliEscape';
+  | 'bestCourseReached' | 'bestEscape' | 'killBurst' | 'maxLinks' | 'peakBag' | 'chiliEscape' | 'bestHealRun';
 
 /** Counters that keep the best single-run value instead of a running total. */
 export const MAX_COUNTERS: ReadonlySet<CounterId> = new Set<CounterId>([
-  'bestCourseReached', 'bestEscape', 'killBurst', 'maxLinks', 'peakBag', 'chiliEscape',
+  'bestCourseReached', 'bestEscape', 'killBurst', 'maxLinks', 'peakBag', 'chiliEscape', 'bestHealRun',
 ]);
 
 export type Counters = Partial<Record<CounterId, number>>;
@@ -63,30 +63,33 @@ const list: RecipeDef[] = [
   r('dash_500', 'Fast Food', 'Dash 500 times', 'dashes', 500, 30, { kind: 'sausage', sausage: 'hotdog' }),
   r('dash_5000', 'Drive-Thru', 'Dash 5,000 times', 'dashes', 5000, 120),
   r('heal_1000', 'Comfort Food', 'Heal 1,000 HP', 'healed', 1000, 40, { kind: 'sausage', sausage: 'veggie' }),
+  r('heal_run_300', 'Blood Sausage', 'Heal 300 HP in a single run', 'bestHealRun', 300, 40, { kind: 'sausage', sausage: 'blackpudding' }),
   r('heal_10000', 'Bone Broth', 'Heal 10,000 HP', 'healed', 10000, 150),
   // Weapons and builds
   r('kills_100', 'Amuse-Bouche', 'Bend 100 utensils', 'kills', 100, 20),
   r('kills_1000', 'Skewered Back', 'Bend 1,000 utensils', 'kills', 1000, 50, { kind: 'weapon', weapon: 'skewer' }),
   r('kills_5000', 'Utensil Drawer', 'Bend 5,000 utensils', 'kills', 5000, 150),
   r('kills_20000', 'Cutlery Crisis', 'Bend 20,000 utensils', 'kills', 20000, 400),
-  r('poison_500', 'Off Flavour', 'Finish 500 enemies with poison or fire', 'poisonKills', 500, 60),
-  r('links_6', 'Long Boi', 'Have 6 links at once', 'maxLinks', 6, 40),
+  r('poison_500', 'Off Flavour', 'Finish 500 enemies with poison or fire', 'poisonKills', 500, 60, { kind: 'sausage', sausage: 'merguez' }),
+  r('links_6', 'Long Boi', 'Have 6 links at once', 'maxLinks', 6, 40, { kind: 'sausage', sausage: 'kielbasa' }),
   r('tier4', 'Well Done', 'Upgrade a weapon to tier IV', 'tier4', 1, 40),
   r('legendary', 'Chef\'s Kiss', 'Buy a Legendary item', 'legendaries', 1, 50),
   r('crumbs_2000', 'Crumb Collector', 'Earn 2,000 crumbs', 'crumbsEarned', 2000, 50),
   r('rerolls_100', 'Picky Eater', 'Reroll the shop 100 times', 'rerolls', 100, 40),
   // Combat
   r('hitless_wave', 'Not a Scratch', 'Clear a wave without getting hit', 'hitlessWaves', 1, 20),
+  r('hitless_3', 'Batter Up', 'Clear 3 waves without getting hit', 'hitlessWaves', 3, 30, { kind: 'sausage', sausage: 'corndog' }),
   r('hitless_10', 'Untouchable', 'Clear 10 waves without getting hit', 'hitlessWaves', 10, 80),
   r('hitless_boss', 'Clean Plate', 'Beat a boss without getting hit', 'hitlessBosses', 1, 150),
-  r('burst_50', 'Buffet Rush', 'Bend 50 utensils within 10 seconds', 'killBurst', 50, 60),
+  r('burst_50', 'Buffet Rush', 'Bend 50 utensils within 10 seconds', 'killBurst', 50, 60, { kind: 'sausage', sausage: 'weisswurst' }),
+  r('events_25', 'Side Dishes', 'Win 25 timed events', 'eventsWon', 25, 60),
   // Risk
   r('big_push', 'Doggy Bag Gambler', 'Push on with 300+ Spice in the bag', 'bigPushes', 1, 50, { kind: 'talent', talent: 'lunchbox' }),
   r('push_10', 'Second Helpings', 'Push on 10 times', 'pushes', 10, 80),
   r('peak_bag_1000', 'Overstuffed', 'Carry 1,000 Spice in the bag at once', 'peakBag', 1000, 150),
   r('low_escape', 'By a Hair', 'Take it home with under 10 HP', 'lowHpEscapes', 1, 80),
   r('trophies_10', 'Trophy Cabinet', 'Bring home 10 trophies', 'trophies', 10, 100),
-  r('chili_1', 'Feeling the Heat', 'Take it home after the Smokehouse on Chili 1', 'chiliEscape', 1, 100),
+  r('chili_1', 'Feeling the Heat', 'Take it home after the Smokehouse on Chili 1', 'chiliEscape', 1, 100, { kind: 'sausage', sausage: 'cocktail' }),
   r('chili_5', 'Ghost Pepper', 'Take it home after the Smokehouse on Chili 5', 'chiliEscape', 5, 500),
   // Habit
   r('runs_10', 'Regular', 'Play 10 runs', 'runs', 10, 30),

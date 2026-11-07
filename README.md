@@ -21,16 +21,25 @@ terminal in the folder and run `npm install` and `npm run dev`.
 ## How to play
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
-| Move | WASD (ZQSD on AZERTY) / arrows | Left stick / D-pad | Drag on the left half |
-| Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | DASH button |
-| Pause menu | Esc / P | Start | II button |
-| Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap |
+| Move | WASD (ZQSD on AZERTY) / arrows | Left stick / D-pad | Drag anywhere on the left half (the stick follows your thumb) |
+| Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | Tap anywhere on the right half |
+| Pause menu | Esc / P | Start / Back | II button, top right |
+| Menus | Arrows + Enter, Esc to go back | D-pad / stick + A, B to go back | Tap |
+| Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap Buy / Keep / Reroll / Next |
+
+On-screen prompts follow whatever you last touched: key names on a keyboard, (A)/(B) on a controller,
+nothing on a touch screen. Any controller in any slot works; the game pauses if it disconnects,
+and it rumbles when you get hit (phones vibrate on Android). **Settings → Vibration** turns that off,
+and **Settings → Touch: DASH button side** swaps the halves for left-handed play.
+
+On a phone, tapping START goes full screen in landscape (Android). On iPhone, use
+**Share → Add to Home Screen** to play full screen without the browser bars.
 
 Keys work by **position**, not by the letter printed on them, so the defaults work on any keyboard
 (WASD on QWERTY, ZQSD on AZERTY, and so on) and the game shows the letters of your layout.
 Every key can be changed in **Settings → Keyboard controls**.
 
-**Pick a sausage.** Each sausage has its own stats, starting weapons and one special rule.
+**Pick a sausage.** Eleven sausages, each with its own stats, starting weapons and one special rule.
 The Classic Frank is yours from the start. Each other sausage is listed in the Cookbook: cook its recipe,
 then buy it with Spice (the Veggie Sausage also needs a Grinder Blade trophy).
 
@@ -41,6 +50,12 @@ then buy it with Spice (the Veggie Sausage also needs a Grinder Blade trophy).
 | Chorizo | +20% damage, +10% crit, Mustard | -25 HP | Land 300 crits, 200 Spice |
 | Hot Dog | 7 links, faster, Toothpick + Skewer | -15 HP | Dash 500 times, 200 Spice |
 | Veggie Sausage | 1.5 HP/s regen, grill-proof, Onion Ring | -10% damage | Heal 1000 HP, 250 Spice + 1 Grinder Blade |
+| Corn Dog | Batter shell blocks the first hit of every wave, +10 HP, Pickle Launcher | -15% speed | Clear 3 waves without a hit, 300 Spice |
+| Cocktail Sausage | 35% smaller hitbox, +20% speed, Toothpick | -30 HP, only 4 links | Take it home after the Smokehouse on Chili 1, 400 Spice |
+| Black Pudding | 12% lifesteal, +10 HP, Pepper Mill | Condiment packets don't drop | Heal 300 HP in one run, 400 Spice |
+| Merguez | Every hit sets enemies on fire, Toothpick | -4 armor (takes 20% more damage) | Finish 500 enemies with poison or fire, 400 Spice |
+| Weisswurst | +40% damage for the first 20 s of every wave, Skewer | -20% damage after that | Kill 50 enemies within 10 s, 450 Spice |
+| Kielbasa | 8 links, +20 HP, Toothpick + Pepper Mill | Every link can be hit | Have 6 links at once, 600 Spice |
 
 **Courses and the doggy bag.** A run is three courses: the Backyard (6 waves, then the Tongs), the Kitchen
 (5 waves, then The Meat Grinder) and the Smokehouse (5 waves, then Big Smokey). After that come endless
@@ -57,14 +72,14 @@ You can also **bail out** from the pause menu and keep 50%. Each course boss dro
 Hustle, Doggy Bag), each with two shelves and two keystones that also cost trophies. You can refund
 everything for free.
 
-**The Cookbook** (C on the menu) lists 41 recipes, some secret. Every run counts towards them, even the
+**The Cookbook** (C on the menu) lists 44 recipes, some secret. Every run counts towards them, even the
 ones that end in death. Recipes pay Spice and unlock sausages, Rare and Legendary items, more weapons,
 talents and **Chili levels**: optional difficulty steps per sausage that add Spice. Pick your Chili level
 on the sausage select screen (up and down).
 
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
 preferring ranged enemies. Buying a new weapon adds a link; buying one you own upgrades it (tiers I–IV).
-Only your **head** can be hit; the white dot is your hitbox. Melee enemies bounce off your links.
+Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 
 **Health.** Armor reduces every hit (diminishing returns), regen and lifesteal heal you, and blue condiment
 packets restore HP. Red-hot grill tiles burn you. You heal to full between waves.
@@ -73,6 +88,21 @@ packets restore HP. Red-hot grill tiles burn you. You heal to full between waves
 waves and with more Luck. Every card shows exactly what it would change ("Damage 108% → 116%").
 "Keep" holds an offer through rerolls and into the next shop (re-priced for that wave).
 Crumbs left on the floor when a wave ends are swept up at half value.
+
+**Events.** Every wave except the boss has 1–3 events at set seconds. The line under the wave timer shows
+an icon at each one, and an icon pulses 3 seconds before its event. A wave never has two hazards, and it
+always has at least one event that pays something.
+
+| Event | From wave | What happens |
+|---|---|---|
+| Picnic Basket | 1 | Stand in its circle for 3 s to open it: a free random item and some crumbs. It vanishes after 16 s. |
+| Golden Hot Dog | 1 | A golden runner flees from you; catch it within 10 s for a pile of crumbs. |
+| Happy Hour | 2 | 15 s of double crumbs and +30% fire rate. |
+| Chef's Bounty | 2 | Kill a number of enemies within 20 s for a crumb bonus. |
+| Fork Stampede | 2 | Arrows warn you; then a wall of forks charges across the arena. Dodge, or dash through the gap. |
+| Elite | 3 | A big, glowing enemy with 6× HP; drops a pile of crumbs and a condiment packet. |
+| Grease Flare-up | 4 | Two lanes flash for 2 s, then burn for 3.5 s. |
+| Sauce Rain | 5 | Shadows grow where sauce will land, and every other drop aims at you. |
 
 **Settings** (from the menu or the pause menu): volumes, screen shake, reduce flashing, reduce motion
 (defaults to your OS setting) and damage numbers. Settings, Spice, talents, recipes and best runs are saved in the browser.
@@ -107,6 +137,8 @@ fail; when the bug is fixed the runner flags it so the marker can be removed.
 | `balance` | economy, boss time-to-kill, weapon/item rules |
 | `ux` | layout at phone/tablet/ultrawide sizes, contrast, pause/blur behaviour |
 | `features` | settings, pause menu, sausage select and unlocks, tips, touch, gamepad, audio, shop controls |
+| `controls` | prompts per device, touch stick/dash/left-handed layout, controller in any slot, menu focus, rumble, pause on disconnect |
+| `sausages` | each newer sausage's special rule in a real run, and the scrolling select screen |
 
 ### Timing rule
 All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on
@@ -129,6 +161,13 @@ src/
   ui/                HUD, buttons, pause menu, settings, tips, damage numbers, touch and gamepad input
 tests/               Vitest tests for the logic in systems/, data/ and state/
 ```
+
+## Versioning
+The version lives in `package.json` and follows [semantic versioning](https://semver.org): bump the
+minor number for new content or features, the patch number for fixes. The main menu shows it in the
+bottom-right corner with the build's commit, e.g. `v0.2.0 (1a2b3c4)`, so a bug report can name the
+exact build. Bump it with `npm version minor --no-git-tag-version` (or `patch`) and add a line to
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Tuning the game
 Everything you'd want to tweak is plain data:
@@ -160,7 +199,9 @@ PNG falls back to its drawn placeholder.
 **To replace or add a sprite:** drop a PNG named after its key into `src/art/sprites/` (transparent
 background; the sausage faces **right**, enemies face **up**), add its in-game size to
 `sprites.json`, and reload. To re-cut everything from a new sheet with the same layout, run
-`python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy). The keys and sizes the art
+`python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy), then
+`python3 tools/make_portraits.py`, which paints the portraits of the six newer sausages from the cut
+ones until they get their own art. The keys and sizes the art
 must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md).
 
 ## What's next

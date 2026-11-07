@@ -8,6 +8,7 @@ import { BASE_STATS, computeStats, type PlayerStats } from './stats';
 import type { Offer } from '../systems/Economy';
 import { mulberry32 } from '../systems/rng';
 import type { MenuId } from '../data/menus';
+import type { EventKind } from '../data/events';
 
 export interface WeaponSlot {
   id: WeaponId;
@@ -28,6 +29,8 @@ export interface RunState {
   kills: number;
   crumbsEarned: number;
   timeSurvivedSec: number;
+  /** Timed events finished successfully this run, by kind (see data/events.ts). */
+  eventsWon: Partial<Record<EventKind, number>>;
   /** What landed the final hit, shown on the Game Over screen. */
   causeOfDeath?: string;
 
@@ -94,6 +97,7 @@ export function newRun(seed: number = Date.now() >>> 0, sausage: SausageId = 'fr
     mods,
     reviveUsed: false,
     tally: {},
+    eventsWon: {},
   };
 }
 

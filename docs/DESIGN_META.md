@@ -1,6 +1,7 @@
 # Design: why you play one more run
 
 Status: **proposal**, waiting for approval before it's built.
+Section 4 (events at marked times) is built: see `src/data/events.ts`. The Escape Hatch and Tasting Spoon wait for the doggy bag.
 
 ## The problem
 Right now a run ends and nothing carries over except a high score. One good run unlocks every
@@ -103,7 +104,7 @@ something new every run.
 | 🧂 **Seasoning** (offense) | Sharp Seasoning +3% damage ×5 · Quick Hands +3% fire rate ×5 · Coarse Grind +2% crit ×5 | Spread the Flavour +5% explosion size ×3 · Marinade +15% poison ×3 · First Bite +20% damage to unhurt enemies ×2 | **Extra Spicy**: crits set enemies on fire · **Double Batch**: your starting weapon begins at tier II |
 | 🥩 **Casing** (defense) | Plump +5 max HP ×10 · Tough Skin +1 armor ×3 · Simmer +0.2 HP/s ×3 | Condiment Lover +15% healing ×3 · Grill Marks −20% hot-tile damage ×3 · Iron Stomach longer invulnerability after a hit ×2 | **Second Skin**: revive once per run at 40% HP · **Smoked**: a one-hit shield at the start of every wave |
 | 👟 **Hustle** (movement and shop) | Quick Feet +3% speed ×5 · Hot Pan −5% dash cooldown ×4 · Big Plate +10% pickup range ×3 | Tip Jar +3 starting crumbs ×3 · Free Refill +1 free reroll per shop ×2 · Regular Customer −5% shop prices ×3 | **Food Truck**: shop items are Uncommon or better · **Mise en Place**: start each run with a random common item |
-| 🎒 **Doggy Bag** (risk and reward) | Spice Hound +5% Spice ×5 · Tupperware +5% kept on death ×4 (25% → 45%) · Lucky Fork +3 luck ×5 | Lunchbox: bank 10% of the bag each time you push on ×2 · Treasure Nose +20% event rewards ×3 · Greedy Gut +10% crumbs ×1 | **Takeout**: bailing out keeps 75% · **All You Can Eat**: each course you push on adds another +0.25 multiplier |
+| 🎒 **Doggy Bag** (risk and reward) | Spice Hound +5% Spice ×5 · Tupperware +5% kept on death ×4 (25% → 45%) · Lucky Fork +3 luck ×5 | Lunchbox: bank 10% of the bag each time you push on ×2 · Treasure Nose +20% boss and event Spice ×3 · Greedy Gut +10% crumbs ×1 | **Takeout**: bailing out keeps 75% · **All You Can Eat**: each course you push on adds another +0.25 multiplier |
 
 ---
 
@@ -197,11 +198,12 @@ Changes made while building it:
 - **Double Batch** starts your first weapon at tier II (two copies of one weapon would just stack).
 - **Food Truck** makes every shop item Uncommon or better (5 offers did not fit the shop layout).
 - **Busy Kitchen** became **Greedy Gut** (+10% crumbs) until the events system lands.
-- **Chili 1** makes enemies 15% faster instead of spawning elites, so it does not clash with events.
 - The Kitchen and Smokehouse reuse the Backyard enemies with tougher numbers, a tinted arena and two
   Tongs variants (The Meat Grinder, Big Smokey) as placeholders until their art exists.
-- **Treasure Nose** pays +20% boss Spice for now; it moves to event rewards when events land.
-- Events and the 6 new sausages come with the other threads' work and hook in later.
+- **Treasure Nose** pays +20% Spice from bosses and events. Each won event puts 8 Spice (times the multiplier) in the bag.
+- The 6 new sausages from the sausages PR use recipes and prices from the table above (Weisswurst uses
+  "50 kills within 10 s" and Black Pudding "heal 300 HP in one run").
+- Chili 1 makes enemies faster rather than adding elites, since events already spawn elites.
 
 ## Open questions
 - Payouts and prices need a tuning pass with the bot once all phases are in.

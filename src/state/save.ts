@@ -79,6 +79,13 @@ export function migrate(raw: Record<string, unknown>): SaveData {
     if (bestWave >= 7) owned.add('chorizo');
     if (bestWave >= 10) owned.add('hotdog');
     if (wins > 0) owned.add('veggie');
+    // The newer sausages unlocked by escaping with another one.
+    const winsBy = (raw.winsBy as Record<string, number>) ?? {};
+    const winWith: [SausageId, SausageId][] = [
+      ['bratwurst', 'corndog'], ['hotdog', 'cocktail'], ['veggie', 'blackpudding'],
+      ['chorizo', 'merguez'], ['frank', 'weisswurst'], ['cocktail', 'kielbasa'],
+    ];
+    for (const [by, id] of winWith) if ((winsBy[by] ?? 0) > 0) owned.add(id);
     data.owned = [...owned];
     data.counters = { runs: Number(raw.runs) || 0, bossKills: wins, bestEscape: wins > 0 ? 1 : 0, bestCourseReached: 0 };
     data.cooked = cookedBy(data.counters);

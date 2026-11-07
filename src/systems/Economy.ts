@@ -61,7 +61,7 @@ function itemPool(rarity: Rarity, owned: readonly string[]): string[] {
  * Rolls a rarity (by wave and luck), falling back to lower rarities when a pool is empty.
  * Locked rarities are never rolled; with a minimum rarity, lower ones aren't either.
  */
-function rollItem(rng: Rng, wave: number, ctx: ShopContext, owned: readonly string[], used: Set<string>): string | null {
+export function rollItem(rng: Rng, wave: number, ctx: ShopContext, owned: readonly string[], used: Set<string>): string | null {
   const allowed = ctx.rarities ?? RARITY_ORDER;
   const min = RARITY_ORDER.indexOf(ctx.minRarity ?? 'common');
   const weights = rarityWeights(wave, ctx.luck ?? 0);

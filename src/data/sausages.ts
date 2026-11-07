@@ -3,7 +3,9 @@ import type { WeaponId } from './weapons';
 import { MAX_LINKS } from './weapons';
 import type { TrophyId } from './courses';
 
-export type SausageId = 'frank' | 'bratwurst' | 'chorizo' | 'hotdog' | 'veggie';
+export type SausageId =
+  | 'frank' | 'bratwurst' | 'chorizo' | 'hotdog' | 'veggie'
+  | 'corndog' | 'cocktail' | 'blackpudding' | 'merguez' | 'weisswurst' | 'kielbasa';
 
 /**
  * How a sausage is unlocked: cook its Cookbook recipe, then buy it with Spice (and, for some,
@@ -13,6 +15,25 @@ export interface Unlock {
   recipe: string | null;
   spice: number;
   trophies?: Partial<Record<TrophyId, number>>;
+}
+
+/**
+ * The one rule that makes a sausage play differently. Stats live in `stats`; anything that isn't a
+ * plain stat offset lives here and is applied by the Game scene.
+ */
+export interface SausageRules {
+  /** Corn Dog: hits blocked by a batter shell at the start of every wave. */
+  waveShield?: number;
+  /** Cocktail Sausage: size of the head, its hitbox and the links (1 = normal). */
+  bodyScale?: number;
+  /** Black Pudding: condiment packets don't heal. */
+  noCondimentHeal?: boolean;
+  /** Merguez: every hit sets the enemy on fire for this much damage per second. */
+  burnDps?: number;
+  /** Weisswurst: damage bonus for the first `ms` of every wave, then a penalty for the rest. */
+  freshness?: { ms: number; bonus: number; stale: number };
+  /** Kielbasa: enemy shots and enemies hurt you when they touch any link, not just the head. */
+  linksHittable?: boolean;
 }
 
 export interface SausageDef {
@@ -27,6 +48,7 @@ export interface SausageDef {
   maxLinks: number;
   /** One-line rules shown on the select screen. */
   perks: string[];
+  rules?: SausageRules;
   unlock: Unlock;
 }
 
@@ -61,9 +83,54 @@ export const SAUSAGES: Record<SausageId, SausageDef> = {
     perks: ['Regenerates 1.5 HP/s', 'Immune to grill tiles', '-10% damage', 'Starts with an Onion Ring'],
     unlock: { recipe: 'heal_1000', spice: 250, trophies: { grinder_blade: 1 } },
   },
+  corndog: {
+    id: 'corndog', name: 'Corn Dog', tagline: 'Battered, fried and ready for anything.',
+    tint: 0xf0c060, stats: { maxHp: 10, speedMult: -0.15 }, startWeapons: ['pickle'], maxLinks: MAX_LINKS,
+    perks: ['A batter shell blocks the first hit of every wave', '+10 max HP', '-15% speed', 'Starts with a Pickle Launcher'],
+    rules: { waveShield: 1 },
+    unlock: { recipe: 'hitless_3', spice: 300 },
+  },
+  cocktail: {
+    id: 'cocktail', name: 'Cocktail Sausage', tagline: 'Small enough to slip through anything.',
+    tint: 0xff9a8a, stats: { speedMult: 0.2, maxHp: -30 }, startWeapons: ['toothpick'], maxLinks: 4,
+    perks: ['Tiny: 35% smaller hitbox', '+20% speed', '-30 max HP, only 4 links', 'Starts with a Toothpick'],
+    rules: { bodyScale: 0.65 },
+    unlock: { recipe: 'chili_1', spice: 400 },
+  },
+  blackpudding: {
+    id: 'blackpudding', name: 'Black Pudding', tagline: 'Thirsty. Very thirsty.',
+    tint: 0x7a3a44, stats: { lifesteal: 0.12, maxHp: 10 }, startWeapons: ['pepper'], maxLinks: MAX_LINKS,
+    perks: ['+12% chance per hit to heal 1 HP', '+10 max HP', 'Condiment packets don\'t heal', 'Starts with a Pepper Mill'],
+    rules: { noCondimentHeal: true },
+    unlock: { recipe: 'heal_run_300', spice: 400 },
+  },
+  merguez: {
+    id: 'merguez', name: 'Merguez', tagline: 'Hot-blooded. Sets everything on fire.',
+    tint: 0xd8583a, stats: { armor: -4 }, startWeapons: ['toothpick'], maxLinks: MAX_LINKS,
+    perks: ['Every hit sets enemies on fire (4 dmg/s, stacks 3×)', '-4 armor: takes 20% more damage', 'Starts with a Toothpick'],
+    rules: { burnDps: 4 },
+    unlock: { recipe: 'poison_500', spice: 400 },
+  },
+  weisswurst: {
+    id: 'weisswurst', name: 'Weisswurst', tagline: 'Eat before noon. Seriously.',
+    tint: 0xf4efe2, stats: {}, startWeapons: ['skewer'], maxLinks: MAX_LINKS,
+    perks: ['+40% damage for the first 20 s of every wave', '-20% damage after that', 'Starts with a Skewer'],
+    rules: { freshness: { ms: 20000, bonus: 0.4, stale: -0.2 } },
+    unlock: { recipe: 'burst_50', spice: 450 },
+  },
+  kielbasa: {
+    id: 'kielbasa', name: 'Kielbasa', tagline: 'Long, loaded and hard to miss.',
+    tint: 0xb0603a, stats: { maxHp: 20 }, startWeapons: ['toothpick', 'pepper'], maxLinks: MAX_LINKS + 2,
+    perks: ['8 links instead of 6', '+20 max HP', 'Every link can be hit, not just the head', 'Starts with a Toothpick and a Pepper Mill'],
+    rules: { linksHittable: true },
+    unlock: { recipe: 'links_6', spice: 600 },
+  },
 };
 
 export const SAUSAGE_IDS = Object.keys(SAUSAGES) as SausageId[];
+
+/** The most links any sausage can have (sizes the link chain's trail). */
+export const MOST_LINKS = Math.max(...SAUSAGE_IDS.map((id) => SAUSAGES[id].maxLinks));
 
 /** Applies a sausage's stat offsets to the base stats. */
 export function sausageBaseStats(base: Readonly<PlayerStats>, id: SausageId): PlayerStats {

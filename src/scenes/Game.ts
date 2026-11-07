@@ -4,10 +4,10 @@ import type { EnemyKind } from '../data/enemies';
 import { waveConfig, type WaveConfig } from '../data/waves';
 import { createEnemyBulletPool, createPlayerBulletPool, EnemyBullet, PlayerBullet } from '../entities/BulletPool';
 import { Enemy, type EnemyContext } from '../entities/Enemy';
-import { LINK_RADIUS, LinkChain } from '../entities/LinkChain';
+import { LinkChain } from '../entities/LinkChain';
 import { Pickups } from '../entities/Pickup';
 import { HIT_INVULN_MS, SausageHead } from '../entities/SausageHead';
-import { SAUSAGES } from '../data/sausages';
+import { SAUSAGES, type SausageRules } from '../data/sausages';
 import { runStats, type RunState } from '../state/run';
 import type { PlayerStats } from '../state/stats';
 import { BulletPatterns } from '../systems/BulletPatterns';
@@ -15,6 +15,11 @@ import { Health } from '../systems/Health';
 import { rollCrumbs } from '../systems/Economy';
 import { mulberry32, randRange, type Rng } from '../systems/rng';
 import { WaveDirector } from '../systems/WaveDirector';
+import { EventDirector } from '../systems/EventDirector';
+import { rollWaveEvents } from '../data/events';
+import { ITEMS } from '../data/items';
+import { RARITIES } from '../data/rarity';
+import { rollItem } from '../systems/Economy';
 import { POISON_MS, WeaponSystem } from '../systems/WeaponSystem';
 import { FONT, HUD_H, Hud } from '../ui/Hud';
 import { onAction } from '../ui/input';
@@ -24,12 +29,14 @@ import { SettingsPanel } from '../ui/SettingsPanel';
 import { Tutorial } from '../ui/Tutorial';
 import { DamageNumbers } from '../ui/DamageNumbers';
 import { PadPoller } from '../ui/pad';
-import { TouchControls, wantsTouchControls } from '../ui/TouchControls';
-import { bankSpice, loadSave, writeSave } from '../state/save';
+import { TouchControls } from '../ui/TouchControls';
+import { haptic } from '../ui/haptics';
+import { getInputMode } from '../ui/inputMode';
+import { bankSpice, loadSave, unlockedRarities, writeSave } from '../state/save';
 import { tally } from '../state/run';
 import { bossName, courseDef, courseName, courseTrophy, TROPHIES } from '../data/courses';
 import { menuDef } from '../data/menus';
-import { BOSS_SPICE, firstTasteSpice, KILL_SPICE_PER_CRUMB, settleRun, spiceMult, waveClearSpice, bagValue } from '../state/meta';
+import { BOSS_SPICE, EVENT_SPICE, firstTasteSpice, KILL_SPICE_PER_CRUMB, settleRun, spiceMult, waveClearSpice, bagValue } from '../state/meta';
 import { startRun } from './startRun';
 import { audio } from '../audio/Audio';
 import { getSettings } from '../state/settings';
@@ -56,6 +63,13 @@ export class GameScene extends Phaser.Scene {
   /** Test hook: when true the sausage takes no damage (set by tests/e2e harness godMode). */
   invincible = false;
   private thornsReadyAt = new WeakMap<Enemy, number>();
+  /** The chosen sausage's special rule (see SausageRules). */
+  private rules: SausageRules = {};
+  /** Corn Dog: batter-shell hits left this wave, and the ring that shows it. */
+  private shellHits = 0;
+  private shellRing: Phaser.GameObjects.Image | null = null;
+  /** Weisswurst: whether the "gone stale" moment has happened this wave. */
+  private stale = false;
 
   private head!: SausageHead;
   private chain!: LinkChain;
@@ -66,6 +80,8 @@ export class GameScene extends Phaser.Scene {
   private patterns!: BulletPatterns;
   private pickups!: Pickups;
   private director!: WaveDirector;
+  /** Timed events of this wave (see data/events.ts). */
+  private timedEvents!: EventDirector;
   private hud!: Hud;
   /** Held keys by physical position; movement uses the player's bindings (WASD = ZQSD on AZERTY). */
   controls!: PhysicalKeys;
@@ -130,6 +146,10 @@ export class GameScene extends Phaser.Scene {
     this.hitThisWave = false;
     this.killTimes = [];
     this.damageTakenMult = menuDef(this.run.menu).damageTakenMult ?? 1;
+    this.rules = SAUSAGES[this.run.sausage].rules ?? {};
+    this.shellHits = this.rules.waveShield ?? 0;
+    this.shellRing = null;
+    this.stale = false;
     this.invincible = false;
     this.thornsReadyAt = new WeakMap();
     this.boss = null;
@@ -156,8 +176,12 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1; // in case a hit-stop was cut short by a scene change
     this.createHotTiles();
 
-    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock);
-    this.chain = new LinkChain(this, this.head.x, this.head.y, 0);
+    const bodyScale = this.rules.bodyScale ?? 1;
+    this.head = new SausageHead(this, GAME_W / 2, GAME_H / 2 + 40, this.clock, bodyScale);
+    this.chain = new LinkChain(this, this.head.x, this.head.y, 0, bodyScale);
+    if (this.shellHits > 0) {
+      this.shellRing = this.add.image(this.head.x, this.head.y, 'ring').setDepth(10.5).setTint(0xffc84a).setAlpha(0.8).setScale(0.75);
+    }
     this.chain.setWeapons(this.run.weapons);
 
     this.enemies = this.physics.add.group();
@@ -240,10 +264,34 @@ export class GameScene extends Phaser.Scene {
       ? `${courseName(this.cfg.course).toUpperCase()} · BOSS`
       : `${courseName(this.cfg.course).toUpperCase()} · WAVE ${this.cfg.courseWave}/${this.cfg.courseWaves}`);
     this.hud.setBossName(bossName(this.cfg.course));
+    // Events get their own seeded streams so they don't change what the spawner rolls.
+    const schedule = rollWaveEvents(mulberry32((this.run.seed ^ (this.run.wave * 0x9e3779b1) ^ 0x5eed) >>> 0), this.run.wave);
+    this.timedEvents = new EventDirector(this, schedule, this.cfg, mulberry32((this.run.seed + this.run.wave * 7717 + 1) >>> 0), this.arena, {
+      player: () => this.head,
+      hurt: (dmg, source) => this.takeDamage(dmg, source),
+      spawnElite: (kind, x, y, elite) => this.spawnEnemy(kind, x, y, elite),
+      spawnCrumbs: (x, y, n) => this.pickups.spawnCrumbs(x, y, n),
+      spawnCondiment: (x, y) => { if (!this.rules.noCondimentHeal) this.pickups.spawnCondiment(x, y); },
+      grantItem: () => this.grantRandomItem(),
+      floatText: (x, y, text, color) => this.floatText(x, y, text, color),
+      blocked: (x, y, r) => this.hotTiles.some((t) => Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(x, y, r), t)),
+      kills: () => this.run.kills,
+      onEventDone: (r) => {
+        if (!r.success) return;
+        this.run.eventsWon[r.kind] = (this.run.eventsWon[r.kind] ?? 0) + 1;
+        tally(this.run, 'eventsWon');
+        // Events pay Spice into the doggy bag too (Treasure Nose adds to it).
+        this.addSpice(EVENT_SPICE * (1 + this.run.mods.bossBonus));
+      },
+    });
+    this.hud.setEvents(schedule, this.cfg.durationSec);
     this.damageNumbers = new DamageNumbers(this);
-    this.touch = wantsTouchControls(this.game)
-      ? new TouchControls(this, () => { if (!this.paused) this.dashQueued = true; }, () => { this.pauseQueued = true; })
-      : null;
+    // Always there; shows itself whenever the player is playing by touch.
+    this.touch = new TouchControls(this, {
+      dash: () => { if (!this.paused) this.dashQueued = true; },
+      pause: () => { this.pauseQueued = true; },
+      isPaused: () => this.paused,
+    });
     this.tutorial = this.run.wave === 1 && !loadSave().tutorialDone ? new Tutorial(this) : null;
     this.movedPx = 0;
     this.lastHeadPos = { x: this.head.x, y: this.head.y };
@@ -271,11 +319,16 @@ export class GameScene extends Phaser.Scene {
     else this.banner(`WAVE ${this.cfg.courseWave}`, 'Survive!');
     audio.setMood(this.cfg.boss ? 'boss' : 'fight');
     audio.play('waveStart');
+    if (this.rules.freshness) {
+      this.time.delayedCall(900, () => this.floatText(this.head.x, this.head.y - 34, `FRESH! +${Math.round(this.rules.freshness!.bonus * 100)}% damage`, '#fff3c0'));
+    }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
 
     // A bullet-hell must not keep running when the player looks away.
     this.game.events.on(Phaser.Core.Events.BLUR, this.autoPause, this);
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.autoPause, this);
+    // ...or when the controller they're playing with drops out (battery, cable, Bluetooth).
+    window.addEventListener('gamepaddisconnected', this.onPadLost);
 
     // Debug/testing hook (used by automated screenshots, harmless otherwise).
     (window as unknown as { __sausage?: unknown }).__sausage = this;
@@ -328,9 +381,11 @@ export class GameScene extends Phaser.Scene {
       this.head.halt();
     }
     this.dashQueued = false;
-    const tint = this.dying ? 0x2a2a2a : SAUSAGES[this.run.sausage].tint;
+    const tint = this.dying ? 0x2a2a2a : this.stale ? 0xc9c0a6 : SAUSAGES[this.run.sausage].tint;
     this.head.setTint(tint);
     this.chain.update(this.head.x, this.head.y, tint, time);
+    this.shellRing?.setPosition(this.head.x, this.head.y).setRotation(time / 400);
+    if (this.rules.linksHittable) this.checkLinkHits();
 
     // --- Health: grill burns, regen heals ---
     this.onGrill = false;
@@ -349,8 +404,9 @@ export class GameScene extends Phaser.Scene {
 
     // --- Combat ---
     if (!this.dying && !this.ending) {
-      this.weapons.update(time, this.stats.damageMult, this.stats.fireRateMult);
+      this.weapons.update(time, this.damageMultNow(), this.stats.fireRateMult * this.timedEvents.fireRateMult);
       this.director.update(dtMs);
+      if (!this.director.timeUp) this.timedEvents.update(this.director.elapsedMs, dt);
       this.run.timeSurvivedSec += dt;
     }
     for (const e of this.enemyList()) {
@@ -362,8 +418,9 @@ export class GameScene extends Phaser.Scene {
       // Melee enemies bounce off your links.
       if (e.def.melee && !e.dead) {
         for (const p of this.chain.positions) {
-          if (Math.abs(e.x - p.x) < e.def.radius + LINK_RADIUS && Math.abs(e.y - p.y) < e.def.radius + LINK_RADIUS) {
-            if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.radius + LINK_RADIUS) e.shove(p.x, p.y, 220);
+          const reach = e.def.radius + this.chain.radius;
+          if (Math.abs(e.x - p.x) < reach && Math.abs(e.y - p.y) < reach) {
+            if (Math.hypot(e.x - p.x, e.y - p.y) < reach) e.shove(p.x, p.y, 220);
           }
         }
       }
@@ -389,8 +446,11 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.graveyard) e.destroy();
     this.graveyard.length = 0;
 
-    this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
+    const dashCharge = this.head.dashCharge(this.stats.dashCooldownMs);
+    this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, dashCharge, time);
     this.hud.setBag(Math.floor(this.run.bag), bagValue('death', this.run), this.run.trophies.map((t) => TROPHIES[t].color));
+    this.hud.updateTrack(this.director.elapsedMs / 1000, time);
+    this.touch?.update(dashCharge);
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
     this.damageNumbers.update(time);
 
@@ -412,9 +472,9 @@ export class GameScene extends Phaser.Scene {
     return this.enemies.getChildren() as Enemy[];
   }
 
-  private spawnEnemy(kind: EnemyKind, x: number, y: number): void {
+  private spawnEnemy(kind: EnemyKind, x: number, y: number, elite?: { hpMult: number; scale: number }): void {
     if (this.ending || this.dying) return;
-    const e = new Enemy(this, x, y, kind, kind === 'tongs' ? this.cfg.bossHpMult : this.cfg.hpMult);
+    const e = new Enemy(this, x, y, kind, kind === 'tongs' ? this.cfg.bossHpMult : this.cfg.hpMult, elite);
     if (this.run.chili >= 1) e.speedMult = 1.15;
     if (kind === 'tongs') {
       const style = courseDef(this.cfg.course).boss;
@@ -458,6 +518,7 @@ export class GameScene extends Phaser.Scene {
       this.sparks.explode(4, e.x, e.y);
     }
     if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) tally(this.run, 'healed', this.health.heal(1));
+    if (this.rules.burnDps) e.poison(this.rules.burnDps, POISON_MS, this.gameTime);
     audio.play(crit ? 'crit' : 'hit');
     if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
@@ -496,14 +557,18 @@ export class GameScene extends Phaser.Scene {
     if (!e.isBoss) this.addSpice(e.def.crumbs * KILL_SPICE_PER_CRUMB);
     this.sparks.setParticleTint(e.isBoss ? 0xb040ff : e.def.kind === 'hotsauce' ? 0xff7a00 : e.def.kind === 'ketchup' ? 0xe0242c : 0xd0d8e0);
     this.sparks.explode(e.isBoss ? 60 : 9, e.x, e.y);
-    const crumbs = rollCrumbs(this.rng, e.def.crumbs * this.cfg.crumbMult, this.stats.crumbMult);
+    const crumbs = rollCrumbs(this.rng, e.def.crumbs * this.cfg.crumbMult, this.stats.crumbMult * this.timedEvents.crumbMult);
     this.pickups.spawnCrumbs(e.x, e.y, crumbs);
-    if (Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
+    if (!this.rules.noCondimentHeal && Math.random() < CONDIMENT_DROP_CHANCE) this.pickups.spawnCondiment(e.x, e.y);
     this.killPop(e);
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
-    if (e.isBoss) this.win();
+    this.timedEvents.onKill(e);
+    if (e.isBoss) {
+      haptic('bossDown');
+      this.win();
+    }
   }
 
   /** Spice goes into the doggy bag, times the current multiplier. */
@@ -525,6 +590,23 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Picnic Basket reward: a random item rolled like a shop slot, applied right away. */
+  private grantRandomItem(): { name: string; color: string } | null {
+    const id = rollItem(this.rng, this.run.wave, { luck: this.stats.luck, rarities: unlockedRarities() }, this.run.items, new Set());
+    if (!id) return null;
+    this.run.items.push(id);
+    const old = this.stats;
+    this.stats = runStats(this.run);
+    this.health.maxHp = this.stats.maxHp;
+    if (this.stats.maxHp > old.maxHp) this.health.heal(this.stats.maxHp - old.maxHp);
+    this.health.hp = Math.min(this.health.hp, this.health.maxHp);
+    this.health.armor = this.stats.armor;
+    this.health.regenPerSec = this.stats.regenPerSec;
+    this.livesLeft = Math.max(0, this.livesLeft + this.stats.extraLives - old.extraLives);
+    const item = ITEMS[id];
+    return { name: item.name, color: RARITIES[item.rarity].css };
+  }
+
   /** A hit on the sausage: dodge roll, armor, i-frames, then death or a Second Skin save. */
   private takeDamage(amount: number, source: string): void {
     if (this.dying || this.ending || this.invincible) return;
@@ -535,6 +617,19 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.hitThisWave = true;
+    if (this.shellHits > 0) {
+      this.shellHits--;
+      this.head.markHit();
+      audio.play('dodge');
+      this.sparks.setParticleTint(0xffc84a);
+      this.sparks.explode(12, this.head.x, this.head.y);
+      this.floatText(this.head.x, this.head.y - 24, 'BATTER CRACKED!', '#ffd27a');
+      if (this.shellHits === 0) {
+        this.shellRing?.destroy();
+        this.shellRing = null;
+      }
+      return;
+    }
     if (this.shieldUp) {
       // Smoked keystone: the first hit of every wave is absorbed.
       this.shieldUp = false;
@@ -548,8 +643,53 @@ export class GameScene extends Phaser.Scene {
     if (!getSettings().reducedMotion) this.hitStopMs = 70;
     this.shake(110, 0.005);
     audio.play('hurt');
+    if (!this.health.dead) haptic('hit');
     this.floatText(this.head.x, this.head.y - 24, `-${dealt}`, '#ff6a5a');
     if (this.health.dead) this.onLethal(source);
+  }
+
+  /**
+   * Damage multiplier right now. Weisswurst: a bonus while the wave is young, a penalty once it
+   * has gone stale (the moment is announced once per wave).
+   */
+  private damageMultNow(): number {
+    const f = this.rules.freshness;
+    if (!f) return this.stats.damageMult;
+    const stale = this.director.elapsedMs >= f.ms;
+    if (stale && !this.stale) {
+      this.stale = true;
+      audio.play('hurt');
+      this.floatText(this.head.x, this.head.y - 34, `GONE STALE: ${Math.round(f.stale * 100)}% damage`, '#d8d0b8');
+    }
+    return Math.max(0.2, this.stats.damageMult + (stale ? f.stale : f.bonus));
+  }
+
+  /** Kielbasa: enemy shots and enemies that touch any link hurt, just like hitting the head. */
+  private checkLinkHits(): void {
+    if (this.dying || this.ending || this.head.invulnerable) return;
+    const r = this.chain.radius;
+    for (const b of this.enemyBullets.getChildren() as EnemyBullet[]) {
+      if (!b.active) continue;
+      const br = (b.body as Phaser.Physics.Arcade.Body).halfWidth;
+      for (const p of this.chain.positions) {
+        if (Math.abs(b.x - p.x) > r + br || Math.abs(b.y - p.y) > r + br) continue;
+        if (Math.hypot(b.x - p.x, b.y - p.y) < r + br) {
+          b.kill();
+          this.takeDamage(b.damage, b.source);
+          return;
+        }
+      }
+    }
+    for (const e of this.enemyList()) {
+      if (e.dead) continue;
+      for (const p of this.chain.positions) {
+        if (Math.hypot(e.x - p.x, e.y - p.y) < e.def.radius + r) {
+          e.shove(p.x, p.y, 260);
+          this.takeDamage(e.def.contactDamage, e.def.name);
+          return;
+        }
+      }
+    }
   }
 
   private onLethal(source: string): void {
@@ -559,6 +699,7 @@ export class GameScene extends Phaser.Scene {
       this.head.markHit(1500);
       this.flash(250, 255, 200, 160);
       audio.play('save');
+      haptic('save');
       this.floatText(this.head.x, this.head.y - 40, 'SECOND SKIN!', '#ffd23f');
       return;
     }
@@ -651,6 +792,10 @@ export class GameScene extends Phaser.Scene {
     if (!getSettings().reduceFlashing) this.cameras.main.flash(ms, r, g, b);
   }
 
+  private readonly onPadLost = (): void => {
+    if (getInputMode() === 'pad') this.autoPause();
+  };
+
   private autoPause(): void {
     if (!this.paused && this.scene.isActive()) this.togglePause();
   }
@@ -720,6 +865,7 @@ export class GameScene extends Phaser.Scene {
 
   private clearArena(): void {
     this.director.stop();
+    this.timedEvents.stop();
     this.patterns.clear();
     for (const b of this.playerBullets.getChildren() as PlayerBullet[]) if (b.active) b.kill();
   }
@@ -802,6 +948,7 @@ export class GameScene extends Phaser.Scene {
     this.shake(500, 0.012);
     audio.setMood('off');
     audio.play('death');
+    haptic('death');
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
     this.banner('SKEWERED!', `Done in by: ${source}`, 1500);
@@ -811,6 +958,7 @@ export class GameScene extends Phaser.Scene {
   private cleanup(): void {
     this.game.events.off(Phaser.Core.Events.BLUR, this.autoPause, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.autoPause, this);
+    window.removeEventListener('gamepaddisconnected', this.onPadLost);
     this.weapons.destroy();
     this.chain.destroy();
   }

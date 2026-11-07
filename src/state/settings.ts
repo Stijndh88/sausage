@@ -12,6 +12,10 @@ export interface Settings {
   /** Fewer particles and tweens; defaults to the OS "reduce motion" setting. */
   reducedMotion: boolean;
   damageNumbers: boolean;
+  /** Controller rumble / phone vibration on hits. */
+  vibration: boolean;
+  /** Touch screens: which side the DASH button sits on (the move stick takes the other side). */
+  dashSide: 'right' | 'left';
   /** Keyboard bindings by physical key position (see state/controls.ts). */
   keyBindings: Bindings;
 }
@@ -36,6 +40,8 @@ export function defaultSettings(): Settings {
     reduceFlashing: reduced,
     reducedMotion: reduced,
     damageNumbers: true,
+    vibration: true,
+    dashSide: 'right',
     keyBindings: defaultBindings(),
   };
 }
@@ -88,6 +94,8 @@ export function sanitize(s: Settings): Settings {
     reduceFlashing: !!s.reduceFlashing,
     reducedMotion: !!s.reducedMotion,
     damageNumbers: s.damageNumbers !== false,
+    vibration: s.vibration !== false,
+    dashSide: s.dashSide === 'left' ? 'left' : 'right',
     keyBindings: sanitizeBindings(s.keyBindings),
   };
 }

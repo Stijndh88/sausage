@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindPrompt, hint } from '../ui/inputMode';
 import { GAME_H, GAME_W } from '../art/textures';
 import { courseName, locate, TROPHIES } from '../data/courses';
 import { RECIPES, rewardText } from '../data/recipes';
@@ -176,10 +177,11 @@ export function endScreen(scene: Phaser.Scene, data: EndData, title: string, sub
   const again = () => go(() => startRun(scene, run.sausage));
   const rack = () => go(() => scene.scene.start('SpiceRack', { back: 'Select' }));
   const menu = () => go(() => scene.scene.start('Menu'));
-  new Button(scene, GAME_W / 2 - 300, 650, 'One more run (Enter)', { width: 280, height: 58, fontSize: 21, fill: 0x3c8d3c, hover: 0x52b052 }, again)
-    .setFocused(true);
-  new Button(scene, GAME_W / 2, 650, 'Spice Rack (Tab)', { width: 240, height: 58, fill: 0x8a6a1a, hover: 0xa88228 }, rack);
-  new Button(scene, GAME_W / 2 + 280, 650, 'Main menu (Esc)', { width: 220, height: 58, fill: 0x5a4a3a, hover: 0x7a6650 }, menu);
+  const againBtn = new Button(scene, GAME_W / 2 - 300, 650, '', { width: 280, height: 58, fontSize: 21, fill: 0x3c8d3c, hover: 0x52b052 }, again);
+  againBtn.setFocused(true);
+  bindPrompt(againBtn, () => `One more run${hint('Enter', 'A')}`);
+  bindPrompt(new Button(scene, GAME_W / 2, 650, '', { width: 240, height: 58, fill: 0x8a6a1a, hover: 0xa88228 }, rack), () => `Spice Rack${hint('Tab', 'X')}`);
+  bindPrompt(new Button(scene, GAME_W / 2 + 280, 650, '', { width: 220, height: 58, fill: 0x5a4a3a, hover: 0x7a6650 }, menu), () => `Main menu${hint('Esc', 'B')}`);
   const kb = scene.input.keyboard!;
   const ready = () => scene.time.now >= readyAt;
   onKeyPress(kb, 'ENTER', again, ready);

@@ -145,7 +145,7 @@ const list: TalentDef[] = [
     stats: (s, r) => { s.luck += 3 * r; } },
   { id: 'lunchbox', jar: 'doggybag', shelf: 2, name: 'Lunchbox', desc: 'Bank 10% of the bag per push', maxRank: 2,
     recipe: 'big_push', mods: (m, r) => { m.pushBank += 0.1 * r; } },
-  { id: 'treasure_nose', jar: 'doggybag', shelf: 2, name: 'Treasure Nose', desc: '+20% Spice from bosses', maxRank: 3,
+  { id: 'treasure_nose', jar: 'doggybag', shelf: 2, name: 'Treasure Nose', desc: '+20% Spice from bosses and events', maxRank: 3,
     mods: (m, r) => { m.bossBonus += 0.2 * r; } },
   { id: 'greedy_gut', jar: 'doggybag', shelf: 2, name: 'Greedy Gut', desc: '+10% crumbs from enemies', maxRank: 3,
     stats: (s, r) => { s.crumbMult += 0.1 * r; } },

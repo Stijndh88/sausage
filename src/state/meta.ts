@@ -25,6 +25,8 @@ export const CHILI_SPICE = 0.2;
 /** Spice per crumb an enemy is worth (a fork is 0.05 Spice, a turret 0.15). */
 export const KILL_SPICE_PER_CRUMB = 0.05;
 export const BOSS_SPICE = 25;
+/** Spice for each timed event you win (before the multiplier). */
+export const EVENT_SPICE = 8;
 
 export function waveClearSpice(courseWave: number): number {
   return 6 + 2 * courseWave;
@@ -126,6 +128,7 @@ export function settleRun(run: RunState, outcome: Outcome, hpLeft = 0, save: Sav
   if (trophiesKept.length) add('trophies', trophiesKept.length);
   max('bestCourseReached', loc.course);
   max('peakBag', bag);
+  max('bestHealRun', Math.floor(run.tally.healed ?? 0));
 
   const counters = mergeCounters(save.counters, t);
   const cookedNow = cookedBy(counters).filter((id) => !save.cooked.includes(id));
