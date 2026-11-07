@@ -358,6 +358,46 @@ module.exports = {
     },
 
     {
+      name: 'stacking: an owned weapon buys a new link by default, ▲▼ switches to upgrade, 6 copies fight with their stack bonus',
+      fn: async ({ page, g }) => {
+        await g.openShop({ seed: 11, run: { wave: 5, crumbs: 500, weapons: [{ id: 'onion', tier: 1 }] } });
+        await g.wait(450);
+        await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Shop');
+          s.offers = [0, 1, 2, 3].map(() => ({ type: 'weapon', id: 'onion', price: 10 }));
+          s.locked = new Set();
+          s.render();
+        });
+        await page.keyboard.press('1');
+        await frames(g, 2);
+        let w = await g.evaluate(() => window.__game.scene.getScene('Shop').run.weapons);
+        assert.deepEqual(w, [{ id: 'onion', tier: 1 }, { id: 'onion', tier: 1 }], '1 added a second Onion Ring link');
+        // Card 2: switch to upgrade with the arrow keys, then buy.
+        await page.keyboard.press('ArrowRight');
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('2');
+        await frames(g, 2);
+        w = await g.evaluate(() => window.__game.scene.getScene('Shop').run.weapons);
+        assert.deepEqual(w.map((x) => x.tier).sort(), [1, 2], 'ArrowDown + 2 upgraded a copy instead');
+        const texts = await g.evaluate(() => window.__game.scene.getScene('Shop').children.list.filter((o) => o.type === 'Text').map((o) => o.text));
+        assert.ok(texts.some((t) => /^STACKS\s+Onion ×2/.test(t)), 'loadout shows the stack');
+        assert.ok(texts.some((t) => /Stack ×4: \+1 ring/.test(t)), 'card says what the next stack gives');
+
+        // Six Onion Rings in a fight: every link gets the 2/4/6 bonuses (+15% range, +1 ring, +25% damage).
+        await g.startRun({ seed: 3, weapons: Array.from({ length: 6 }, () => ({ id: 'onion', tier: 1 })) });
+        await g.godMode();
+        const b = await g.evaluate(() => window.__game.scene.getScene('Game').weapons.bonus);
+        assert.equal(b.length, 6);
+        for (const x of b) {
+          assert.equal(x.extraProjectiles, 1);
+          assert.ok(Math.abs(x.damageMult - 1.25) < 1e-9 && Math.abs(x.rangeMult - 1.15) < 1e-9, JSON.stringify(x));
+        }
+        await g.wait(2500);
+        assert.ok((await g.gameState()).playerBullets > 0, 'the stacked links fire');
+      },
+    },
+
+    {
       name: 'keyboard layouts: movement follows physical keys, so ZQSD works on AZERTY',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 2, weapons: [] });
