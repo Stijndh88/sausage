@@ -35,14 +35,20 @@ export class Pickups {
     this.add('condiment', x, y, 0, -30, this.clock.now() + CONDIMENT_LIFETIME_MS);
   }
 
-  update(dt: number, px: number, py: number, radius: number, collect: (kind: PickupKind) => void): void {
+  /**
+   * Moves drops and collects the ones you touch. `wanted(kind)` false leaves that kind on the
+   * floor (condiments while you're at full HP): it isn't pulled in or picked up.
+   */
+  update(dt: number, px: number, py: number, radius: number, collect: (kind: PickupKind) => void, wanted: (kind: PickupKind) => boolean = () => true): void {
     const now = this.clock.now();
+    const want = { crumb: wanted('crumb'), condiment: wanted('condiment') };
     for (let i = this.drops.length - 1; i >= 0; i--) {
       const d = this.drops[i];
       const dx = px - d.img.x;
       const dy = py - d.img.y;
       const dist = Math.hypot(dx, dy);
-      if (dist < radius) d.magnet = true;
+      if (!want[d.kind]) d.magnet = false;
+      else if (dist < radius) d.magnet = true;
       if (d.magnet) {
         d.vx = (dx / (dist || 1)) * MAGNET_SPEED;
         d.vy = (dy / (dist || 1)) * MAGNET_SPEED;
@@ -53,7 +59,7 @@ export class Pickups {
       }
       d.img.x += d.vx * dt;
       d.img.y += d.vy * dt;
-      if (dist < COLLECT_RADIUS) {
+      if (want[d.kind] && dist < COLLECT_RADIUS) {
         collect(d.kind);
         this.remove(i);
         continue;

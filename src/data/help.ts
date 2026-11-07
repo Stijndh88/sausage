@@ -68,7 +68,7 @@ const BASICS: HelpEntry[] = [
   },
   {
     id: 'mech:condiment', section: 'basics', title: 'Condiments',
-    body: 'Now and then an enemy drops a condiment. Picking it up heals you a little.',
+    body: 'Now and then an enemy drops a condiment. Picking it up heals you a little. At full HP you leave it on the floor for later, but it only lasts a few seconds.',
   },
   {
     id: 'mech:grill', section: 'basics', title: 'Hot grill tiles',

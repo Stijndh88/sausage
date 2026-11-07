@@ -151,18 +151,31 @@ export class WeaponSystem {
 export const RANGED_TARGET_BIAS = 0.65;
 const RANGED_BIAS_SQ = RANGED_TARGET_BIAS * RANGED_TARGET_BIAS;
 
+/** Bosses, elites and the loot goblin: links shoot these first whenever one is in range. */
+export function isPriorityTarget(e: Pick<Enemy, 'isBoss' | 'elite' | 'def'>): boolean {
+  return e.isBoss || e.elite || e.def.kind === 'goblin';
+}
+
+/**
+ * The enemy a link shoots at: the closest boss, elite or loot goblin in range, otherwise the
+ * closest other enemy in range (with ranged enemies counted a bit closer, see above).
+ */
 export function nearest(enemies: readonly Enemy[], x: number, y: number, range: number): Enemy | null {
   let best: Enemy | null = null;
   let bestScore = Infinity;
+  let bestPriority = false;
   const r2 = range * range;
   for (const e of enemies) {
     if (e.dead || !e.active) continue;
     const d = (e.x - x) ** 2 + (e.y - y) ** 2;
     if (d > r2) continue;
-    const score = e.def.melee || e.isBoss ? d : d * RANGED_BIAS_SQ;
-    if (score < bestScore) {
+    const priority = isPriorityTarget(e);
+    if (bestPriority && !priority) continue;
+    const score = priority || e.def.melee ? d : d * RANGED_BIAS_SQ;
+    if ((priority && !bestPriority) || score < bestScore) {
       bestScore = score;
       best = e;
+      bestPriority = priority;
     }
   }
   return best;

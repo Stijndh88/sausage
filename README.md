@@ -33,6 +33,10 @@ On-screen prompts follow whatever you last touched: key names on a keyboard, (A)
 nothing on a touch screen. Any controller in any slot works; the game pauses if it disconnects,
 and it rumbles when you get hit (phones vibrate on Android). **Settings → Vibration** turns that off,
 and **Settings → Touch: DASH button side** swaps the halves for left-handed play.
+If a controller misbehaves, **Settings → Controller check** (or the button on the Keyboard controls
+screen) shows every device the browser reports and what the game reads from it. A screenshot of it is
+the best bug report. PlayStation pads work with or without the browser's remapping, and a DualSense
+that shows up twice (Steam / DS4Windows) no longer confuses the game.
 
 On a phone, tapping START goes full screen in landscape (Android). On iPhone, use
 **Share → Add to Home Screen** to play full screen without the browser bars.
@@ -82,7 +86,8 @@ on the sausage select screen (up and down).
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
 preferring ranged enemies. Any link can hold any weapon, so you can run 3 or even 6 Onion Rings. Buying a
 weapon you own puts it on a new link by default; switch the card to **Upgrade** (▲▼ or tap) to raise a copy's
-tier instead (I–IV). With full links, buying upgrades. **Stack bonuses:** 2, 4 and 6 links of the same weapon
+tier instead (I–IV). With full links, buying upgrades. **Merge** two links with the same weapon and tier in the
+shop (Merge button, M, or LB/RB then A) to get one link a tier higher and a free link. **Stack bonuses:** 2, 4 and 6 links of the same weapon
 each unlock a bonus for every copy (see `src/data/stacks.ts`), e.g. Onion Ring: +15% range, +1 ring, +25% damage.
 Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 

@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { FONT } from './Hud';
 import { onKeyPress } from './input';
 import { ControlsPanel } from './ControlsPanel';
+import { PadCheckPanel } from './PadCheckPanel';
 import { bindPrompt, getInputMode, hint } from './inputMode';
 import { moveLabel } from './keyboardLayout';
 import { downloadTelemetry } from '../state/telemetry';
@@ -49,12 +50,16 @@ export class SettingsPanel {
   private open = false;
   /** The keyboard controls screen, opened from the last row. */
   readonly controls: ControlsPanel;
+  /** Live controller readout; the "controls" row opens it instead while you use a controller. */
+  readonly padCheck: PadCheckPanel;
 
   constructor(private readonly scene: Phaser.Scene, private readonly onClose: () => void) {
     this.controls = new ControlsPanel(scene, () => this.refresh());
+    this.padCheck = new PadCheckPanel(scene, () => this.refresh());
+    this.controls.openPadCheck = () => this.padCheck.show();
     const kb = scene.input.keyboard!;
-    // While the controls screen is open it owns the keyboard.
-    const when = (fn: () => void) => () => { if (this.open && !this.controls.isOpen) fn(); };
+    // While the controls screen or the controller check is open, it owns the keyboard.
+    const when = (fn: () => void) => () => { if (this.open && !this.subOpen) fn(); };
     onKeyPress(kb, 'UP', when(() => this.focus(this.index - 1)));
     onKeyPress(kb, 'W', when(() => this.focus(this.index - 1)));
     onKeyPress(kb, 'DOWN', when(() => this.focus(this.index + 1)));
@@ -70,25 +75,30 @@ export class SettingsPanel {
     return this.open;
   }
 
+  private get subOpen(): boolean {
+    return this.controls.isOpen || this.padCheck.isOpen;
+  }
+
   /** Gamepad / external navigation (forwarded to the controls screen when it's open). */
   navigate(dy: number): void {
     if (this.controls.isOpen) this.controls.navigate(dy);
-    else if (this.open) this.focus(this.index + dy);
+    else if (this.open && !this.padCheck.isOpen) this.focus(this.index + dy);
   }
 
   change(dx: number): void {
-    if (this.open && !this.controls.isOpen) this.adjust(ROWS[this.index], dx);
+    if (this.open && !this.subOpen) this.adjust(ROWS[this.index], dx);
   }
 
   /** A / Enter equivalent. */
   confirm(): void {
     if (this.controls.isOpen) this.controls.confirm();
-    else if (this.open) this.adjust(ROWS[this.index], 1);
+    else if (this.open && !this.padCheck.isOpen) this.adjust(ROWS[this.index], 1);
   }
 
   /** Esc / B: step back one level (cancel a rebind, close controls, then close settings). */
   back(): void {
     if (this.controls.isOpen) this.controls.back();
+    else if (this.padCheck.isOpen) this.padCheck.hide();
     else this.hide();
   }
 
@@ -122,7 +132,8 @@ export class SettingsPanel {
         this.focus(i);
         if (row.kind !== 'slider') this.adjust(row, 1);
       });
-      add(s.add.text(left + 34, y, row.label, { fontFamily: FONT, fontSize: '19px', color: '#ffffff' }).setOrigin(0, 0.5));
+      const label = add(s.add.text(left + 34, y, row.label, { fontFamily: FONT, fontSize: '19px', color: '#ffffff' }).setOrigin(0, 0.5));
+      if (row.kind === 'controls') bindPrompt(label, () => (getInputMode() === 'pad' ? 'Controller check' : row.label));
       // Slider values sit between − and +; the others end just left of their button.
       const value = add(s.add.text(row.kind === 'slider' ? left + W - 150 : left + W - 138, y, '', { fontFamily: FONT, fontSize: '19px', fontStyle: 'bold', color: '#ffd23f' })
         .setOrigin(row.kind === 'slider' ? 0.5 : 1, 0.5));
@@ -134,7 +145,8 @@ export class SettingsPanel {
         }));
         add(new Button(s, left + W - 78, y, 'Toggle', { width: 96, height: 40, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
       } else if (row.kind === 'controls') {
-        add(new Button(s, left + W - 80, y, 'Change…', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1)));
+        bindPrompt(add(new Button(s, left + W - 80, y, '', { width: 100, height: 36, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 15 }, () => this.adjust(row, 1))),
+          () => (getInputMode() === 'pad' ? 'Open…' : 'Change…'));
       } else if (row.kind === 'slider') {
         add(new Button(s, left + W - 222, y, '−', { width: 56, height: 40, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 24 }, () => this.adjust(row, -1)));
         add(new Button(s, left + W - 78, y, '+', { width: 56, height: 40, fill: 0x4a3a30, hover: 0x6a5240, fontSize: 24 }, () => this.adjust(row, 1)));
@@ -152,6 +164,7 @@ export class SettingsPanel {
   hide(): void {
     if (!this.open) return;
     this.controls.hide();
+    this.padCheck.hide();
     this.open = false;
     for (const o of this.objects) o.destroy();
     this.objects = [];
@@ -173,7 +186,8 @@ export class SettingsPanel {
     const s = getSettings();
     if (row.kind === 'controls') {
       audio.play('click');
-      this.controls.show();
+      if (getInputMode() === 'pad') this.padCheck.show();
+      else this.controls.show();
       return;
     }
     if (row.kind === 'playData') {
@@ -198,7 +212,7 @@ export class SettingsPanel {
     ROWS.forEach((row, i) => {
       const t = this.valueTexts[i];
       if (!t) return;
-      if (row.kind === 'controls') t.setText(`Move: ${moveLabel(s.keyBindings)}`);
+      if (row.kind === 'controls') t.setText(getInputMode() === 'pad' ? '' : `Move: ${moveLabel(s.keyBindings)}`);
       else if (row.kind === 'playData') t.setText(s.sharePlayData ? 'On' : 'Off');
       else if (row.kind === 'dashSide') t.setText(s.dashSide === 'left' ? 'Left' : 'Right');
       else t.setText(row.kind === 'slider' ? `${Math.round(s[row.key] * 100)}%` : s[row.key] ? 'On' : 'Off');

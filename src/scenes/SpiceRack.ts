@@ -98,7 +98,6 @@ export class SpiceRackScene extends Phaser.Scene {
   private buy(id = this.focused().id): void {
     if (buyTalent(id)) {
       audio.play('buy');
-      this.cameras.main.flash(100, 255, 220, 150);
     } else {
       audio.play('deny');
     }

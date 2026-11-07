@@ -398,6 +398,33 @@ module.exports = {
     },
 
     {
+      name: 'merging: two tier I Skewers merge into one tier II Skewer by click or M, freeing a link',
+      fn: async ({ page, g }) => {
+        const start = [{ id: 'skewer', tier: 1 }, { id: 'onion', tier: 1 }, { id: 'skewer', tier: 1 }, { id: 'onion', tier: 1 }];
+        await g.openShop({ seed: 11, run: { wave: 5, crumbs: 50, weapons: start } });
+        await g.wait(450);
+        const merges = () => g.evaluate(() => window.__game.scene.getScene('Shop').children.list
+          .filter((o) => o.type === 'Container' && o.label && /^Merge/.test(o.label.text)).map((o) => o.label.text));
+        assert.equal((await merges()).length, 2, 'one Merge button per pair');
+        // Click the first Merge button (under the first Skewer).
+        await g.evaluate(() => {
+          const btn = window.__game.scene.getScene('Shop').children.list.find((o) => o.type === 'Container' && o.label && /^Merge/.test(o.label.text));
+          btn.emit('pointerdown');
+        });
+        await frames(g, 2);
+        let w = await g.evaluate(() => window.__game.scene.getScene('Shop').run.weapons);
+        assert.deepEqual(w, [{ id: 'skewer', tier: 2 }, { id: 'onion', tier: 1 }, { id: 'onion', tier: 1 }], JSON.stringify(w));
+        // M merges the next pair; crumbs are untouched.
+        await page.keyboard.press('m');
+        await frames(g, 2);
+        const r = await g.evaluate(() => { const s = window.__game.scene.getScene('Shop'); return { w: s.run.weapons, crumbs: s.run.crumbs }; });
+        assert.deepEqual(r.w, [{ id: 'skewer', tier: 2 }, { id: 'onion', tier: 2 }], JSON.stringify(r.w));
+        assert.equal(r.crumbs, 50, 'merging is free');
+        assert.equal((await merges()).length, 0, 'no pairs left');
+      },
+    },
+
+    {
       name: 'keyboard layouts: movement follows physical keys, so ZQSD works on AZERTY',
       fn: async ({ page, g }) => {
         await g.startRun({ seed: 2, weapons: [] });
