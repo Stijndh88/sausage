@@ -15,6 +15,9 @@ const CARD_W = 226;
 const CARD_H = 430;
 const GAP = 14;
 const CARD_Y = 330;
+/** Cards on screen at once; the row scrolls to keep the selected one in view. */
+const VISIBLE = 5;
+const NUMBER_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'ZERO'];
 
 /** Pick a sausage. Locked ones show what unlocks them. */
 export class SelectScene extends Phaser.Scene {
@@ -54,7 +57,7 @@ export class SelectScene extends Phaser.Scene {
     onKeyPress(kb, 'A', () => move(-1), ready);
     onKeyPress(kb, 'RIGHT', () => move(1), ready);
     onKeyPress(kb, 'D', () => move(1), ready);
-    ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'].forEach((k, i) => onKeyPress(kb, k, () => this.select(SAUSAGE_IDS[i]), ready));
+    NUMBER_KEYS.slice(0, SAUSAGE_IDS.length).forEach((k, i) => onKeyPress(kb, k, () => this.select(SAUSAGE_IDS[i]), ready));
     onKeyPress(kb, 'ENTER', () => this.start(), ready);
     onKeyPress(kb, 'SPACE', () => this.start(), ready);
     onKeyPress(kb, 'ESC', () => this.back(), ready);
@@ -91,12 +94,17 @@ export class SelectScene extends Phaser.Scene {
       return o;
     };
     const save = loadSave();
-    const total = SAUSAGE_IDS.length * CARD_W + (SAUSAGE_IDS.length - 1) * GAP;
-    SAUSAGE_IDS.forEach((id, i) => {
+    const n = SAUSAGE_IDS.length;
+    const shown = Math.min(VISIBLE, n);
+    const first = Phaser.Math.Clamp(SAUSAGE_IDS.indexOf(this.selected) - Math.floor(shown / 2), 0, n - shown);
+    const total = shown * CARD_W + (shown - 1) * GAP;
+    const rowLeft = (GAME_W - total) / 2;
+    SAUSAGE_IDS.slice(first, first + shown).forEach((id, slot) => {
+      const i = first + slot;
       const def = SAUSAGES[id];
       const unlocked = isUnlocked(def.unlock, save);
       const sel = id === this.selected;
-      const x = (GAME_W - total) / 2 + i * (CARD_W + GAP) + CARD_W / 2;
+      const x = rowLeft + slot * (CARD_W + GAP) + CARD_W / 2;
       const left = x - CARD_W / 2;
       const top = CARD_Y - CARD_H / 2;
       const g = add(this.add.graphics());
@@ -113,7 +121,7 @@ export class SelectScene extends Phaser.Scene {
         add(this.add.image(x + 26, top + 70, 'sausage-head').setScale(1.5).setTint(tint));
       }
 
-      add(this.add.text(x, top + 118, `${i + 1}  ${def.name}`, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: unlocked ? '#ffffff' : '#8a7a70' }).setOrigin(0.5));
+      add(this.add.text(x, top + 118, `${i < NUMBER_KEYS.length ? `${(i + 1) % 10}  ` : ''}${def.name}`, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: unlocked ? '#ffffff' : '#8a7a70' }).setOrigin(0.5));
       if (!unlocked) {
         add(this.add.image(x, top + 200, 'icon-lock').setScale(2.2).setTint(0x8a7a70));
         add(this.add.text(x, top + 250, unlockText(def.unlock), {
@@ -139,6 +147,25 @@ export class SelectScene extends Phaser.Scene {
         else this.select(id);
       });
     });
+
+    // Scroll arrows and a dot per sausage, when there are more than fit.
+    if (n > shown) {
+      const arrow = (dx: number, label: string, enabled: boolean, target: number) => {
+        const t = add(this.add.text(GAME_W / 2 + dx, CARD_Y, label, {
+          fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: enabled ? '#ffd9a0' : '#5a4a3a', stroke: '#3a1408', strokeThickness: 5,
+        }).setOrigin(0.5));
+        if (enabled) t.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.select(SAUSAGE_IDS[target]));
+      };
+      arrow(-total / 2 - 2 - GAP, '◀', first > 0, first - 1);
+      arrow(total / 2 + 2 + GAP, '▶', first + shown < n, first + shown);
+      const dotGap = 18;
+      SAUSAGE_IDS.forEach((id, i) => {
+        const dx = (i - (n - 1) / 2) * dotGap;
+        const on = id === this.selected;
+        const visible = i >= first && i < first + shown;
+        add(this.add.circle(GAME_W / 2 + dx, CARD_Y + CARD_H / 2 + 22, on ? 6 : 4, on ? 0xffb347 : visible ? 0xc8a890 : 0x5a4a3a));
+      });
+    }
 
     const canStart = isUnlocked(SAUSAGES[this.selected].unlock, save);
     add(new Button(this, GAME_W / 2 + 130, GAME_H - 54, canStart ? `Fry ${SAUSAGES[this.selected].name}  ▶` : 'Locked', {
