@@ -351,7 +351,7 @@ export function generateTextures(scene: Phaser.Scene): void {
     eye(g, 11, 15, 3.5, true);
     eye(g, 23, 15, 3.5, true);
   });
-  // Placeholder until the painted loot goblin arrives: a hunched jerky gremlin hugging a pot of gold.
+  // Fallback for the painted loot goblin (src/art/sprites/enemy-goblin.png): a jerky gremlin with a pot of gold.
   make(scene, 'enemy-goblin', 40, 40, (g) => {
     g.fillStyle(0x2a120a, 1).fillEllipse(20, 25, 34, 28); // outline
     g.fillStyle(0x8a3b26, 1).fillEllipse(20, 25, 30, 24); // jerky back

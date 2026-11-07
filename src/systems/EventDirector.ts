@@ -347,7 +347,7 @@ export class EventDirector {
     const gob = this.hooks.spawnGoblin(x, y);
     if (!gob) return null;
     const color = EVENTS.goblin.color;
-    const glow = this.scene.add.image(x, y, 'ring').setDepth(4).setTint(0xffd23f).setScale(0.75).setAlpha(0.6);
+    const glow = this.scene.add.image(x, y, 'ring').setDepth(4).setTint(0xffd23f).setScale(0.95).setAlpha(0.6);
     // Spills a few crumbs each time it loses another GOBLIN_SPILL_STEP of its HP.
     let spilled = 0;
     let over = false;
@@ -370,7 +370,7 @@ export class EventDirector {
           if (item) this.hooks.floatText(gob.x, gob.y - 66, `+ ${item.name}`, item.color);
           return true;
         }
-        glow.setPosition(gob.x, gob.y).setScale(0.75 + Math.sin(now / 90) * 0.1);
+        glow.setPosition(gob.x, gob.y).setScale(0.95 + Math.sin(now / 90) * 0.1);
         const left = GOBLIN_LIFETIME_SEC - (now - t0) / 1000;
         this.setStatus(r, `LOOT GOBLIN ${Math.ceil(Math.max(0, left))}s`);
         return left <= 0;
