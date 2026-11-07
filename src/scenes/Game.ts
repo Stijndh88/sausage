@@ -41,6 +41,8 @@ import { startRun } from './startRun';
 import { audio } from '../audio/Audio';
 import { getSettings } from '../state/settings';
 import { fitCamera } from '../ui/view';
+import { logDamage, logKill, logTaken, syncLinks, tickLinks, totalDealt, totalTaken, type SourceKey, type WaveOutcome } from '../state/runLog';
+import { markRunActive, recordRunEnd, type RunEnd } from '../state/telemetry';
 
 /** HP per second lost while standing on a hot grill tile (armor doesn't help). */
 export const GRILL_DAMAGE_PER_SEC = 6;
@@ -127,6 +129,12 @@ export class GameScene extends Phaser.Scene {
   private dashQueued = false;
   private pauseQueued = false;
   readonly clock = { now: (): number => this.gameTime };
+  /** Run totals when this wave started, so the wave's own numbers can be logged at the end. */
+  private waveStart = { kills: 0, dealt: 0, taken: 0, crumbs: 0, sec: 0 };
+  private waveFrames = 0;
+  private waveRealMs = 0;
+  private slowFrames = 0;
+  private waveLogged = false;
 
   constructor() {
     super('Game');
@@ -165,6 +173,19 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     this.dashQueued = false;
     this.pauseQueued = false;
+    syncLinks(this.run.log, this.run.weapons);
+    this.waveStart = {
+      kills: this.run.kills,
+      dealt: totalDealt(this.run.log),
+      taken: totalTaken(this.run.log),
+      crumbs: this.run.crumbsEarned,
+      sec: this.run.timeSurvivedSec,
+    };
+    this.waveFrames = 0;
+    this.waveRealMs = 0;
+    this.slowFrames = 0;
+    this.waveLogged = false;
+    markRunActive(this.run, getInputMode());
   }
 
   create(): void {
@@ -195,7 +216,7 @@ export class GameScene extends Phaser.Scene {
       head: () => this.head,
       mods: () => this.stats,
       damage: (e, amount, fx, fy, kb) => this.damageEnemy(e, amount, fx, fy, kb),
-      explode: (x, y, r, dmg) => this.explode(x, y, r, dmg),
+      explode: (x, y, r, dmg, src) => this.explode(x, y, r, dmg, src),
     });
     this.weapons.setWeapons(this.run.weapons);
 
@@ -299,10 +320,10 @@ export class GameScene extends Phaser.Scene {
     this.pauseMenu = new PauseMenu(this, {
       resume: () => { if (this.paused) this.togglePause(); },
       // Leaving a run early banks it like a bail-out, so the bag and the Cookbook progress aren't lost.
-      restart: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); startRun(this, this.run.sausage); }),
+      restart: () => this.leavePaused(() => { this.leaveRun('restart'); settleRun(this.run, 'bail', this.health.hp); startRun(this, this.run.sausage); }),
       settings: () => { this.pauseMenu.setActive(false); this.settingsPanel.show(); },
-      quit: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); this.scene.start('Menu'); }),
-      bail: () => this.leavePaused(() => this.scene.start('GameOver', { run: this.run, outcome: 'bail', hp: this.health.hp })),
+      quit: () => this.leavePaused(() => { this.leaveRun('quit'); settleRun(this.run, 'bail', this.health.hp); this.scene.start('Menu'); }),
+      bail: () => this.leavePaused(() => { this.logWave('left'); this.scene.start('GameOver', { run: this.run, outcome: 'bail', hp: this.health.hp }); }),
       bailValue: () => bagValue('bail', this.run),
     });
 
@@ -344,6 +365,14 @@ export class GameScene extends Phaser.Scene {
     if (this.paused) {
       this.dashQueued = false;
       return;
+    }
+
+    // Performance, per wave: real frame times (not the capped, smoothed delta).
+    if (!this.dying && !this.ending) {
+      const raw = this.game.loop.rawDelta;
+      this.waveFrames++;
+      this.waveRealMs += raw;
+      if (raw > 50) this.slowFrames++;
     }
 
     // The engine already caps delta at 100ms (fps.min = 10 in main.ts); this is a safety net.
@@ -392,12 +421,14 @@ export class GameScene extends Phaser.Scene {
     if (!this.dying && !this.ending) {
       this.onGrill = !this.stats.grillImmune && this.hotTiles.some((r) => r.contains(this.head.x, this.head.y));
       if (this.onGrill && !this.invincible) {
-        this.health.hp = Math.max(0, this.health.hp - GRILL_DAMAGE_PER_SEC * this.stats.grillDamageMult * dt);
+        const burn = Math.min(this.health.hp, GRILL_DAMAGE_PER_SEC * this.stats.grillDamageMult * dt);
+        this.health.hp -= burn;
+        logTaken(this.run.log, 'Grill tile', burn);
         if (this.health.dead) this.onLethal('Grill tile');
       }
       const before = this.health.hp;
       this.health.tick(dt);
-      if (this.health.hp > before) tally(this.run, 'healed', this.health.hp - before);
+      if (this.health.hp > before) this.logHeal(this.health.hp - before);
     }
     this.sizzle.emitting = !this.dying && this.onGrill;
     this.sizzle.frequency = 90;
@@ -408,13 +439,19 @@ export class GameScene extends Phaser.Scene {
       this.director.update(dtMs);
       if (!this.director.timeUp) this.timedEvents.update(this.director.elapsedMs, dt);
       this.run.timeSurvivedSec += dt;
+      tickLinks(this.run.log, this.run.weapons.length, dt);
     }
     for (const e of this.enemyList()) {
       if (this.dying) {
         e.setVelocity(0, 0);
         continue;
       }
-      if (e.think(this.enemyCtx, time, dt)) this.killEnemy(e, true);
+      const poisoned = e.think(this.enemyCtx, time, dt);
+      if (e.dot.size) {
+        for (const [src, amount] of e.dot) logDamage(this.run.log, src, amount, { dot: true });
+        e.dot.clear();
+      }
+      if (poisoned) this.killEnemy(e, true);
       // Melee enemies bounce off your links.
       if (e.def.melee && !e.dead) {
         for (const p of this.chain.positions) {
@@ -493,19 +530,19 @@ export class GameScene extends Phaser.Scene {
     const [bullet, enemy] = pair<PlayerBullet, Enemy>(a, b, PlayerBullet);
     if (!bullet || !enemy || !bullet.active || enemy.dead || bullet.hitSet.has(enemy)) return;
     bullet.hitSet.add(enemy);
-    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps * this.stats.poisonMult, POISON_MS, this.gameTime);
+    if (bullet.poisonDps > 0) enemy.poison(bullet.poisonDps * this.stats.poisonMult, POISON_MS, this.gameTime, bullet.src);
     // Push away from where the shot came from (its velocity: spinning shots' rotation means nothing).
     const v = (bullet.body as Phaser.Physics.Arcade.Body).velocity;
     const heading = v.lengthSq() > 1 ? Math.atan2(v.y, v.x) : bullet.rotation;
     const fromX = bullet.x - Math.cos(heading) * 20;
     const fromY = bullet.y - Math.sin(heading) * 20;
-    this.damageEnemy(enemy, bullet.damage, fromX, fromY, bullet.knockback);
+    this.damageEnemy(enemy, bullet.damage, fromX, fromY, bullet.knockback, bullet.src);
     if (bullet.pierceLeft > 0) bullet.pierceLeft--;
     else bullet.kill();
   }
 
   /** Every source of player damage goes through here: crits and lifesteal apply to all of them. */
-  private damageEnemy(e: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void {
+  private damageEnemy(e: Enemy, amount: number, fromX: number, fromY: number, knockback: number, src: SourceKey = 'other'): void {
     // First Bite talent: extra damage to enemies that haven't been hurt yet.
     if (this.stats.firstBite > 0 && e.hp >= e.maxHp) amount *= 1 + this.stats.firstBite;
     const crit = this.stats.critChance > 0 && Math.random() < this.stats.critChance;
@@ -513,15 +550,24 @@ export class GameScene extends Phaser.Scene {
       amount *= 2;
       tally(this.run, 'crits');
       // Extra Spicy keystone: crits set enemies on fire.
-      if (this.stats.critBurn > 0) e.poison(this.stats.critBurn, 2000, this.gameTime);
+      if (this.stats.critBurn > 0) e.poison(this.stats.critBurn, 2000, this.gameTime, 'critBurn');
       this.sparks.setParticleTint(0xffd23f);
       this.sparks.explode(4, e.x, e.y);
     }
-    if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) tally(this.run, 'healed', this.health.heal(1));
-    if (this.rules.burnDps) e.poison(this.rules.burnDps, POISON_MS, this.gameTime);
+    if (this.stats.lifesteal > 0 && !this.dying && Math.random() < this.stats.lifesteal) this.logHeal(this.health.heal(1));
+    if (this.rules.burnDps) e.poison(this.rules.burnDps, POISON_MS, this.gameTime, 'burn');
     audio.play(crit ? 'crit' : 'hit');
     if (getSettings().damageNumbers) this.damageNumbers.spawn(e.x, e.y - e.def.radius, amount, crit, this.gameTime);
+    logDamage(this.run.log, src, Math.min(amount, Math.max(0, e.hp)), { crit });
+    e.lastHitBy = src;
     if (e.hit(amount, this.gameTime, fromX, fromY, knockback)) this.killEnemy(e);
+  }
+
+  /** Healing counts toward the Cookbook and the run stats. */
+  private logHeal(amount: number): void {
+    if (amount <= 0) return;
+    tally(this.run, 'healed', amount);
+    this.run.log.healed += amount;
   }
 
   /** Spiky Bun: enemies touching you take damage (at most every THORNS_COOLDOWN_MS each). */
@@ -530,10 +576,10 @@ export class GameScene extends Phaser.Scene {
     const ready = this.thornsReadyAt.get(e) ?? 0;
     if (this.gameTime < ready) return;
     this.thornsReadyAt.set(e, this.gameTime + THORNS_COOLDOWN_MS);
-    this.damageEnemy(e, this.stats.thorns, this.head.x, this.head.y, 200);
+    this.damageEnemy(e, this.stats.thorns, this.head.x, this.head.y, 200, 'thorns');
   }
 
-  private explode(x: number, y: number, radius: number, damage: number): void {
+  private explode(x: number, y: number, radius: number, damage: number, src: SourceKey = 'other'): void {
     audio.play('explode');
     const ring = this.add.image(x, y, 'ring').setDepth(12).setTint(0x8fe35a).setScale(0.2);
     this.tweens.add({ targets: ring, scale: (radius * 2) / 64, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
@@ -541,7 +587,7 @@ export class GameScene extends Phaser.Scene {
     this.sparks.explode(10, x, y);
     for (const e of [...this.enemyList()]) {
       if (e.dead) continue;
-      if (Math.hypot(e.x - x, e.y - y) <= radius + e.def.radius) this.damageEnemy(e, damage, x, y, 180);
+      if (Math.hypot(e.x - x, e.y - y) <= radius + e.def.radius) this.damageEnemy(e, damage, x, y, 180, src);
     }
   }
 
@@ -551,6 +597,7 @@ export class GameScene extends Phaser.Scene {
     this.run.kills++;
     tally(this.run, 'kills');
     if (byPoison) tally(this.run, 'poisonKills');
+    logKill(this.run.log, e.lastHitBy);
     this.killTimes.push(this.gameTime);
     while (this.killTimes.length && this.killTimes[0] < this.gameTime - 10_000) this.killTimes.shift();
     tally(this.run, 'killBurst', this.killTimes.length, 'max');
@@ -582,10 +629,11 @@ export class GameScene extends Phaser.Scene {
       audio.play('crumb');
       this.run.crumbs++;
       this.run.crumbsEarned++;
+      this.run.log.crumbs.picked++;
     } else {
       audio.play('heal');
       const healed = this.health.heal(this.stats.condimentHeal);
-      tally(this.run, 'healed', healed);
+      this.logHeal(healed);
       this.floatText(this.head.x, this.head.y - 24, `+${Math.round(healed)} HP`, '#7dff9a');
     }
   }
@@ -612,6 +660,7 @@ export class GameScene extends Phaser.Scene {
     if (this.dying || this.ending || this.invincible) return;
     if (this.stats.dodge > 0 && Math.random() < this.stats.dodge) {
       this.head.markHit(DODGE_IFRAMES_MS);
+      this.run.log.dodges++;
       audio.play('dodge');
       this.floatText(this.head.x, this.head.y - 24, 'DODGE', '#8fd3ff');
       return;
@@ -619,6 +668,7 @@ export class GameScene extends Phaser.Scene {
     this.hitThisWave = true;
     if (this.shellHits > 0) {
       this.shellHits--;
+      this.run.log.blocked++;
       this.head.markHit();
       audio.play('dodge');
       this.sparks.setParticleTint(0xffc84a);
@@ -633,12 +683,16 @@ export class GameScene extends Phaser.Scene {
     if (this.shieldUp) {
       // Smoked keystone: the first hit of every wave is absorbed.
       this.shieldUp = false;
+      this.run.log.blocked++;
       this.head.markHit(600);
       audio.play('dodge');
       this.floatText(this.head.x, this.head.y - 24, 'SHIELD!', '#ffd0a0');
       return;
     }
+    const hpBefore = this.health.hp;
     const dealt = this.health.takeDamage(amount * this.damageTakenMult);
+    this.run.log.hitsTaken++;
+    logTaken(this.run.log, source, hpBefore - this.health.hp);
     this.head.markHit(HIT_INVULN_MS + this.stats.iframeBonusMs);
     if (!getSettings().reducedMotion) this.hitStopMs = 70;
     this.shake(110, 0.005);
@@ -891,7 +945,9 @@ export class GameScene extends Phaser.Scene {
     const banked = rollCrumbs(this.rng, floor, FLOOR_CRUMB_BANK);
     this.run.crumbs += banked;
     this.run.crumbsEarned += banked;
+    this.run.log.crumbs.swept += banked;
     this.addSpice(waveClearSpice(this.cfg.courseWave));
+    this.logWave('cleared');
     if (!this.hitThisWave) tally(this.run, 'hitlessWaves');
     audio.play('waveClear');
     this.banner('WAVE CLEARED!', floor
@@ -916,6 +972,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.pickups.collectAll((kind) => this.collect(kind));
+    this.logWave('boss');
 
     // The boss pays into the bag, drops its trophy, and the first kill pays a First Taste bonus.
     const course = this.cfg.course;
@@ -944,6 +1001,7 @@ export class GameScene extends Phaser.Scene {
     this.dying = true;
     this.health.hp = 0;
     this.run.causeOfDeath = source;
+    this.logWave('died');
     this.clearArena();
     this.shake(500, 0.012);
     audio.setMood('off');
@@ -953,6 +1011,35 @@ export class GameScene extends Phaser.Scene {
     this.sizzle.frequency = 25;
     this.banner('SKEWERED!', `Done in by: ${source}`, 1500);
     this.time.delayedCall(2200, () => this.scene.start('GameOver', { run: this.run, outcome: 'death', hp: 0 }));
+  }
+
+  /** Adds this wave's numbers to the run stats (once per wave). */
+  private logWave(outcome: WaveOutcome): void {
+    if (this.waveLogged) return;
+    this.waveLogged = true;
+    const log = this.run.log;
+    const w = this.waveStart;
+    log.waves.push({
+      wave: this.run.wave,
+      course: this.cfg.course,
+      boss: !!this.cfg.boss,
+      outcome,
+      sec: Math.round((this.run.timeSurvivedSec - w.sec) * 10) / 10,
+      kills: this.run.kills - w.kills,
+      dealt: Math.round(totalDealt(log) - w.dealt),
+      taken: Math.round(totalTaken(log) - w.taken),
+      crumbs: this.run.crumbsEarned - w.crumbs,
+      hpLeft: Math.max(0, Math.round(this.health.hp)),
+      maxHp: this.health.maxHp,
+      fps: this.waveRealMs > 0 ? Math.round((this.waveFrames * 1000) / this.waveRealMs) : 0,
+      slowFrames: this.slowFrames,
+    });
+  }
+
+  /** Restart / main menu from the pause menu: the run ends here. */
+  private leaveRun(outcome: RunEnd): void {
+    this.logWave('left');
+    recordRunEnd(this.run, outcome, getInputMode());
   }
 
   private cleanup(): void {

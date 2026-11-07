@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ENEMIES, type EnemyDef, type EnemyKind } from '../data/enemies';
 import type { BulletPatterns } from '../systems/BulletPatterns';
 import type { BossStyle } from '../data/courses';
+import type { SourceKey } from '../state/runLog';
 
 export interface EnemyContext {
   player: { x: number; y: number };
@@ -36,7 +37,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private kbX = 0;
   private kbY = 0;
   /** Up to MAX_POISON_STACKS independent poison stacks, each with its own timer. */
-  private poisons: { dps: number; until: number }[] = [];
+  private poisons: { dps: number; until: number; src: SourceKey }[] = [];
+  /** Damage over time dealt since the scene last read it, by source (for the run stats). */
+  readonly dot = new Map<SourceKey, number>();
+  /** Who hit it last: gets the kill in the run stats. */
+  lastHitBy: SourceKey = 'other';
   private flashUntil = 0;
   private mode: Mode = 'move';
   private stateUntil = 0;
@@ -125,9 +130,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** Adds a poison stack; at the cap, the weakest (or oldest) stack is replaced. */
-  poison(dps: number, durationMs: number, now: number): void {
+  poison(dps: number, durationMs: number, now: number, src: SourceKey = 'other'): void {
     this.poisons = this.poisons.filter((p) => p.until > now);
-    const stack = { dps, until: now + durationMs };
+    const stack = { dps, until: now + durationMs, src };
     if (this.poisons.length < MAX_POISON_STACKS) {
       this.poisons.push(stack);
       return;
@@ -161,10 +166,21 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       let dps = 0;
       for (const p of this.poisons) if (p.until > now) dps += p.dps;
       if (dps === 0) this.poisons.length = 0;
+      // Credit each stack its share of what the enemy actually lost (no overkill).
+      const lost = Math.min(dps * dt, Math.max(0, this.hp));
+      let top: { dps: number; src: SourceKey } | null = null;
+      if (lost > 0) {
+        for (const p of this.poisons) {
+          if (p.until <= now) continue;
+          this.dot.set(p.src, (this.dot.get(p.src) ?? 0) + (lost * p.dps) / dps);
+          if (!top || p.dps > top.dps) top = p;
+        }
+      }
       this.hp -= dps * dt;
       if (this.hp <= 0) {
         this.dead = true;
         poisonKill = true;
+        if (top) this.lastHitBy = top.src;
       }
     }
 
