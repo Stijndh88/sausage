@@ -311,6 +311,7 @@ export class ShopScene extends Phaser.Scene {
       rarities: unlockedRarities(save),
       minRarity: run.mods.betterShop ? 'uncommon' : undefined,
       priceMult,
+      baseStats: runBaseStats(run),
     };
   }
 
@@ -473,7 +474,6 @@ export class ShopScene extends Phaser.Scene {
     this.offers[i] = null;
     this.locked.delete(i);
     this.upgradeMode.delete(i);
-    this.cameras.main.flash(120, 255, 220, 150);
     this.render();
   }
 

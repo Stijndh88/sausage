@@ -2,6 +2,7 @@ import { ITEMS, ITEM_IDS, isItemMaxed } from '../data/items';
 import { RARITY_ORDER, rarityWeights, type Rarity } from '../data/rarity';
 import { MAX_LINKS, MAX_TIER, WEAPONS, WEAPON_IDS, type WeaponId } from '../data/weapons';
 import type { WeaponSlot } from '../state/run';
+import { computeStats, type PlayerStats } from '../state/stats';
 import { type Rng, mulberry32, pickWeighted } from './rng';
 
 export interface Offer {
@@ -50,11 +51,23 @@ export interface ShopContext {
   minRarity?: Rarity;
   /** Multiplies every price (talent discount, Chili, menus). */
   priceMult?: number;
+  /** Your stats before items (sausage + talents): items that would change nothing aren't offered. */
+  baseStats?: Readonly<PlayerStats>;
 }
 
-/** Item ids of one rarity that can still be offered. */
-function itemPool(rarity: Rarity, owned: readonly string[]): string[] {
-  return ITEM_IDS.filter((id) => ITEMS[id].rarity === rarity && !isItemMaxed(owned, id));
+/**
+ * True if adding this item would change at least one of your stats. False when every stat it
+ * touches is already at its cap (or floor), so buying it would do nothing.
+ */
+export function itemHasEffect(owned: readonly string[], id: string, base?: Readonly<PlayerStats>): boolean {
+  const before = computeStats(owned, base);
+  const after = computeStats([...owned, id], base);
+  return (Object.keys(before) as (keyof PlayerStats)[]).some((k) => Math.abs(after[k] - before[k]) > 1e-9);
+}
+
+/** Item ids of one rarity that can still be offered (not maxed out, and still doing something). */
+function itemPool(rarity: Rarity, owned: readonly string[], base?: Readonly<PlayerStats>): string[] {
+  return ITEM_IDS.filter((id) => ITEMS[id].rarity === rarity && !isItemMaxed(owned, id) && itemHasEffect(owned, id, base));
 }
 
 /**
@@ -71,7 +84,7 @@ export function rollItem(rng: Rng, wave: number, ctx: ShopContext, owned: readon
   for (let r = RARITY_ORDER.indexOf(rarity); r >= 0; r--) {
     rarity = RARITY_ORDER[r];
     if (!allowed.includes(rarity) || r < min) continue;
-    const pool = itemPool(rarity, owned).filter((id) => !used.has(`item:${id}`));
+    const pool = itemPool(rarity, owned, ctx.baseStats).filter((id) => !used.has(`item:${id}`));
     if (pool.length) return pool[Math.floor(rng() * pool.length)];
   }
   return null;

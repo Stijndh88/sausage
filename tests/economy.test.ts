@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ITEMS } from '../src/data/items';
 import { RARITY_ORDER, rarityWeights } from '../src/data/rarity';
 import { MAX_LINKS } from '../src/data/weapons';
-import { CAPS, computeStats } from '../src/state/stats';
+import { BASE_STATS, CAPS, computeStats } from '../src/state/stats';
 import type { WeaponSlot } from '../src/state/run';
 import {
-  applyWeaponPurchase, canBuy, weaponBuyModes, mergeLinks, mergePartner, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
+  applyWeaponPurchase, canBuy, itemHasEffect, weaponBuyModes, mergeLinks, mergePartner, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
 } from '../src/systems/Economy';
 import { mulberry32 } from '../src/systems/rng';
 
@@ -150,5 +150,36 @@ describe('rarities and maxed items', () => {
       return total / n;
     };
     expect(avgRank(9)).toBeGreaterThan(avgRank(2));
+  });
+});
+
+describe('items that would do nothing', () => {
+  // Dodge and crit already at their caps: the items that only raise those do nothing.
+  const capped = { ...BASE_STATS, dodge: CAPS.dodge, critChance: CAPS.critChance };
+
+  it('knows when an item would change no stat', () => {
+    expect(itemHasEffect([], 'slippery_oil', capped)).toBe(false);
+    expect(itemHasEffect([], 'mustard_seed', capped)).toBe(false);
+    expect(itemHasEffect([], 'slippery_oil')).toBe(true);
+  });
+
+  it('never offers them in the shop', () => {
+    for (let seed = 1; seed <= 400; seed++) {
+      const offers = generateOffers(shopRng(seed, 6, 0), 6, [], undefined, [], { baseStats: capped });
+      for (const o of offers) {
+        if (o.type === 'item') expect(itemHasEffect([], o.id, capped), `${o.id} (seed ${seed})`).toBe(true);
+      }
+    }
+  });
+
+  it('stops offering an item once an owned copy reaches the stat cap', () => {
+    // One Slippery Oil tops dodge up to the cap, well below the item's own stack limit.
+    const nearCap = { ...BASE_STATS, dodge: CAPS.dodge - 0.01 };
+    expect(computeStats(['slippery_oil'], nearCap).dodge).toBe(CAPS.dodge);
+    expect(itemHasEffect([], 'slippery_oil', nearCap)).toBe(true);
+    for (let seed = 1; seed <= 400; seed++) {
+      const offers = generateOffers(shopRng(seed, 6, 0), 6, [], undefined, [], { items: ['slippery_oil'], baseStats: nearCap });
+      expect(offers.some((o) => o.id === 'slippery_oil')).toBe(false);
+    }
   });
 });
