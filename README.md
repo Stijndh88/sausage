@@ -38,8 +38,9 @@ Keys work by **position**, not by the letter printed on them, so the defaults wo
 (WASD on QWERTY, ZQSD on AZERTY, and so on) and the game shows the letters of your layout.
 Every key can be changed in **Settings → Keyboard controls**.
 
-**Pick a sausage.** Five sausages with their own stats, starting weapons and one special rule each.
-The Classic Frank is unlocked from the start; the others unlock by reaching later waves or escaping.
+**Pick a sausage.** Eleven sausages with their own stats, starting weapons and one special rule each.
+The Classic Frank is unlocked from the start; the first four unlock by reaching later waves or escaping,
+the newer six by escaping with a particular sausage.
 
 | Sausage | Strength | Weakness | Unlock |
 |---|---|---|---|
@@ -48,10 +49,16 @@ The Classic Frank is unlocked from the start; the others unlock by reaching late
 | Chorizo | +20% damage, +10% crit, Mustard | -25 HP | Reach wave 7 |
 | Hot Dog | 7 links, faster, Toothpick + Skewer | -15 HP | Reach wave 10 |
 | Veggie Sausage | 1.5 HP/s regen, grill-proof, Onion Ring | -10% damage | Escape once |
+| Corn Dog | Batter shell blocks the first hit of every wave, +10 HP, Pickle Launcher | -15% speed | Escape as the Bratwurst |
+| Cocktail Sausage | 35% smaller hitbox, +20% speed, Toothpick | -30 HP, only 4 links | Escape as the Hot Dog |
+| Black Pudding | 12% lifesteal, +10 HP, Pepper Mill | Condiment packets don't drop | Escape as the Veggie |
+| Merguez | Every hit sets enemies on fire, Toothpick | -4 armor (takes 20% more damage) | Escape as the Chorizo |
+| Weisswurst | +40% damage for the first 20 s of every wave, Skewer | -20% damage after that | Escape as the Frank |
+| Kielbasa | 8 links, +20 HP, Toothpick + Pepper Mill | Every link can be hit | Escape as the Cocktail Sausage |
 
 **Sausage links.** Each weapon rides on its own link trailing behind your head and fires on its own,
 preferring ranged enemies. Buying a new weapon adds a link; buying one you own upgrades it (tiers I–IV).
-Only your **head** can be hit; the white dot is your hitbox. Melee enemies bounce off your links.
+Only your **head** can be hit (except as the Kielbasa); the white dot is your hitbox. Melee enemies bounce off your links.
 
 **Health.** Armor reduces every hit (diminishing returns), regen and lifesteal heal you, and blue condiment
 packets restore HP. Red-hot grill tiles burn you. You heal to full between waves.
@@ -95,6 +102,7 @@ fail; when the bug is fixed the runner flags it so the marker can be removed.
 | `ux` | layout at phone/tablet/ultrawide sizes, contrast, pause/blur behaviour |
 | `features` | settings, pause menu, sausage select and unlocks, tips, touch, gamepad, audio, shop controls |
 | `controls` | prompts per device, touch stick/dash/left-handed layout, controller in any slot, menu focus, rumble, pause on disconnect |
+| `sausages` | each newer sausage's special rule in a real run, and the scrolling select screen |
 
 ### Timing rule
 All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on
@@ -116,6 +124,13 @@ src/
   ui/                HUD, buttons, pause menu, settings, tips, damage numbers, touch and gamepad input
 tests/               Vitest tests for the logic in systems/, data/ and state/
 ```
+
+## Versioning
+The version lives in `package.json` and follows [semantic versioning](https://semver.org): bump the
+minor number for new content or features, the patch number for fixes. The main menu shows it in the
+bottom-right corner with the build's commit, e.g. `v0.2.0 (1a2b3c4)`, so a bug report can name the
+exact build. Bump it with `npm version minor --no-git-tag-version` (or `patch`) and add a line to
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Tuning the game
 Everything you'd want to tweak is plain data:
@@ -144,7 +159,9 @@ PNG falls back to its drawn placeholder.
 **To replace or add a sprite:** drop a PNG named after its key into `src/art/sprites/` (transparent
 background; the sausage faces **right**, enemies face **up**), add its in-game size to
 `sprites.json`, and reload. To re-cut everything from a new sheet with the same layout, run
-`python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy). The keys and sizes the art
+`python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy), then
+`python3 tools/make_portraits.py`, which paints the portraits of the six newer sausages from the cut
+ones until they get their own art. The keys and sizes the art
 must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md).
 
 ## What's next

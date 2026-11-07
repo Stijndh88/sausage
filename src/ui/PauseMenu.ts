@@ -100,7 +100,7 @@ export class PauseMenu {
     const wy = py + 200;
     add(s.add.text(px + 20, wy, 'LINKS', { fontFamily: FONT, fontSize: '14px', fontStyle: 'bold', color: '#c8a890' }));
     run.weapons.forEach((w, i) => {
-      const x = px + 46 + i * 92;
+      const x = px + 46 + i * (run.weapons.length > 7 ? 86 : 92);
       add(s.add.image(x, wy + 44, 'sausage-link').setScale(1.4));
       add(s.add.image(x, wy + 44, WEAPONS[w.id].icon).setScale(1.4));
       add(s.add.text(x, wy + 70, `${WEAPONS[w.id].name.split(' ')[0]} ${tierLabel(w.tier)}`, {

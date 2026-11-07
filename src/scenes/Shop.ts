@@ -124,8 +124,10 @@ export class ShopScene extends Phaser.Scene {
 
     // Loadout
     add(this.add.text(40, 548, `LINKS ${run.weapons.length}/${maxLinksFor(run)}`, { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
+    // The Kielbasa's 8 links need a tighter row to stay clear of the item list.
+    const linkStep = run.weapons.length > 7 ? 90 : 104;
     run.weapons.forEach((w, i) => {
-      const x = 60 + i * 104;
+      const x = 60 + i * linkStep;
       add(this.add.image(x, 600, 'sausage-link').setScale(1.6));
       add(this.add.image(x, 600, WEAPONS[w.id].icon).setScale(1.5));
       add(this.add.text(x, 634, `${WEAPONS[w.id].name}\n${tierLabel(w.tier)}`, { fontFamily: FONT, fontSize: '12px', color: '#ffffff', align: 'center' }).setOrigin(0.5, 0));

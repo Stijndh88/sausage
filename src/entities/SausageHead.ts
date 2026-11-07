@@ -15,15 +15,18 @@ export class SausageHead extends Phaser.Physics.Arcade.Sprite {
   private dashAngle = 0;
   private readonly dot: Phaser.GameObjects.Image;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, private readonly clock: GameClock) {
+  /** `scale` shrinks the head and its hitbox together (the Cocktail Sausage is tiny). */
+  constructor(scene: Phaser.Scene, x: number, y: number, private readonly clock: GameClock, scale = 1) {
     super(scene, x, y, 'sausage-head');
     scene.add.existing(this);
     scene.physics.add.existing(this);
+    // Scale before the circle: Arcade sizes the circle by the sprite's scale, offsets stay in texture pixels.
+    this.setScale(scale);
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setCircle(8, this.width / 2 - 8, this.height / 2 - 8);
     body.setCollideWorldBounds(true);
     this.setDepth(10);
-    this.dot = scene.add.image(x, y, 'hitbox').setDepth(11).setAlpha(0.85);
+    this.dot = scene.add.image(x, y, 'hitbox').setDepth(11).setAlpha(0.85).setScale(Math.max(0.7, scale));
   }
 
   get isDashing(): boolean {

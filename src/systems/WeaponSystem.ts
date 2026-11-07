@@ -19,7 +19,7 @@ export interface WeaponHooks {
   /** The sausage's head: where a boomerang goes if its link is gone. */
   head(): { x: number; y: number };
   /** Item effects that change how weapons fire. */
-  mods(): { explosionRadiusMult: number; extraProjectiles: number };
+  mods(): { explosionRadiusMult: number; extraProjectiles: number; pierce: number };
   /** Deal damage from a weapon. Returns nothing; the scene handles death. */
   damage(enemy: Enemy, amount: number, fromX: number, fromY: number, knockback: number): void;
   explode: ExplodeHandler;
@@ -68,13 +68,16 @@ export class WeaponSystem {
     const damage = tierDamage(def, tier) * damageMult;
     const lifetimeMs = (def.range / def.speed) * 1000 + 80;
     const spread = def.kind === 'cone' || def.kind === 'shotgun';
-    const count = tierProjectiles(def, tier) + (spread ? this.hooks.mods().extraProjectiles : 0);
+    const mods = this.hooks.mods();
+    const count = tierProjectiles(def, tier) + (spread ? mods.extraProjectiles : 0);
+    // Sharp Cheddar: straight shots pass through extra enemies (lobs explode, boomerangs already pass through all).
+    const pierce = (p: number) => p + mods.pierce;
 
     audio.play(`shoot_${def.kind}`);
     switch (def.kind) {
       case 'single':
       case 'pierce':
-        this.shot({ x, y, angle, speed: def.speed, damage, texture: def.bulletTexture, lifetimeMs, pierce: tierPierce(def, tier), knockback: def.kind === 'pierce' ? 120 : 60 }, now);
+        this.shot({ x, y, angle, speed: def.speed, damage, texture: def.bulletTexture, lifetimeMs, pierce: pierce(tierPierce(def, tier)), knockback: def.kind === 'pierce' ? 120 : 60 }, now);
         break;
       case 'cone':
       case 'shotgun': {
@@ -84,6 +87,7 @@ export class WeaponSystem {
           const speed = def.speed * (0.85 + Math.random() * 0.3);
           this.shot({
             x, y, angle: a, speed, damage, texture: def.bulletTexture, lifetimeMs,
+            pierce: pierce(0),
             poisonDps: def.poisonDps ? def.poisonDps * (1 + 0.5 * (tier - 1)) * damageMult : 0,
             knockback: def.kind === 'shotgun' ? 90 : 20,
           }, now);
@@ -96,7 +100,7 @@ export class WeaponSystem {
           x, y, angle, speed: def.speed, damage, texture: def.bulletTexture,
           lifetimeMs: (dist / def.speed) * 1000 + 50,
           lobTarget: { x: target.x, y: target.y },
-          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)) * this.hooks.mods().explosionRadiusMult,
+          explodeRadius: (def.explodeRadius ?? 60) * (1 + 0.1 * (tier - 1)) * mods.explosionRadiusMult,
           onExplode: this.hooks.explode,
         }, now);
         break;
