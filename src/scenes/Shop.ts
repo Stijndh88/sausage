@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindPrompt, getInputMode, hint, type InputMode } from '../ui/inputMode';
 import { GAME_H, GAME_W } from '../art/textures';
 import { ITEMS } from '../data/items';
 import { WEAPONS, tierLabel, type WeaponId } from '../data/weapons';
@@ -27,6 +28,13 @@ const CARD_Y = 300;
 const ROW_Y = 500;
 
 /** Between waves: spend crumbs on new links (weapons) or passive items. */
+/** The how-to line under the shop, for the device in use. */
+const SHOP_HELP: Record<InputMode, string> = {
+  keyboard: '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · ◄► pick a card',
+  pad: '◄► pick a card · (A) buy · (Y) keep for next shop · (X) reroll · (Start) next wave',
+  touch: 'Tap Buy to buy · tap Keep to save a card for the next shop',
+};
+
 export class ShopScene extends Phaser.Scene {
   private run!: RunState;
   private offers: (Offer | null)[] = [];
@@ -108,9 +116,11 @@ export class ShopScene extends Phaser.Scene {
 
     // Bottom row: reroll + next
     const cost = rerollCost(run.wave, run.rerollCount);
-    add(new Button(this, GAME_W / 2 - 150, ROW_Y, `Reroll (R)  ${cost}`, { width: 240, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.reroll())
+    const reroll = add(new Button(this, GAME_W / 2 - 150, ROW_Y, '', { width: 240, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.reroll())
       .setEnabled(run.crumbs >= cost && this.canReroll()));
-    add(new Button(this, GAME_W / 2 + 150, ROW_Y, 'Next wave (Enter)  ▶', { width: 240, height: 52, fill: 0x3c8d3c, hover: 0x52b052 }, () => this.next()));
+    bindPrompt(reroll, () => `Reroll${hint('R', 'X')}  ${cost}`);
+    const next = add(new Button(this, GAME_W / 2 + 150, ROW_Y, '', { width: 240, height: 52, fill: 0x3c8d3c, hover: 0x52b052 }, () => this.next()));
+    bindPrompt(next, () => `Next wave${hint('Enter', 'Start')}  ▶`);
 
     // Loadout
     add(this.add.text(40, 548, `LINKS ${run.weapons.length}/${maxLinksFor(run)}`, { fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890' }));
@@ -128,9 +138,9 @@ export class ShopScene extends Phaser.Scene {
     add(this.add.text(780, 574, itemLines.length ? itemLines.join('   ') : 'None yet', {
       fontFamily: FONT, fontSize: '14px', color: '#ffffff', wordWrap: { width: 460 }, lineSpacing: 6,
     }));
-    add(this.add.text(GAME_W / 2, GAME_H - 18, '1-4 buy · Shift+1-4 keep · R reroll · Enter next wave · Pad: ◄► pick, A buy, Y keep, X reroll, Start next', {
+    bindPrompt(add(this.add.text(GAME_W / 2, GAME_H - 18, '', {
       fontFamily: FONT, fontSize: '14px', color: '#b09080',
-    }).setOrigin(0.5));
+    }).setOrigin(0.5)), () => SHOP_HELP[getInputMode()]);
   }
 
   private renderCard(add: <T extends Phaser.GameObjects.GameObject>(o: T) => T, offer: Offer | null, i: number, x: number, y: number): void {
@@ -195,8 +205,9 @@ export class ShopScene extends Phaser.Scene {
       fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#9fe7a8', align: 'center', wordWrap: { width: CARD_W - 24 }, lineSpacing: 2,
     }).setOrigin(0.5, 0));
 
-    add(new Button(this, x - 38, top + CARD_H - 34, `${i + 1}  Buy · ${offer.price}`, { width: 156, height: 42, fontSize: 17 }, () => this.buy(i))
+    const buyBtn = add(new Button(this, x - 38, top + CARD_H - 34, '', { width: 156, height: 42, fontSize: 17 }, () => this.buy(i))
       .setEnabled(check.ok));
+    bindPrompt(buyBtn, () => `${getInputMode() === 'keyboard' ? `${i + 1}  ` : ''}Buy · ${offer.price}`);
     add(new Button(this, x + 82, top + CARD_H - 34, kept ? 'Kept' : 'Keep', {
       width: 64, height: 42, fill: kept ? 0x2a7fbf : 0x4a3a30, hover: 0x3a8fcf, fontSize: 14,
     }, () => this.toggleLock(i)));

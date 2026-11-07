@@ -20,10 +20,19 @@ terminal in the folder and run `npm install` and `npm run dev`.
 ## How to play
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
-| Move | WASD (ZQSD on AZERTY) / arrows | Left stick / D-pad | Drag on the left half |
-| Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | DASH button |
-| Pause menu | Esc / P | Start | II button |
-| Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap |
+| Move | WASD (ZQSD on AZERTY) / arrows | Left stick / D-pad | Drag anywhere on the left half (the stick follows your thumb) |
+| Dash (brief invulnerability) | Space / Shift | A / bumpers / triggers | Tap anywhere on the right half |
+| Pause menu | Esc / P | Start / Back | II button, top right |
+| Menus | Arrows + Enter, Esc to go back | D-pad / stick + A, B to go back | Tap |
+| Shop: buy / keep / reroll / next | 1–4 / Shift+1–4 / R / Enter | A / Y / X / Start (◄► picks a card) | Tap Buy / Keep / Reroll / Next |
+
+On-screen prompts follow whatever you last touched: key names on a keyboard, (A)/(B) on a controller,
+nothing on a touch screen. Any controller in any slot works; the game pauses if it disconnects,
+and it rumbles when you get hit (phones vibrate on Android). **Settings → Vibration** turns that off,
+and **Settings → Touch: DASH button side** swaps the halves for left-handed play.
+
+On a phone, tapping START goes full screen in landscape (Android). On iPhone, use
+**Share → Add to Home Screen** to play full screen without the browser bars.
 
 Keys work by **position**, not by the letter printed on them, so the defaults work on any keyboard
 (WASD on QWERTY, ZQSD on AZERTY, and so on) and the game shows the letters of your layout.
@@ -85,6 +94,7 @@ fail; when the bug is fixed the runner flags it so the marker can be removed.
 | `balance` | economy, boss time-to-kill, weapon/item rules |
 | `ux` | layout at phone/tablet/ultrawide sizes, contrast, pause/blur behaviour |
 | `features` | settings, pause menu, sausage select and unlocks, tips, touch, gamepad, audio, shop controls |
+| `controls` | prompts per device, touch stick/dash/left-handed layout, controller in any slot, menu focus, rumble, pause on disconnect |
 
 ### Timing rule
 All gameplay timing uses the Game scene's own clock (`gameTime`), which only advances on

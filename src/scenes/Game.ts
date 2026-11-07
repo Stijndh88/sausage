@@ -24,7 +24,9 @@ import { SettingsPanel } from '../ui/SettingsPanel';
 import { Tutorial } from '../ui/Tutorial';
 import { DamageNumbers } from '../ui/DamageNumbers';
 import { PadPoller } from '../ui/pad';
-import { TouchControls, wantsTouchControls } from '../ui/TouchControls';
+import { TouchControls } from '../ui/TouchControls';
+import { haptic } from '../ui/haptics';
+import { getInputMode } from '../ui/inputMode';
 import { loadSave, writeSave } from '../state/save';
 import { newRun } from '../state/run';
 import { audio } from '../audio/Audio';
@@ -221,9 +223,12 @@ export class GameScene extends Phaser.Scene {
 
     this.hud = new Hud(this, this.run.wave);
     this.damageNumbers = new DamageNumbers(this);
-    this.touch = wantsTouchControls(this.game)
-      ? new TouchControls(this, () => { if (!this.paused) this.dashQueued = true; }, () => { this.pauseQueued = true; })
-      : null;
+    // Always there; shows itself whenever the player is playing by touch.
+    this.touch = new TouchControls(this, {
+      dash: () => { if (!this.paused) this.dashQueued = true; },
+      pause: () => { this.pauseQueued = true; },
+      isPaused: () => this.paused,
+    });
     this.tutorial = this.run.wave === 1 && !loadSave().tutorialDone ? new Tutorial(this) : null;
     this.movedPx = 0;
     this.lastHeadPos = { x: this.head.x, y: this.head.y };
@@ -251,6 +256,8 @@ export class GameScene extends Phaser.Scene {
     // A bullet-hell must not keep running when the player looks away.
     this.game.events.on(Phaser.Core.Events.BLUR, this.autoPause, this);
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.autoPause, this);
+    // ...or when the controller they're playing with drops out (battery, cable, Bluetooth).
+    window.addEventListener('gamepaddisconnected', this.onPadLost);
 
     // Debug/testing hook (used by automated screenshots, harmless otherwise).
     (window as unknown as { __sausage?: unknown }).__sausage = this;
@@ -359,7 +366,9 @@ export class GameScene extends Phaser.Scene {
     for (const e of this.graveyard) e.destroy();
     this.graveyard.length = 0;
 
-    this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, this.head.dashCharge(this.stats.dashCooldownMs), time);
+    const dashCharge = this.head.dashCharge(this.stats.dashCooldownMs);
+    this.hud.update(this.health.hp, this.health.maxHp, this.run.crumbs, this.cfg.boss ? null : this.director.timeLeftSec, dashCharge, time);
+    this.touch?.update(dashCharge);
     this.hud.setBoss(this.boss && !this.boss.dead ? this.boss.hp / this.boss.maxHp : null);
     this.damageNumbers.update(time);
 
@@ -456,7 +465,10 @@ export class GameScene extends Phaser.Scene {
     e.disableBody(true, true);
     this.tweens.killTweensOf(e); // e.g. its spawn pop-in, if it died while appearing
     this.graveyard.push(e);
-    if (e.isBoss) this.win();
+    if (e.isBoss) {
+      haptic('bossDown');
+      this.win();
+    }
   }
 
   private collect(kind: 'crumb' | 'condiment'): void {
@@ -485,6 +497,7 @@ export class GameScene extends Phaser.Scene {
     if (!getSettings().reducedMotion) this.hitStopMs = 70;
     this.shake(110, 0.005);
     audio.play('hurt');
+    if (!this.health.dead) haptic('hit');
     this.floatText(this.head.x, this.head.y - 24, `-${dealt}`, '#ff6a5a');
     if (this.health.dead) this.onLethal(source);
   }
@@ -496,6 +509,7 @@ export class GameScene extends Phaser.Scene {
       this.head.markHit(1500);
       this.flash(250, 255, 200, 160);
       audio.play('save');
+      haptic('save');
       this.floatText(this.head.x, this.head.y - 40, 'SECOND SKIN!', '#ffd23f');
       return;
     }
@@ -577,6 +591,10 @@ export class GameScene extends Phaser.Scene {
   private flash(ms: number, r: number, g: number, b: number): void {
     if (!getSettings().reduceFlashing) this.cameras.main.flash(ms, r, g, b);
   }
+
+  private readonly onPadLost = (): void => {
+    if (getInputMode() === 'pad') this.autoPause();
+  };
 
   private autoPause(): void {
     if (!this.paused && this.scene.isActive()) this.togglePause();
@@ -708,6 +726,7 @@ export class GameScene extends Phaser.Scene {
     this.shake(500, 0.012);
     audio.setMood('off');
     audio.play('death');
+    haptic('death');
     this.sizzle.emitting = true;
     this.sizzle.frequency = 25;
     this.banner('SKEWERED!', `Done in by: ${source}`, 1500);
@@ -717,6 +736,7 @@ export class GameScene extends Phaser.Scene {
   private cleanup(): void {
     this.game.events.off(Phaser.Core.Events.BLUR, this.autoPause, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.autoPause, this);
+    window.removeEventListener('gamepaddisconnected', this.onPadLost);
     this.weapons.destroy();
     this.chain.destroy();
   }

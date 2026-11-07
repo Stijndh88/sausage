@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getInputMode } from './inputMode';
 import { GAME_W } from '../art/textures';
 import { FONT, HUD_H } from './Hud';
 import { getSettings } from '../state/settings';
@@ -31,6 +32,12 @@ const STEPS: Step[] = [
   {
     id: 'move',
     text: () => {
+      const mode = getInputMode();
+      if (mode === 'pad') return 'Move with the left stick. (A) dashes.';
+      if (mode === 'touch') {
+        const dashSide = getSettings().dashSide;
+        return `Drag on the ${dashSide === 'left' ? 'right' : 'left'} side to move. Tap the ${dashSide} side to dash.`;
+      }
       const b = getSettings().keyBindings;
       return `Move with ${moveLabel(b)} or the arrows. ${labelForCode(b.dash[0])} dashes.`;
     },

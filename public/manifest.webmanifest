@@ -1,0 +1,11 @@
+{
+  "name": "Wurst Case Scenario",
+  "short_name": "Wurst Case",
+  "description": "A sausage roguelite bullet-hell. Escape the BBQ.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1a1210",
+  "theme_color": "#1a1210"
+}
