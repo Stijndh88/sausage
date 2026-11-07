@@ -26,13 +26,14 @@ import { onAction } from '../ui/input';
 import { PhysicalKeys } from '../ui/keys';
 import { PauseMenu } from '../ui/PauseMenu';
 import { SettingsPanel } from '../ui/SettingsPanel';
+import { HelpPanel } from '../ui/HelpPanel';
 import { Tutorial } from '../ui/Tutorial';
 import { DamageNumbers } from '../ui/DamageNumbers';
 import { PadPoller } from '../ui/pad';
 import { TouchControls } from '../ui/TouchControls';
 import { haptic } from '../ui/haptics';
 import { getInputMode } from '../ui/inputMode';
-import { bankSpice, loadSave, unlockedRarities, writeSave } from '../state/save';
+import { bankSpice, loadSave, markSeen, unlockedRarities, writeSave } from '../state/save';
 import { tally } from '../state/run';
 import { bossName, courseDef, courseName, courseTrophy, TROPHIES } from '../data/courses';
 import { menuDef } from '../data/menus';
@@ -109,6 +110,7 @@ export class GameScene extends Phaser.Scene {
   private movedPx = 0;
   private lastHeadPos = { x: 0, y: 0 };
   private settingsPanel!: SettingsPanel;
+  private helpPanel!: HelpPanel;
   private onGrill = false;
   /** Smoked keystone: a one-hit shield each wave. */
   private shieldUp = false;
@@ -276,6 +278,7 @@ export class GameScene extends Phaser.Scene {
       floatText: (x, y, text, color) => this.floatText(x, y, text, color),
       blocked: (x, y, r) => this.hotTiles.some((t) => Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(x, y, r), t)),
       kills: () => this.run.kills,
+      onEventStart: (kind) => markSeen(`event:${kind}`),
       onEventDone: (r) => {
         if (!r.success) return;
         this.run.eventsWon[r.kind] = (this.run.eventsWon[r.kind] ?? 0) + 1;
@@ -296,11 +299,13 @@ export class GameScene extends Phaser.Scene {
     this.movedPx = 0;
     this.lastHeadPos = { x: this.head.x, y: this.head.y };
     this.settingsPanel = new SettingsPanel(this, () => this.pauseMenu.setActive(true));
+    this.helpPanel = new HelpPanel(this, () => this.pauseMenu.setActive(true));
     this.pauseMenu = new PauseMenu(this, {
       resume: () => { if (this.paused) this.togglePause(); },
       // Leaving a run early banks it like a bail-out, so the bag and the Cookbook progress aren't lost.
       restart: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); startRun(this, this.run.sausage); }),
       settings: () => { this.pauseMenu.setActive(false); this.settingsPanel.show(); },
+      help: () => { this.pauseMenu.setActive(false); this.helpPanel.show(); },
       quit: () => this.leavePaused(() => { settleRun(this.run, 'bail', this.health.hp); this.scene.start('Menu'); }),
       bail: () => this.leavePaused(() => this.scene.start('GameOver', { run: this.run, outcome: 'bail', hp: this.health.hp })),
       bailValue: () => bagValue('bail', this.run),
@@ -313,6 +318,9 @@ export class GameScene extends Phaser.Scene {
     const queuePause = () => { this.pauseQueued = true; };
     onAction(kb, 'dash', queueDash);
     onAction(kb, 'pause', queuePause);
+
+    // What the How to Play screen may explain: this run's links and items, and bosses once you meet one.
+    markSeen(...this.run.weapons.map((w) => `weapon:${w.id}`), ...this.run.items.map((id) => `item:${id}`), ...(this.cfg.boss ? ['mech:boss'] : []));
 
     if (this.cfg.boss) this.banner(bossName(this.cfg.course).toUpperCase(), 'Beat the boss, then take it home or go for seconds!');
     else if (this.cfg.courseWave === 1) this.banner(courseName(this.cfg.course).toUpperCase(), courseDef(this.cfg.course).intro);
@@ -595,6 +603,7 @@ export class GameScene extends Phaser.Scene {
     const id = rollItem(this.rng, this.run.wave, { luck: this.stats.luck, rarities: unlockedRarities() }, this.run.items, new Set());
     if (!id) return null;
     this.run.items.push(id);
+    markSeen(`item:${id}`);
     const old = this.stats;
     this.stats = runStats(this.run);
     this.health.maxHp = this.stats.maxHp;
@@ -811,13 +820,19 @@ export class GameScene extends Phaser.Scene {
         if (b === 'a' || b === 'rb' || b === 'lb') this.dashQueued = true;
         continue;
       }
-      if (this.settingsPanel.isOpen) {
+      if (this.helpPanel.isOpen) {
+        if (b === 'up' || b === 'down') this.helpPanel.navigate(b === 'up' ? -1 : 1);
+        else if (b === 'left' || b === 'right' || b === 'lb' || b === 'rb') this.helpPanel.changeTab(b === 'left' || b === 'lb' ? -1 : 1);
+        else if (b === 'b' || b === 'a') this.helpPanel.back();
+      } else if (this.settingsPanel.isOpen) {
         if (b === 'up' || b === 'down') this.settingsPanel.navigate(b === 'up' ? -1 : 1);
         else if (b === 'left' || b === 'right') this.settingsPanel.change(b === 'left' ? -1 : 1);
         else if (b === 'a') this.settingsPanel.confirm();
         else if (b === 'b') this.settingsPanel.back();
       } else if (b === 'up' || b === 'down') {
         this.pauseMenu.navigate(b === 'up' ? -1 : 1);
+      } else if (b === 'left' || b === 'right') {
+        this.pauseMenu.browse(b === 'left' ? -1 : 1);
       } else if (b === 'a') {
         this.pauseMenu.pressFocused();
       } else if (b === 'b') {
@@ -829,6 +844,7 @@ export class GameScene extends Phaser.Scene {
   /** Leave the paused state cleanly, then go somewhere else (restart / main menu). */
   private leavePaused(go: () => void): void {
     this.settingsPanel.hide();
+    this.helpPanel.hide();
     this.pauseMenu.hide();
     this.physics.world.resume();
     this.tweens.resumeAll();
@@ -842,6 +858,10 @@ export class GameScene extends Phaser.Scene {
     // Esc while the settings overlay is open just closes it.
     if (this.paused && this.settingsPanel.isOpen) {
       this.settingsPanel.back();
+      return;
+    }
+    if (this.paused && this.helpPanel.isOpen) {
+      this.helpPanel.back();
       return;
     }
     // Never *enter* pause during the end-of-wave/death/victory transitions,

@@ -10,7 +10,7 @@ const CODES: Record<string, string[]> = {
   ONE: ['Digit1', 'Numpad1'], TWO: ['Digit2', 'Numpad2'], THREE: ['Digit3', 'Numpad3'], FOUR: ['Digit4', 'Numpad4'], FIVE: ['Digit5', 'Numpad5'],
   ENTER: ['Enter', 'NumpadEnter'], ESC: ['Escape'], SPACE: ['Space'], SHIFT: ['ShiftLeft', 'ShiftRight'],
   UP: ['ArrowUp'], DOWN: ['ArrowDown'], LEFT: ['ArrowLeft'], RIGHT: ['ArrowRight'],
-  W: ['KeyW'], A: ['KeyA'], S: ['KeyS'], D: ['KeyD'], P: ['KeyP'], R: ['KeyR'], C: ['KeyC'], TAB: ['Tab'],
+  W: ['KeyW'], A: ['KeyA'], S: ['KeyS'], D: ['KeyD'], P: ['KeyP'], R: ['KeyR'], C: ['KeyC'], H: ['KeyH'], TAB: ['Tab'],
 };
 
 /**

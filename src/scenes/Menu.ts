@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { FONT } from '../ui/Hud';
 import { onKeyPress } from '../ui/input';
 import { SettingsPanel } from '../ui/SettingsPanel';
+import { HelpPanel } from '../ui/HelpPanel';
 import { PadPoller } from '../ui/pad';
 import { audio } from '../audio/Audio';
 import { fitCamera } from '../ui/view';
@@ -39,6 +40,7 @@ export class MenuScene extends Phaser.Scene {
   private row: Button[] = [];
   private focus = 1;
   private settingsPanel: SettingsPanel | null = null;
+  private helpPanel: HelpPanel | null = null;
 
   constructor() {
     super('Menu');
@@ -53,8 +55,13 @@ export class MenuScene extends Phaser.Scene {
     this.head.y = 250 + Math.sin(time / 220 + 0.8) * 10;
     // Gamepad: A/Start to play, X for settings; the pad also drives the settings panel.
     const sp = this.settingsPanel;
+    const hp = this.helpPanel;
     for (const b of this.pad.poll(this)) {
-      if (sp?.isOpen) {
+      if (hp?.isOpen) {
+        if (b === 'up' || b === 'down') hp.navigate(b === 'up' ? -1 : 1);
+        else if (b === 'left' || b === 'right' || b === 'lb' || b === 'rb') hp.changeTab(b === 'left' || b === 'lb' ? -1 : 1);
+        else if (b === 'b' || b === 'start' || b === 'a') hp.back();
+      } else if (sp?.isOpen) {
         if (b === 'up' || b === 'down') sp.navigate(b === 'up' ? -1 : 1);
         else if (b === 'left' || b === 'right') sp.change(b === 'left' ? -1 : 1);
         else if (b === 'a') sp.confirm();
@@ -67,6 +74,7 @@ export class MenuScene extends Phaser.Scene {
       else if (b === 'x') sp?.show();
       else if (b === 'y') this.rackFn();
       else if (b === 'b') this.bookFn();
+      else if (b === 'rb' || b === 'lb') this.helpPanel?.show();
     }
   }
 
@@ -118,8 +126,11 @@ export class MenuScene extends Phaser.Scene {
     let leaving = false;
     const settings = new SettingsPanel(this, () => {});
     this.settingsPanel = settings;
+    const helpPanel = new HelpPanel(this);
+    this.helpPanel = helpPanel;
+    const busy = () => settings.isOpen || helpPanel.isOpen;
     const start = () => {
-      if (leaving || settings.isOpen) return;
+      if (leaving || busy()) return;
       leaving = true;
       goImmersive(this);
       this.scene.start('Select');
@@ -133,16 +144,19 @@ export class MenuScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
     const go = (key: string) => {
-      if (leaving || settings.isOpen) return;
+      if (leaving || busy()) return;
       leaving = true;
       this.scene.start(key, { back: 'Menu' });
     };
     this.rackFn = () => go('SpiceRack');
     this.bookFn = () => go('Cookbook');
-    bindPrompt(new Button(this, GAME_W / 2 - 130, 568, '', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.rackFn), () => `Spice Rack${hint('Tab', 'Y')}`);
-    bindPrompt(new Button(this, GAME_W / 2 + 130, 568, '', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.bookFn), () => `Cookbook${hint('C', 'B')}`);
-    onKeyPress(this.input.keyboard!, 'TAB', () => this.rackFn());
+    const helpFn = () => { if (!busy() && !leaving) helpPanel.show(); };
+    bindPrompt(new Button(this, GAME_W / 2 - 250, 568, '', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.rackFn), () => `Spice Rack${hint('Tab', 'Y')}`);
+    bindPrompt(new Button(this, GAME_W / 2, 568, '', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, this.bookFn), () => `Cookbook${hint('C', 'B')}`);
+    bindPrompt(new Button(this, GAME_W / 2 + 250, 568, '', { width: 230, height: 46, fontSize: 18, fill: 0x8a6a1a, hover: 0xa88228 }, helpFn), () => `How to play${hint('H', 'RB')}`);
+    onKeyPress(this.input.keyboard!, 'TAB', () => { if (!helpPanel.isOpen) this.rackFn(); });
     onKeyPress(this.input.keyboard!, 'C', () => this.bookFn());
+    onKeyPress(this.input.keyboard!, 'H', () => (helpPanel.isOpen ? helpPanel.back() : helpFn()));
     this.input.keyboard!.addCapture('TAB');
     this.startFn = start;
     const startBtn = new Button(this, GAME_W / 2, 630, 'START', { width: 280, height: 60, fontSize: 24 }, start);
@@ -170,6 +184,6 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(1, 1).setAlpha(0.8);
     onKeyPress(this.input.keyboard!, 'ENTER', start);
     onKeyPress(this.input.keyboard!, 'SPACE', start);
-    onKeyPress(this.input.keyboard!, 'ESC', () => settings.back());
+    onKeyPress(this.input.keyboard!, 'ESC', () => (helpPanel.isOpen ? helpPanel.back() : settings.back()));
   }
 }

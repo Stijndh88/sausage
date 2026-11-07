@@ -49,6 +49,11 @@ export interface SaveData {
   /** Furthest course escaped per sausage (1 = took it home after the Backyard). */
   bestEscapeBy: Partial<Record<SausageId, number>>;
   history: RunRecord[];
+  /**
+   * Things the player has met, for the How to Play screen: "weapon:<id>", "item:<id>",
+   * "event:<kind>" and "mech:<name>". The screen only explains what is in here (no spoilers).
+   */
+  seen: string[];
 }
 
 const KEY = 'wurst-case-scenario/save';
@@ -59,7 +64,7 @@ export function defaultSave(): SaveData {
   return {
     version: 2, bestWave: 0, wins: 0, runs: 0, bestWaveBy: {}, winsBy: {}, lastSausage: 'frank', tutorialDone: false,
     spice: 0, trophies: { tong_tip: 0, grinder_blade: 0, smoked_brisket: 0 }, talents: {}, owned: ['frank'],
-    counters: {}, cooked: [], chili: {}, chiliPick: {}, firstTaste: [], bestEscapeBy: {}, history: [],
+    counters: {}, cooked: [], chili: {}, chiliPick: {}, firstTaste: [], bestEscapeBy: {}, history: [], seen: [],
   };
 }
 
@@ -104,10 +109,11 @@ export function migrate(raw: Record<string, unknown>): SaveData {
   for (const k of ['talents', 'counters', 'chili', 'chiliPick', 'bestEscapeBy', 'bestWaveBy', 'winsBy'] as const) {
     if (!data[k] || typeof data[k] !== 'object') (data as unknown as Record<string, unknown>)[k] = {};
   }
-  for (const k of ['cooked', 'firstTaste', 'history'] as const) {
+  for (const k of ['cooked', 'firstTaste', 'history', 'seen'] as const) {
     if (!Array.isArray(data[k])) (data as unknown as Record<string, unknown>)[k] = [];
   }
   data.cooked = data.cooked.filter((id) => id in RECIPES);
+  data.seen = data.seen.filter((id) => typeof id === 'string');
   if (!(data.lastSausage in SAUSAGES)) data.lastSausage = 'frank';
   return data as SaveData;
 }
@@ -246,4 +252,18 @@ export function bankSpice(amount: number): void {
   if (amount <= 0) return;
   const save = loadSave();
   writeSave({ ...save, spice: save.spice + Math.floor(amount) });
+}
+
+// --- How to Play ------------------------------------------------------------------------------
+
+/** Records things the player has now met (see SaveData.seen). Writes only when something is new. */
+export function markSeen(...ids: string[]): void {
+  const save = loadSave();
+  const fresh = ids.filter((id) => !save.seen.includes(id));
+  if (!fresh.length) return;
+  writeSave({ ...save, seen: [...save.seen, ...new Set(fresh)] });
+}
+
+export function hasSeen(id: string, save: SaveData = loadSave()): boolean {
+  return save.seen.includes(id);
 }

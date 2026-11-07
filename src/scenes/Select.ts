@@ -118,7 +118,6 @@ export class SelectScene extends Phaser.Scene {
     const total = shown * CARD_W + (shown - 1) * GAP;
     const rowLeft = (GAME_W - total) / 2;
     SAUSAGE_IDS.slice(first, first + shown).forEach((id, slot) => {
-      const i = first + slot;
       const def = SAUSAGES[id];
       const state = sausageState(id, save);
       const owned = state === 'owned';
@@ -141,7 +140,7 @@ export class SelectScene extends Phaser.Scene {
         add(this.add.image(x + 26, top + 70, 'sausage-head').setScale(1.5).setTint(tint));
       }
 
-      add(this.add.text(x, top + 118, `${i < NUMBER_KEYS.length ? `${(i + 1) % 10}  ` : ''}${def.name}`, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: owned ? '#ffffff' : '#8a7a70' }).setOrigin(0.5));
+      add(this.add.text(x, top + 118, def.name, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: owned ? '#ffffff' : '#8a7a70' }).setOrigin(0.5));
       const u = def.unlock;
       const price = `${u.spice} Spice${Object.entries(u.trophies ?? {}).map(([t, n]) => ` + ${n} ${TROPHIES[t as TrophyId].name}`).join('')}`;
       if (state === 'locked') {
