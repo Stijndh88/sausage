@@ -10,9 +10,12 @@ import { loadTelemetry, markSent, onTelemetryRecord, type ErrorRecord, type RunR
  * The server side (tables and insert-only policies) is in supabase/play_data.sql.
  */
 
-/** The game's Supabase project. The publishable key is meant to ship in the client. */
-export const PLAY_DATA_URL: string = (import.meta.env.VITE_PLAY_DATA_URL as string | undefined) ?? '';
-export const PLAY_DATA_KEY: string = (import.meta.env.VITE_PLAY_DATA_KEY as string | undefined) ?? '';
+/**
+ * The game's own Supabase project ("wurst"). The publishable key is meant to ship in the client:
+ * the tables only accept inserts (supabase/play_data.sql). VITE_PLAY_DATA_URL / _KEY override them.
+ */
+export const PLAY_DATA_URL: string = (import.meta.env.VITE_PLAY_DATA_URL as string | undefined) ?? 'https://sabxjyesqcymeayxirxk.supabase.co';
+export const PLAY_DATA_KEY: string = (import.meta.env.VITE_PLAY_DATA_KEY as string | undefined) ?? 'sb_publishable_5tZtxHFFSzf8XIcxMgEkmw_1Re8NoX9';
 
 /** Records per request, so one upload stays small. */
 const BATCH = 20;
