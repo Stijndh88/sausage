@@ -5,7 +5,7 @@ import { MAX_LINKS } from '../src/data/weapons';
 import { CAPS, computeStats } from '../src/state/stats';
 import type { WeaponSlot } from '../src/state/run';
 import {
-  applyWeaponPurchase, canBuy, weaponBuyModes, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
+  applyWeaponPurchase, canBuy, weaponBuyModes, mergeLinks, mergePartner, generateOffers, rerollCost, rollCrumbs, scalePrice, shopRng,
 } from '../src/systems/Economy';
 import { mulberry32 } from '../src/systems/rng';
 
@@ -76,6 +76,18 @@ describe('weapon purchases', () => {
     expect(canBuy({ type: 'weapon', id: 'mustard', price: 1 }, 10, full).ok).toBe(false);
     expect(canBuy({ type: 'item', id: 'paprika', price: 1 }, 10, full).ok).toBe(true);
     expect(canBuy({ type: 'item', id: 'paprika', price: 11 }, 10, full).ok).toBe(false);
+  });
+
+  it('merges two links with the same weapon and tier into one link a tier higher', () => {
+    const w: WeaponSlot[] = [{ id: 'skewer', tier: 1 }, { id: 'onion', tier: 1 }, { id: 'skewer', tier: 1 }, { id: 'skewer', tier: 2 }];
+    expect(mergePartner(w, 0)).toBe(2);
+    expect(mergePartner(w, 1)).toBe(-1); // only one Onion Ring
+    expect(mergePartner(w, 3)).toBe(-1); // no other tier II Skewer
+    expect(mergeLinks(w, 0)).toEqual([{ id: 'skewer', tier: 2 }, { id: 'onion', tier: 1 }, { id: 'skewer', tier: 2 }]);
+    expect(w).toHaveLength(4); // input untouched
+    expect(mergeLinks(w, 1)).toBeNull();
+    // Tier IV can't go higher.
+    expect(mergeLinks([{ id: 'pepper', tier: 4 }, { id: 'pepper', tier: 4 }], 0)).toBeNull();
   });
 
   it('does not mutate the input', () => {

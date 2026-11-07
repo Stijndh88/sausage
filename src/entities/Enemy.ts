@@ -84,6 +84,14 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     super.destroy(fromScene);
   }
 
+  /**
+   * Swap to another sprite of the same size, if it exists (a later course's look, e.g.
+   * `enemy-fork-kitchen`). Call before setup(), which sizes the hit circle from the sprite.
+   */
+  useTexture(key: string): void {
+    if (key !== this.texture.key && this.scene.textures.exists(key)) this.setTexture(key);
+  }
+
   /** Call after adding to the physics group (groups reset body settings). */
   setup(now: number): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -107,6 +115,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Call before setup(): turns the Tongs into a later course's boss. */
   applyStyle(style: BossStyle): void {
     this.style = style;
+    this.useTexture(style.texture);
     this.baseTint = style.tint;
     this.styleScale = style.scale;
   }
