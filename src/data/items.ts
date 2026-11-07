@@ -64,6 +64,8 @@ const list: ItemDef[] = [
     desc: 'Grill tiles no longer burn you. +3 armor.', apply: (s) => { s.grillImmune = 1; s.armor += 3; } },
   { id: 'extra_pellet', icon: 'dots', name: 'Extra Pellet', rarity: 'rare', price: 30, color: 0x555555, maxStacks: 2, synergy: 'Pepper Mill, Mustard Squirt',
     desc: '+1 pellet for spread weapons.', apply: (s) => { s.extraProjectiles += 1; } },
+  { id: 'sharp_cheddar', icon: 'spear', name: 'Sharp Cheddar', rarity: 'rare', price: 28, color: 0xf2b632, maxStacks: 3, synergy: 'Toothpick, Skewer',
+    desc: 'Shots pierce +1 more enemy (not Pickle or Onion Ring).', apply: (s) => { s.pierce += 1; } },
   { id: 'vampire_ketchup', icon: 'drop', name: 'Vampire Ketchup', rarity: 'rare', price: 30, color: 0x8b0000, maxStacks: 3,
     desc: '+10% chance per hit to heal 1 HP. +1 HP regen.', apply: (s) => { s.lifesteal += 0.1; s.regenPerSec += 1; } },
 

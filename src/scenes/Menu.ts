@@ -10,6 +10,7 @@ import { audio } from '../audio/Audio';
 import { fitCamera } from '../ui/view';
 import { labelForCode, layoutReady, moveLabel } from '../ui/keyboardLayout';
 import { getSettings, onSettingsChange } from '../state/settings';
+import { versionLabel } from '../version';
 
 export class MenuScene extends Phaser.Scene {
   private head!: Phaser.GameObjects.Image;
@@ -106,6 +107,9 @@ export class MenuScene extends Phaser.Scene {
       this.scale.off('enterfullscreen');
       this.scale.off('leavefullscreen');
     });
+    this.add.text(GAME_W - 14, GAME_H - 10, versionLabel(), {
+      fontFamily: FONT, fontSize: '14px', color: '#c8a890',
+    }).setOrigin(1, 1).setAlpha(0.8);
     onKeyPress(this.input.keyboard!, 'ENTER', start);
     onKeyPress(this.input.keyboard!, 'SPACE', start);
     onKeyPress(this.input.keyboard!, 'ESC', () => settings.back());
