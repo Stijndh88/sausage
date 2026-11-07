@@ -112,6 +112,14 @@ class GameDriver {
     }, null, { timeout: 5000, polling: 50 });
   }
 
+  /** After a boss kill: wait for the take-it-home-or-seconds screen and take it home. */
+  async takeHome(timeoutMs = 10000) {
+    await this.waitForScene('Choice', timeoutMs);
+    await this.wait(700);
+    await this.page.keyboard.press('1');
+    await this.waitForScene('Victory', 5000);
+  }
+
   /** Start the Shop scene directly with a run. */
   async openShop(opts = {}) {
     await this.page.evaluate((o) => {

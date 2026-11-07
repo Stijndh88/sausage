@@ -273,7 +273,7 @@ module.exports = {
       },
     },
     {
-      name: 'stress: 60 menu→game→GameOver→menu cycles and 30 boss→Victory cycles stay bounded',
+      name: 'stress: 60 menu→game→GameOver→menu cycles and 30 boss→choice→Victory cycles stay bounded',
       timeoutMs: 90000,
       fn: async ({ g, page }) => {
         await installSim(g);
@@ -299,11 +299,15 @@ module.exports = {
         assertBounded(menu[10], menu[60], 'menu↔game');
         const victory = {};
         for (let i = 1; i <= 30; i++) {
-          await simStart(g, { seed: i, wave: 10, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
+          await simStart(g, { seed: i, wave: 7, weapons: FULL_KIT, items: KIT_ITEMS, god: true });
           await sim(g, 150, { bot: true });
           await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
-          await sim(g, 300, { until: 'Victory' });
-          assert.equal(await g.scene(), 'Victory', `cycle ${i}: boss kill did not reach Victory`);
+          await sim(g, 300, { until: 'Choice' });
+          assert.equal(await g.scene(), 'Choice', `cycle ${i}: boss kill did not reach the choice`);
+          await sim(g, 40); // the choice ignores input for 500 ms
+          await g.evaluate(() => window.__game.scene.getScene('Choice').takeHome());
+          await sim(g, 5, { until: 'Victory' });
+          assert.equal(await g.scene(), 'Victory', `cycle ${i}: taking it home did not reach Victory`);
           await sim(g, 60);
           if (i === 5 || i === 30) victory[i] = { ...(await counts(g)), heap: await heapMB(page) };
         }
@@ -374,7 +378,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 9, wave: 10, weapons: [{ id: 'toothpick', tier: 1 }], god: true });
+        await simStart(g, { seed: 9, wave: 7, weapons: [{ id: 'toothpick', tier: 1 }], god: true });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.director.stop();
@@ -648,7 +652,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 4, wave: 10, god: true });
+        await simStart(g, { seed: 4, wave: 7, god: true });
         const r = await g.evaluate(() => {
           const game = window.__game;
           let s = game.scene.getScene('Game');
@@ -675,7 +679,7 @@ module.exports = {
       timeoutMs: 60000,
       fn: async ({ g }) => {
         await installSim(g);
-        await simStart(g, { seed: 4, wave: 10 });
+        await simStart(g, { seed: 4, wave: 7 });
         const r = await g.evaluate(() => {
           const s = window.__game.scene.getScene('Game');
           s.invincible = true;

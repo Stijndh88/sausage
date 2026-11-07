@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EVENTS, EVENT_EDGE_SEC, EVENT_MIN_GAP_SEC, bountyTarget, eventCount, rollWaveEvents,
 } from '../src/data/events';
-import { TOTAL_WAVES, waveConfig } from '../src/data/waves';
+import { BACKYARD_BOSS_WAVE as TOTAL_WAVES, waveConfig } from '../src/data/waves';
 import { mulberry32 } from '../src/systems/rng';
 
 const SEEDS = Array.from({ length: 300 }, (_, i) => i * 7919 + 13);

@@ -1,6 +1,6 @@
 /**
  * Tests for the features added with HP, sausage types and "the basics":
- * settings, pause menu, sausage select + unlocks, first-run tips, touch, gamepad, audio, shop clarity.
+ * settings, pause menu, sausage select + buying, the doggy bag, first-run tips, touch, gamepad, audio, shop clarity.
  */
 const { assert, GameDriver } = require('./harness.cjs');
 
@@ -100,9 +100,10 @@ module.exports = {
           return { paused: s.paused, menu: s.pauseMenu.open, texts };
         });
         assert.ok(open.paused && open.menu);
-        for (const t of ['PAUSED', 'Resume (Esc)', 'Restart run', 'Settings', 'Main menu', 'Armor']) {
+        for (const t of ['PAUSED', 'Resume (Esc)', 'Bail out', 'Restart run', 'Settings', 'Main menu', 'Armor']) {
           assert.ok(open.texts.some((x) => x.includes(t)), `pause menu shows "${t}"`);
         }
+        await page.keyboard.press('ArrowDown');
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter'); // Settings
@@ -125,6 +126,7 @@ module.exports = {
         await g.godMode();
         await page.keyboard.press('Escape');
         await frames(g, 3);
+        await page.keyboard.press('ArrowDown'); // Bail out
         await page.keyboard.press('ArrowDown'); // Restart run
         await page.keyboard.press('Enter');
         await frames(g, 3);
@@ -138,18 +140,24 @@ module.exports = {
       },
     },
     {
-      name: 'sausage select: locked sausages cannot start; unlocked ones start with their own stats',
+      name: 'sausage select: locked sausages cannot start; a cooked one is bought with Spice, then starts with its own stats',
       fn: async ({ page, g }) => {
-        await setSave(page, save({ bestWave: 4, runs: 2, lastSausage: 'frank' }));
+        await setSave(page, { ...save(), version: 2, runs: 2, spice: 150, owned: ['frank'], cooked: ['escape_backyard'] });
         await reload(page, g);
         await page.keyboard.press('Enter');
         await g.waitForScene('Select');
         await g.wait(350);
-        await page.keyboard.press('4'); // Hot Dog: locked (needs wave 10)
+        await page.keyboard.press('4'); // Hot Dog: recipe not cooked
         await page.keyboard.press('Enter');
         await frames(g, 5);
         assert.equal(await g.evaluate(() => window.__game.scene.isActive('Select')), true, 'locked sausage did not start');
-        await page.keyboard.press('2'); // Bratwurst: unlocked by wave 4
+        await page.keyboard.press('2'); // Bratwurst: recipe cooked, costs 100 Spice
+        await page.keyboard.press('Enter');
+        await frames(g, 5);
+        assert.equal(await g.evaluate(() => window.__game.scene.isActive('Select')), true, 'the first Enter only buys');
+        let stored = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SAVE_KEY));
+        assert.equal(stored.spice, 50);
+        assert.ok(stored.owned.includes('bratwurst'), 'bought');
         await page.keyboard.press('Enter');
         await g.waitForScene('Game');
         const r = await g.evaluate(() => {
@@ -157,15 +165,38 @@ module.exports = {
           return { sausage: s.run.sausage, maxHp: s.health.maxHp, armor: s.health.armor, weapons: s.run.weapons.map((w) => w.id) };
         });
         assert.deepEqual(r, { sausage: 'bratwurst', maxHp: 140, armor: 3, weapons: ['pepper'] });
-        const stored = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SAVE_KEY));
+        stored = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SAVE_KEY));
         assert.equal(stored.lastSausage, 'bratwurst', 'the choice is remembered');
       },
     },
     {
-      name: 'unlocks: dying on wave 4 with a fresh profile unlocks the Bratwurst and records the run',
+      name: 'pause menu: bailing out needs a second press and banks half the bag',
+      fn: async ({ page, g }) => {
+        await g.startRun({ seed: 3, wave: 4 });
+        await g.godMode();
+        await g.evaluate(() => { window.__game.scene.getScene('Game').run.bag = 80; });
+        await page.keyboard.press('Escape');
+        await frames(g, 3);
+        await page.keyboard.press('ArrowDown'); // Bail out
+        await page.keyboard.press('Enter');
+        await frames(g, 3);
+        assert.equal(await g.evaluate(() => window.__game.scene.isActive('Game')), true, 'first press only asks for confirmation');
+        await page.keyboard.press('Enter');
+        await g.waitForScene('GameOver', 10000);
+        const stored = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), SAVE_KEY));
+        assert.equal(stored.spice, 40);
+        assert.equal(stored.history[0].outcome, 'bail');
+      },
+    },
+    {
+      name: 'doggy bag: dying before pushing on keeps half the bag as Spice, records the run and unlocks nothing',
       fn: async ({ g }) => {
         await g.startRun({ seed: 5, wave: 4 });
-        await g.evaluate(() => window.__game.scene.getScene('Game').takeDamage(999, 'Fork'));
+        await g.evaluate(() => {
+          const s = window.__game.scene.getScene('Game');
+          s.run.bag = 100;
+          s.takeDamage(999, 'Fork');
+        });
         await g.waitForScene('GameOver', 10000);
         await frames(g, 3);
         const r = await g.evaluate((k) => {
@@ -173,10 +204,35 @@ module.exports = {
           const texts = s.children.list.filter((o) => o.type === 'Text').map((o) => o.text);
           return { texts, save: JSON.parse(localStorage.getItem(k)) };
         }, SAVE_KEY);
-        assert.ok(r.texts.some((t) => t.includes('NEW SAUSAGE UNLOCKED') && t.includes('Bratwurst')), 'unlock announced');
         assert.ok(r.texts.some((t) => t.includes('Done in by Fork')), 'cause of death shown');
+        assert.equal(r.save.spice, 50);
         assert.equal(r.save.bestWave, 4);
         assert.equal(r.save.runs, 1);
+        assert.deepEqual(r.save.owned, ['frank']);
+      },
+    },
+    {
+      name: 'take it home: escaping the Backyard pays the bag plus 10%, cooks its recipe and announces the Bratwurst',
+      fn: async ({ page, g }) => {
+        await g.startRun({ seed: 5, wave: 7 });
+        await g.godMode();
+        await g.evaluate(() => new Promise((resolve) => {
+          const s = window.__game.scene.getScene('Game');
+          const t = setInterval(() => { if (s.boss) { clearInterval(t); resolve(); } }, 50);
+        }));
+        await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.run.bag = 200; s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
+        await g.takeHome();
+        await frames(g, 3);
+        const r = await g.evaluate((k) => {
+          const s = window.__game.scene.getScene('Victory');
+          const texts = s.children.list.filter((o) => o.type === 'Text').map((o) => o.text);
+          return { texts, save: JSON.parse(localStorage.getItem(k)), bag: window.__results?.bag };
+        }, SAVE_KEY);
+        assert.ok(r.save.cooked.includes('escape_backyard'), `cooked: ${r.save.cooked}`);
+        assert.ok(r.texts.some((t) => t.includes('Bratwurst can be bought')), `news: ${JSON.stringify(r.texts)}`);
+        assert.equal(r.save.wins, 1);
+        assert.equal(r.save.trophies.tong_tip, 1, 'the boss trophy came home');
+        assert.ok(r.save.spice >= 220, `spice ${r.save.spice}`);
       },
     },
     {

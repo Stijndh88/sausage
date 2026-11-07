@@ -10,6 +10,11 @@ import { MenuScene } from './scenes/Menu';
 import { SelectScene } from './scenes/Select';
 import { ShopScene } from './scenes/Shop';
 import { VictoryScene } from './scenes/Victory';
+import { ChoiceScene } from './scenes/Choice';
+import { SpiceRackScene } from './scenes/SpiceRack';
+import { CookbookScene } from './scenes/Cookbook';
+import { loadSave, resetSaveCache, writeSave } from './state/save';
+import { settleRun } from './state/meta';
 import { RENDER_SCALE } from './ui/view';
 import { setInputMode, trackInputMode } from './ui/inputMode';
 
@@ -63,7 +68,7 @@ const game = new Phaser.Game({
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [BootScene, MenuScene, SelectScene, GameScene, ShopScene, GameOverScene, VictoryScene],
+  scene: [BootScene, MenuScene, SelectScene, GameScene, ShopScene, GameOverScene, VictoryScene, ChoiceScene, SpiceRackScene, CookbookScene],
 });
 
 // Browsers only allow sound after a user gesture: start audio on the first key, click or tap.
@@ -92,7 +97,7 @@ window.addEventListener('gamepaddisconnected', () => toast('🎮 Controller disc
 // Hooks for automated tests (tests/e2e). Harmless in normal play.
 Object.assign(window as unknown as Record<string, unknown>, {
   __game: game,
-  __debug: { newRun, waveConfig },
+  __debug: { newRun, waveConfig, loadSave, writeSave, resetSaveCache, settleRun },
   __audio: audio,
   __renderScale: RENDER_SCALE,
 });

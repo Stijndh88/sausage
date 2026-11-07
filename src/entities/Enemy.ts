@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ENEMIES, type EnemyDef, type EnemyKind } from '../data/enemies';
 import type { BulletPatterns } from '../systems/BulletPatterns';
+import type { BossStyle } from '../data/courses';
 
 export interface EnemyContext {
   player: { x: number; y: number };
@@ -21,6 +22,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   hp: number;
   readonly maxHp: number;
   dead = false;
+  /** Multiplies move speed (Chili 1). */
+  speedMult = 1;
+  /** How this boss looks and fights (later courses); null for the Backyard Tongs and normal enemies. */
+  style: BossStyle | null = null;
+  private baseTint = 0xffffff;
+  private styleScale = 1;
   /** Elites (timed event): more HP, bigger, glowing. */
   readonly elite: boolean;
   private readonly baseScale: number;
@@ -79,8 +86,21 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.mode = this.def.kind === 'hotsauce' ? 'idle' : 'move';
     this.nextSummonAt = now + 5000;
     this.strafeDir = Math.random() < 0.5 ? -1 : 1;
-    this.setScale(0.2 * this.baseScale);
-    this.scene.tweens.add({ targets: this, scale: this.baseScale, duration: 180, ease: 'Back.Out' });
+    const scale = this.baseScale * this.styleScale;
+    this.setScale(0.2 * scale);
+    this.scene.tweens.add({ targets: this, scale, duration: 180, ease: 'Back.Out' });
+  }
+
+  /** Call before setup(): turns the Tongs into a later course's boss. */
+  applyStyle(style: BossStyle): void {
+    this.style = style;
+    this.baseTint = style.tint;
+    this.styleScale = style.scale;
+  }
+
+  /** Name for the HUD and the cause of death. */
+  get label(): string {
+    return this.style?.name ?? this.def.name;
   }
 
   get isBoss(): boolean {
@@ -155,7 +175,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     let vx = 0;
     let vy = 0;
     let face = toPlayer;
-    const speed = this.def.speed;
+    const speed = this.def.speed * this.speedMult;
     const spawning = now - this.born < 250;
 
     switch (this.def.kind) {
@@ -260,9 +280,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     // Drift toward the player, but keep some distance.
     if (dist > 260) {
-      vx = (dx / dist) * this.def.speed;
-      vy = (dy / dist) * this.def.speed;
+      vx = (dx / dist) * this.def.speed * this.speedMult;
+      vy = (dy / dist) * this.def.speed * this.speedMult;
     }
+    const fireMult = this.style?.fireMult ?? 1;
 
     if (now >= this.nextFireAt) {
       const i = this.attackIndex++;
@@ -280,7 +301,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (!this.dead && !ctx.halted()) p.ring(this.x, this.y + 30, 22, 170, dmg, 'eb-boss', i * 0.15 + 0.14);
           });
         }
-        this.nextFireAt = now + 1700;
+        this.nextFireAt = now + 1700 * fireMult;
       } else {
         const pick = i % 3;
         if (pick === 0) {
@@ -296,13 +317,22 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         } else {
           this.setMode('windup', now, 650);
         }
-        this.nextFireAt = now + 1500;
+        this.nextFireAt = now + 1500 * fireMult;
+      }
+      // Big Smokey (and Chili 4 bosses): a short aimed spiral after every other attack.
+      if (this.style?.extraAttack && i % 2 === 1) {
+        for (let k = 0; k < 6; k++) {
+          this.scene.time.delayedCall(500 + k * 110, () => {
+            if (!this.dead && !ctx.halted()) p.spiral(this.x, this.y + 30, (this.spiralAngle -= 0.41), 3, 160, dmg, 'eb-hot');
+          });
+        }
       }
     }
 
     if (now >= this.nextSummonAt) {
-      ctx.spawnMinion('fork', this.x - 60, this.y + 40);
-      ctx.spawnMinion('fork', this.x + 60, this.y + 40);
+      const minion = this.style?.minion ?? 'fork';
+      ctx.spawnMinion(minion, this.x - 60, this.y + 40);
+      ctx.spawnMinion(minion, this.x + 60, this.y + 40);
       this.nextSummonAt = now + (phase2 ? 4500 : 6500);
     }
     return [vx, vy];
@@ -322,6 +352,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.setTint(0xc8ff6a);
     } else if (this.elite) {
       this.setTint(0xffd0ff);
+    } else if (this.baseTint !== 0xffffff) {
+      this.setTint(this.baseTint);
     } else {
       this.clearTint();
     }

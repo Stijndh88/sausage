@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W } from '../art/textures';
-import { TOTAL_WAVES } from '../data/waves';
 import { EVENTS, type ScheduledEvent } from '../data/events';
 
 export const HUD_H = 64;
@@ -45,12 +44,17 @@ export class Hud {
   private readonly vignette: Phaser.GameObjects.Graphics;
   private readonly bossBar: Phaser.GameObjects.Graphics;
   private readonly bossName: Phaser.GameObjects.Text;
+  private readonly bagText: Phaser.GameObjects.Text;
+  private readonly keepText: Phaser.GameObjects.Text;
+  private shownBag = '';
+  private readonly trophyMarks: Phaser.GameObjects.Graphics;
   private shownCrumbs = -1;
   private lastHp = -1;
   private hurtFlashUntil = 0;
   private track: { g: Phaser.GameObjects.Graphics; durationSec: number; icons: { ev: ScheduledEvent; img: Phaser.GameObjects.Image }[] } | null = null;
 
-  constructor(private readonly scene: Phaser.Scene, wave: number) {
+  /** `label` is the course and wave ("THE KITCHEN · WAVE 2/5"). */
+  constructor(private readonly scene: Phaser.Scene, label: string) {
     const bg = scene.add.graphics().setDepth(50);
     bg.fillStyle(0x120c0a, 0.92).fillRect(0, 0, GAME_W, HUD_H);
     bg.fillStyle(0x3a2418, 1).fillRect(0, HUD_H - 3, GAME_W, 3);
@@ -73,7 +77,7 @@ export class Hud {
       .setDepth(51);
 
     scene.add
-      .text(GAME_W / 2 + 80, 10, wave >= TOTAL_WAVES ? 'FINAL WAVE' : `WAVE ${wave}/${TOTAL_WAVES}`, {
+      .text(GAME_W / 2 + 80, 10, label, {
         fontFamily: FONT, fontSize: '14px', color: '#c8a890',
       })
       .setOrigin(0.5, 0.5)
@@ -82,6 +86,12 @@ export class Hud {
       .text(GAME_W / 2 + 80, 35, '', { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' })
       .setOrigin(0.5, 0.5)
       .setDepth(51);
+
+    // The doggy bag: Spice you'd take home, and what you'd keep if you died right now.
+    scene.add.text(388, 2, 'DOGGY BAG', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#c8a890' }).setDepth(51);
+    this.bagText = scene.add.text(388, 15, '0', { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#ffd060' }).setDepth(51);
+    this.keepText = scene.add.text(388, 42, '', { fontFamily: FONT, fontSize: '12px', color: '#c8a890' }).setDepth(51);
+    this.trophyMarks = scene.add.graphics().setDepth(51);
 
     this.vignette = scene.add.graphics().setDepth(49);
     this.bossBar = scene.add.graphics().setDepth(51).setVisible(false);
@@ -194,6 +204,24 @@ export class Hud {
   /** Where the boss bar is drawn (inside the HUD strip, never over the arena). */
   get bossBarBounds(): { x: number; y: number; w: number; h: number } {
     return { x: BOSS_BAR_CX - BOSS_BAR_W / 2 - 3, y: BOSS_BAR_Y - 3, w: BOSS_BAR_W + 6, h: 18 };
+  }
+
+  setBossName(name: string): void {
+    this.bossName.setText(name.toUpperCase());
+  }
+
+  /** Spice in the bag, what dying now would keep, and the trophies carried (as coloured diamonds). */
+  setBag(bag: number, keepIfDie: number, trophyColors: readonly number[]): void {
+    const key = `${bag}|${keepIfDie}|${trophyColors.join(',')}`;
+    if (key === this.shownBag) return;
+    this.shownBag = key;
+    this.bagText.setText(`${bag} Spice`);
+    this.keepText.setText(`keep ${keepIfDie} if you die`);
+    const g = this.trophyMarks.clear();
+    trophyColors.forEach((c, i) => {
+      const x = 388 + this.bagText.width + 10 + i * 13;
+      g.fillStyle(c, 1).fillPoints([{ x, y: 20 }, { x: x + 5, y: 26 }, { x, y: 32 }, { x: x - 5, y: 26 }], true);
+    });
   }
 
   setBoss(fraction: number | null): void {

@@ -220,12 +220,12 @@ module.exports = {
 
     // ----- Text placement on every screen --------------------------------------
     {
-      name: 'ux: menu text and START button are inside the canvas and do not overlap',
+      name: 'ux: menu text and buttons are inside the canvas and do not overlap',
       fn: async ({ page }) => {
         const texts = await textBounds(page, 'Menu');
         const buttons = await buttonBounds(page, 'Menu');
         assert.ok(texts.length >= 3, 'expected title, subtitle and help text');
-        assert.equal(buttons.length, 3, 'Settings, START and Fullscreen');
+        assert.equal(buttons.length, 5, 'Settings, START, Fullscreen, Spice Rack and Cookbook');
         assertAllInside([...texts, ...buttons], 'menu');
         const free = texts.filter((t) => !buttons.some((b) => b.text === t.text));
         assertNoOverlaps([...free, ...buttons], 'menu');
@@ -243,7 +243,7 @@ module.exports = {
         assertNoOverlaps(hud, 'HUD');
         for (const t of hud) assert.ok(t.y + t.h <= 64 + 1, `HUD text "${t.text}" spills below the 64px HUD strip`);
 
-        await g.startRun({ seed: 1, wave: 10, crumbs: 999 });
+        await g.startRun({ seed: 1, wave: 7, crumbs: 999 });
         await g.godMode();
         await until(page, () => !!window.__game.scene.getScene('Game').boss);
         await g.wait(200);
@@ -255,7 +255,7 @@ module.exports = {
     {
       name: 'ux: boss health bar and name do not cover the playable arena',
       fn: async ({ page, g }) => {
-        await g.startRun({ seed: 1, wave: 10 });
+        await g.startRun({ seed: 1, wave: 7 });
         await g.godMode();
         await until(page, () => !!window.__game.scene.getScene('Game').boss);
         await g.wait(200);
@@ -299,24 +299,33 @@ module.exports = {
       },
     },
     {
-      name: 'ux: Game Over and Victory text and buttons are inside the canvas and do not overlap',
+      name: 'ux: end screens, the boss choice, the Spice Rack and the Cookbook keep text and buttons inside the canvas without overlaps',
       fn: async ({ page, g }) => {
-        for (const key of ['GameOver', 'Victory']) {
-          await g.evaluate((k) => {
+        const screens = [
+          { key: 'GameOver', data: { outcome: 'death', hp: 0 }, buttons: 3 },
+          { key: 'GameOver', data: { outcome: 'bail', hp: 40 }, buttons: 3 },
+          { key: 'Victory', data: { outcome: 'home', hp: 40 }, buttons: 3 },
+          { key: 'Choice', data: { hp: 40 }, buttons: 2 },
+          { key: 'SpiceRack', data: {}, buttons: 1 },
+          { key: 'Cookbook', data: {}, buttons: 1 },
+        ];
+        for (const sc of screens) {
+          const label = `${sc.key} ${sc.data.outcome ?? ''}`.trim();
+          await g.evaluate((o) => {
             const game = window.__game;
             const run = window.__debug.newRun(5);
-            Object.assign(run, { wave: 10, kills: 12345, crumbsEarned: 9999, timeSurvivedSec: 3599 });
+            Object.assign(run, { wave: 7, kills: 12345, crumbsEarned: 9999, timeSurvivedSec: 3599, bag: 98765, pushes: 1 });
             for (const s of game.scene.getScenes(true)) game.scene.stop(s.scene.key);
-            game.scene.start(k, { run });
-          }, key);
-          await g.waitForScene(key);
-          await g.wait(100);
-          const texts = await textBounds(page, key);
-          const buttons = await buttonBounds(page, key);
-          assert.equal(buttons.length, 2, `${key}: expected two buttons`);
-          assertAllInside([...texts, ...buttons], key);
+            game.scene.start(o.key, { run, ...o.data });
+          }, sc);
+          await g.waitForScene(sc.key);
+          await g.wait(400);
+          const texts = await textBounds(page, sc.key);
+          const buttons = await buttonBounds(page, sc.key);
+          assert.ok(buttons.length >= sc.buttons, `${label}: expected ${sc.buttons} buttons, got ${buttons.length}`);
+          assertAllInside([...texts, ...buttons], label);
           const free = texts.filter((t) => !buttons.some((b) => b.text === t.text));
-          assertNoOverlaps([...free, ...buttons], key);
+          assertNoOverlaps([...free, ...buttons], label);
         }
       },
     },

@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMIES } from '../src/data/enemies';
 import { ITEMS, ITEM_IDS } from '../src/data/items';
-import { TOTAL_WAVES, waveConfig, type WaveConfig } from '../src/data/waves';
+import { BACKYARD_BOSS_WAVE, waveConfig, type WaveConfig } from '../src/data/waves';
 import {
   MAX_LINKS, MAX_TIER, WEAPONS, WEAPON_IDS, tierCooldown, tierDamage, tierPierce, tierProjectiles, type WeaponDef,
 } from '../src/data/weapons';
@@ -69,7 +69,7 @@ function crumbsIfEverythingDies(wave: number): number {
   return spawnSchedule(cfg).reduce((a, s) => a + s.count, 0) * expectedPerSpawn(cfg, 'crumbs');
 }
 
-const BOSS_HP = ENEMIES.tongs.hp * waveConfig(TOTAL_WAVES).hpMult;
+const BOSS_HP = ENEMIES.tongs.hp * waveConfig(BACKYARD_BOSS_WAVE).bossHpMult;
 
 // --- weapons ---------------------------------------------------------------------------------------
 
@@ -196,16 +196,16 @@ describe('health', () => {
 
 describe('wave pressure', () => {
   it('enemy HP spawned per second never drops from one regular wave to the next', () => {
-    for (let w = 2; w < TOTAL_WAVES; w++) expect(hpPressure(w), `wave ${w}`).toBeGreaterThanOrEqual(hpPressure(w - 1));
+    for (let w = 2; w < BACKYARD_BOSS_WAVE; w++) expect(hpPressure(w), `wave ${w}`).toBeGreaterThanOrEqual(hpPressure(w - 1));
   });
 
   it('enemies spawned per wave never drop from one regular wave to the next', () => {
     const count = (w: number) => spawnSchedule(waveConfig(w)).reduce((a, s) => a + s.count, 0);
-    for (let w = 2; w < TOTAL_WAVES; w++) expect(count(w), `wave ${w}`).toBeGreaterThanOrEqual(count(w - 1));
+    for (let w = 2; w < BACKYARD_BOSS_WAVE; w++) expect(count(w), `wave ${w}`).toBeGreaterThanOrEqual(count(w - 1));
   });
 
   it('turrets only appear in waves that allow them, and the cap never exceeds the batch size of a wave', () => {
-    for (let w = 1; w <= TOTAL_WAVES; w++) {
+    for (let w = 1; w <= BACKYARD_BOSS_WAVE; w++) {
       const c = waveConfig(w);
       const hasTurretWeight = (c.weights.hotsauce ?? 0) > 0;
       expect(hasTurretWeight, `wave ${w}`).toBe(c.maxTurrets > 0);
@@ -214,14 +214,14 @@ describe('wave pressure', () => {
   });
 
   it('the boss wave trickle is lighter than the last regular wave', () => {
-    const boss = waveConfig(TOTAL_WAVES);
+    const boss = waveConfig(BACKYARD_BOSS_WAVE);
     const minionPressure = (spawnSchedule(boss, 60).reduce((a, s) => a + s.count, 0) * expectedPerSpawn(boss, 'hp')) / 60;
-    expect(minionPressure).toBeLessThan(hpPressure(TOTAL_WAVES - 1));
+    expect(minionPressure).toBeLessThan(hpPressure(BACKYARD_BOSS_WAVE - 1));
   });
 
   // Sane range only: wave 3 is currently the steepest step (~2x). See the balance report.
   it('no single wave more than 2.5x the enemy HP pressure of the previous one', () => {
-    for (let w = 2; w < TOTAL_WAVES; w++) expect(hpPressure(w) / hpPressure(w - 1), `wave ${w}`).toBeLessThanOrEqual(2.5);
+    for (let w = 2; w < BACKYARD_BOSS_WAVE; w++) expect(hpPressure(w) / hpPressure(w - 1), `wave ${w}`).toBeLessThanOrEqual(2.5);
   });
 
   // Sane range: the boss must not be killable faster than a few seconds by the best possible loadout,
@@ -245,7 +245,7 @@ describe('economy', () => {
   it('every base price is a positive whole number and scaled prices never fall', () => {
     for (const p of [...WEAPON_IDS.map((id) => WEAPONS[id].price), ...ITEM_IDS.map((id) => ITEMS[id].price)]) {
       expect(Number.isInteger(p) && p > 0).toBe(true);
-      for (let w = 2; w <= TOTAL_WAVES; w++) expect(scalePrice(p, w)).toBeGreaterThanOrEqual(scalePrice(p, w - 1));
+      for (let w = 2; w <= BACKYARD_BOSS_WAVE; w++) expect(scalePrice(p, w)).toBeGreaterThanOrEqual(scalePrice(p, w - 1));
     }
   });
 
@@ -267,7 +267,7 @@ describe('economy', () => {
   it('a shop always has at least one buyable offer for a player with crumbs (six maxed links)', () => {
     const maxed: WeaponSlot[] = ['toothpick', 'pickle', 'skewer', 'pepper', 'mustard', 'onion'].map((id) => ({ id: id as WeaponSlot['id'], tier: MAX_TIER }));
     for (let seed = 0; seed < 40; seed++) {
-      for (let wave = 1; wave < TOTAL_WAVES; wave++) {
+      for (let wave = 1; wave < BACKYARD_BOSS_WAVE; wave++) {
         const offers = generateOffers(shopRng(seed, wave, 0), wave + 1, [], SHOP_SIZE, maxed);
         expect(offers.some((o) => canBuy(o, 10_000, maxed).ok), `seed ${seed} wave ${wave}`).toBe(true);
       }

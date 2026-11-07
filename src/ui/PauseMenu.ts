@@ -4,6 +4,7 @@ import { GAME_H, GAME_W } from '../art/textures';
 import { ITEMS } from '../data/items';
 import { RARITIES } from '../data/rarity';
 import { SAUSAGES } from '../data/sausages';
+import { courseName, locate } from '../data/courses';
 import { WEAPONS, tierLabel } from '../data/weapons';
 import type { RunState } from '../state/run';
 import type { PlayerStats } from '../state/stats';
@@ -17,6 +18,10 @@ export interface PauseActions {
   restart(): void;
   settings(): void;
   quit(): void;
+  /** End the run now and keep part of the doggy bag. */
+  bail(): void;
+  /** Spice a bail-out would bank right now. */
+  bailValue(): number;
 }
 
 const DEPTH = 200;
@@ -25,7 +30,7 @@ const DEPTH = 200;
 export class PauseMenu {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private list: MenuList | null = null;
-  private armed: 'restart' | 'quit' | null = null;
+  private armed: 'restart' | 'quit' | 'bail' | null = null;
   open = false;
   /** The "PAUSED" heading while the menu is open (tests check it's visible and on top). */
   title: Phaser.GameObjects.Text | null = null;
@@ -51,15 +56,21 @@ export class PauseMenu {
     const bx = 250;
     const mk = (y: number, label: string, fn: () => void, fill = 0xb8502a) =>
       add(new Button(s, bx, y, label, { width: 280, height: 54, fill, fontSize: 21 }, fn));
-    const resume = mk(220, 'Resume', () => this.actions.resume(), 0x3c8d3c);
+    const resume = mk(200, 'Resume', () => this.actions.resume(), 0x3c8d3c);
     bindPrompt(resume, () => `Resume${hint('Esc', 'B')}`);
-    const restart = mk(290, 'Restart run', () => this.confirm('restart', restart, 'Restart? Press again'), 0x5a4a3a);
-    const settings = mk(360, 'Settings', () => this.actions.settings(), 0x5a4a3a);
-    const quit = mk(430, 'Main menu', () => this.confirm('quit', quit, 'Quit run? Press again'), 0x5a4a3a);
-    if (this.list) this.list.setButtons([resume, restart, settings, quit]);
-    else this.list = new MenuList(s, [resume, restart, settings, quit], () => this.open);
+    const keep = this.actions.bailValue();
+    const bail = mk(270, `Bail out: bank ${keep} Spice`, () => this.confirm('bail', bail, `Bank ${keep}? Press again`), 0x8a6a1a);
+    const restart = mk(340, 'Restart run', () => this.confirm('restart', restart, 'Restart? Press again'), 0x5a4a3a);
+    const settings = mk(410, 'Settings', () => this.actions.settings(), 0x5a4a3a);
+    const quit = mk(480, 'Main menu', () => this.confirm('quit', quit, 'Quit run? Press again'), 0x5a4a3a);
+    const buttons = [resume, bail, restart, settings, quit];
+    if (this.list) this.list.setButtons(buttons);
+    else this.list = new MenuList(s, buttons, () => this.open);
     this.list.active = true;
-    const help = add(s.add.text(bx, 500, '', { fontFamily: FONT, fontSize: '13px', color: '#b09080' }).setOrigin(0.5));
+    add(s.add.text(bx, 540, 'Bailing out keeps part of your doggy bag.\nRestart and Main menu count as bailing out.', {
+      fontFamily: FONT, fontSize: '13px', color: '#b09080', align: 'center',
+    }).setOrigin(0.5, 0));
+    const help = add(s.add.text(bx, 600, '', { fontFamily: FONT, fontSize: '13px', color: '#b09080' }).setOrigin(0.5));
     bindPrompt(help, () => ({ keyboard: '↑↓ + Enter, or click', pad: '↑↓ + (A) · (B) resumes', touch: 'Tap a button' })[getInputMode()]);
 
     // Build overview
@@ -69,7 +80,7 @@ export class PauseMenu {
     const g = add(s.add.graphics());
     g.fillStyle(0x241812, 0.95).fillRoundedRect(px, py, pw, 470, 14);
     g.lineStyle(2, 0x5a4a3a, 1).strokeRoundedRect(px, py, pw, 470, 14);
-    add(s.add.text(px + 20, py + 16, `${SAUSAGES[run.sausage].name.toUpperCase()} · WAVE ${run.wave}`, {
+    add(s.add.text(px + 20, py + 16, `${SAUSAGES[run.sausage].name.toUpperCase()} · ${courseName(locate(run.wave).course).toUpperCase()} · WAVE ${locate(run.wave).courseWave}${run.chili ? ` · CHILI ${run.chili}` : ''}`, {
       fontFamily: FONT, fontSize: '16px', fontStyle: 'bold', color: '#c8a890',
     }));
 
@@ -128,9 +139,10 @@ export class PauseMenu {
   }
 
   /** Destructive actions need a second press. */
-  private confirm(which: 'restart' | 'quit', button: Button, prompt: string): void {
+  private confirm(which: 'restart' | 'quit' | 'bail', button: Button, prompt: string): void {
     if (this.armed === which) {
       if (which === 'restart') this.actions.restart();
+      else if (which === 'bail') this.actions.bail();
       else this.actions.quit();
       return;
     }

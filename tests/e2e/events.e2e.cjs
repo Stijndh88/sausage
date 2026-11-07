@@ -62,7 +62,7 @@ module.exports = {
     {
       name: 'events: the boss wave has no event track',
       fn: async ({ g }) => {
-        await g.startRun({ seed: 7, wave: 10 });
+        await g.startRun({ seed: 7, wave: 7 });
         const n = await g.evaluate(() => window.__game.scene.getScene('Game').timedEvents.schedule.length);
         assert.equal(n, 0);
       },

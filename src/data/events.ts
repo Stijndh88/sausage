@@ -1,5 +1,5 @@
 import { type Rng, pickWeighted } from '../systems/rng';
-import { TOTAL_WAVES, waveConfig } from './waves';
+import { waveConfig } from './waves';
 
 /**
  * Events at marked times during a wave (in the spirit of Vampire Survivors' map events and
@@ -74,9 +74,9 @@ export const EVENT_EDGE_SEC = 7;
 /** Minimum gap between two events in the same wave. */
 export const EVENT_MIN_GAP_SEC = 9;
 
-/** How many events a wave gets: 1 in wave 1, 2 in waves 2-4, 3 after. The boss wave has none. */
+/** How many events a wave gets: 1 in wave 1, 2 in waves 2-4, 3 after. Boss waves have none. */
 export function eventCount(wave: number): number {
-  if (wave >= TOTAL_WAVES) return 0;
+  if (waveConfig(wave).boss) return 0;
   if (wave <= 1) return 1;
   return wave <= 4 ? 2 : 3;
 }

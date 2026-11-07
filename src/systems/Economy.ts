@@ -13,11 +13,14 @@ export interface Offer {
 export const SHOP_SIZE = 4;
 export const WEAPON_OFFER_CHANCE = 0.45;
 
-/** Prices rise 25% (of the base price) per wave. */
+/** Prices rise 25% (of the base price) per wave, then 12% per wave after wave 10 (deep runs). */
 export const PRICE_GROWTH_PER_WAVE = 0.25;
+export const LATE_PRICE_GROWTH_PER_WAVE = 0.12;
 
-export function scalePrice(base: number, wave: number): number {
-  return Math.round(base * (1 + PRICE_GROWTH_PER_WAVE * (wave - 1)));
+export function scalePrice(base: number, wave: number, priceMult = 1): number {
+  const w = Math.max(1, wave);
+  const growth = PRICE_GROWTH_PER_WAVE * (Math.min(w, 10) - 1) + LATE_PRICE_GROWTH_PER_WAVE * Math.max(0, w - 10);
+  return Math.max(1, Math.round(base * (1 + growth) * priceMult));
 }
 
 export function rerollCost(wave: number, rerollCount: number): number {
@@ -39,6 +42,14 @@ export interface ShopContext {
   luck?: number;
   /** Link limit for the chosen sausage. */
   maxLinks?: number;
+  /** Weapons that may be offered (unlocked ones); all when missing. */
+  weaponPool?: readonly WeaponId[];
+  /** Item rarities that may be offered; all when missing. */
+  rarities?: readonly Rarity[];
+  /** Lowest item rarity offered (Food Truck keystone). */
+  minRarity?: Rarity;
+  /** Multiplies every price (talent discount, Chili, menus). */
+  priceMult?: number;
 }
 
 /** Item ids of one rarity that can still be offered. */
@@ -46,11 +57,20 @@ function itemPool(rarity: Rarity, owned: readonly string[]): string[] {
   return ITEM_IDS.filter((id) => ITEMS[id].rarity === rarity && !isItemMaxed(owned, id));
 }
 
-/** Rolls a rarity (by wave and luck), falling back to lower rarities when a pool is empty. */
-export function rollItem(rng: Rng, wave: number, luck: number, owned: readonly string[], used: Set<string>): string | null {
-  let rarity = pickWeighted(rng, rarityWeights(wave, luck));
+/**
+ * Rolls a rarity (by wave and luck), falling back to lower rarities when a pool is empty.
+ * Locked rarities are never rolled; with a minimum rarity, lower ones aren't either.
+ */
+export function rollItem(rng: Rng, wave: number, ctx: ShopContext, owned: readonly string[], used: Set<string>): string | null {
+  const allowed = ctx.rarities ?? RARITY_ORDER;
+  const min = RARITY_ORDER.indexOf(ctx.minRarity ?? 'common');
+  const weights = rarityWeights(wave, ctx.luck ?? 0);
+  for (const r of RARITY_ORDER) if (!allowed.includes(r) || RARITY_ORDER.indexOf(r) < min) weights[r] = 0;
+  if (!Object.values(weights).some((w) => w > 0)) return null;
+  let rarity = pickWeighted(rng, weights);
   for (let r = RARITY_ORDER.indexOf(rarity); r >= 0; r--) {
     rarity = RARITY_ORDER[r];
+    if (!allowed.includes(rarity) || r < min) continue;
     const pool = itemPool(rarity, owned).filter((id) => !used.has(`item:${id}`));
     if (pool.length) return pool[Math.floor(rng() * pool.length)];
   }
@@ -71,23 +91,26 @@ export function generateOffers(
   ctx: ShopContext = {},
 ): Offer[] {
   const owned = ctx.items ?? [];
-  const offers: Offer[] = locked.slice(0, count).map((o) => ({ ...o, price: scalePrice(basePrice(o), wave) }));
+  const priceMult = ctx.priceMult ?? 1;
+  const pool = ctx.weaponPool ?? WEAPON_IDS;
+  const offers: Offer[] = locked.slice(0, count).map((o) => ({ ...o, price: scalePrice(basePrice(o), wave, priceMult) }));
   const used = new Set(offers.map((o) => `${o.type}:${o.id}`));
   let guard = 0;
   while (offers.length < count && guard++ < 200) {
     const type: Offer['type'] = rng() < WEAPON_OFFER_CHANCE ? 'weapon' : 'item';
     let id: string | null;
     if (type === 'weapon') {
-      id = WEAPON_IDS[Math.floor(rng() * WEAPON_IDS.length)];
+      if (!pool.length) continue;
+      id = pool[Math.floor(rng() * pool.length)];
       if (weapons && applyWeaponPurchase(weapons, id as WeaponId, ctx.maxLinks) === null) continue;
     } else {
-      id = rollItem(rng, wave, ctx.luck ?? 0, owned, used);
+      id = rollItem(rng, wave, ctx, owned, used);
       if (!id) continue;
     }
     const key = `${type}:${id}`;
     if (used.has(key)) continue;
     used.add(key);
-    offers.push({ type, id, price: scalePrice(basePrice({ type, id }), wave) });
+    offers.push({ type, id, price: scalePrice(basePrice({ type, id }), wave, priceMult) });
   }
   return offers;
 }

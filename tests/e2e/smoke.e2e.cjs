@@ -45,16 +45,42 @@ module.exports = {
       },
     },
     {
-      name: 'killing the boss leads to Victory',
+      name: 'killing the boss leads to the choice, and taking it home to Victory',
       fn: async ({ g }) => {
-        await g.startRun({ wave: 10 });
+        await g.startRun({ wave: 7 });
         await g.godMode();
         await g.evaluate(() => new Promise((resolve) => {
           const s = window.__game.scene.getScene('Game');
           const t = setInterval(() => { if (s.boss) { clearInterval(t); resolve(); } }, 50);
         }));
         await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
-        await g.waitForScene('Victory', 6000);
+        await g.takeHome();
+      },
+    },
+    {
+      name: 'seconds: after the boss, push on → pick an item → pick a menu → shop → the Kitchen (wave 8)',
+      fn: async ({ page, g }) => {
+        await g.startRun({ seed: 3, wave: 7 });
+        await g.godMode();
+        await g.evaluate(() => new Promise((resolve) => {
+          const s = window.__game.scene.getScene('Game');
+          const t = setInterval(() => { if (s.boss) { clearInterval(t); resolve(); } }, 50);
+        }));
+        await g.evaluate(() => { const s = window.__game.scene.getScene('Game'); s.damageEnemy(s.boss, 1e9, 0, 0, 0); });
+        await g.waitForScene('Choice', 10000);
+        await g.wait(700);
+        await page.keyboard.press('2'); // Seconds?
+        await g.wait(500);
+        await page.keyboard.press('1'); // first free item
+        await g.wait(500);
+        await page.keyboard.press('2'); // Light Lunch
+        await g.waitForScene('Shop', 5000);
+        const run = await g.evaluate(() => { const r = window.__game.scene.getScene('Shop').run; return { pushes: r.pushes, items: r.items.length, menu: r.menu }; });
+        assert.deepEqual(run, { pushes: 1, items: 1, menu: 'light_lunch' });
+        await page.keyboard.press('Enter');
+        await g.waitForScene('Game');
+        const s = await g.gameState();
+        assert.equal(s.wave, 8);
       },
     },
     {

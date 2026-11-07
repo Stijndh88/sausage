@@ -32,6 +32,16 @@ export interface PlayerStats {
   extraLives: number;
   /** HP restored by a condiment packet. */
   condimentHeal: number;
+  /** Multiplies poison damage per second. */
+  poisonMult: number;
+  /** Extra damage (fraction) against enemies at full HP. */
+  firstBite: number;
+  /** Fire damage per second a crit adds (0 = off). */
+  critBurn: number;
+  /** Multiplies grill tile damage. */
+  grillDamageMult: number;
+  /** Extra invulnerability after a hit, in ms. */
+  iframeBonusMs: number;
 }
 
 export const BASE_STATS: Readonly<PlayerStats> = {
@@ -55,6 +65,11 @@ export const BASE_STATS: Readonly<PlayerStats> = {
   grillImmune: 0,
   extraLives: 0,
   condimentHeal: 15,
+  poisonMult: 1,
+  firstBite: 0,
+  critBurn: 0,
+  grillDamageMult: 1,
+  iframeBonusMs: 0,
 };
 
 export const CAPS = {
@@ -84,5 +99,6 @@ export function computeStats(itemIds: readonly string[], base: Readonly<PlayerSt
   s.fireRateMult = Math.max(CAPS.minFireRateMult, s.fireRateMult);
   s.damageMult = Math.max(CAPS.minDamageMult, s.damageMult);
   s.grillImmune = s.grillImmune > 0 ? 1 : 0;
+  s.grillDamageMult = Math.max(0, s.grillDamageMult);
   return s;
 }

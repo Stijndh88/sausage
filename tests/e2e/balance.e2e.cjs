@@ -76,7 +76,7 @@ module.exports = {
       timeoutMs: 120000,
       fn: async ({ g }) => {
         const ttk = async (weapons, items) => {
-          await g.startRun({ seed: 7, wave: 10, weapons, items });
+          await g.startRun({ seed: 7, wave: 7, weapons, items });
           await installStepper(g);
           return g.evaluate(() => {
             const s = window.__game.scene.getScene('Game');
@@ -149,7 +149,7 @@ module.exports = {
     {
       name: 'boss minions respect the spawn rules (telegraph / 240 px from the sausage)',
       fn: async ({ g }) => {
-        await g.startRun({ seed: 9, wave: 10 });
+        await g.startRun({ seed: 9, wave: 7 });
         await g.godMode();
         await installStepper(g);
         const r = await g.evaluate(() => {
