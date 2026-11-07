@@ -224,7 +224,8 @@ background; the sausage faces **right**, enemies face **up**), add its in-game s
 `python3 tools/cut_sprites.py <sheet.png>` (needs Pillow, numpy and scipy), then
 `python3 tools/make_portraits.py`, which paints the portraits of the six newer sausages from the cut
 ones until they get their own art. The keys and sizes the art
-must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md).
+must follow are in [docs/ART_BRIEF.md](docs/ART_BRIEF.md); the Kitchen and Smokehouse art is in
+[docs/ART_BRIEF_COURSES.md](docs/ART_BRIEF_COURSES.md).
 
 ## What's next
 See [docs/ROADMAP.md](docs/ROADMAP.md). Not done yet: mid-wave level-ups, elites and wave modifiers,

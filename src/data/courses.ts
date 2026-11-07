@@ -30,6 +30,8 @@ export const TROPHY_IDS = Object.keys(TROPHIES) as TrophyId[];
 /** How a course's boss looks and fights. All bosses share the Tongs' move set, with twists. */
 export interface BossStyle {
   name: string;
+  /** Its own sprite (falls back to the Tongs if the texture is missing). */
+  texture: string;
   tint: number;
   scale: number;
   /** Multiplies the time between attacks (lower = attacks more often). */
@@ -57,17 +59,17 @@ export const COURSES: readonly CourseDef[] = [
   {
     id: 'backyard', name: 'The Backyard', waves: 6, trophy: 'tong_tip', arenaTint: 0xffffff,
     intro: 'Escape the BBQ!',
-    boss: { name: "The Grill Master's Tongs", tint: 0xffffff, scale: 1, fireMult: 1, minion: 'fork', extraAttack: false },
+    boss: { name: "The Grill Master's Tongs", texture: 'enemy-tongs', tint: 0xffffff, scale: 1, fireMult: 1, minion: 'fork', extraAttack: false },
   },
   {
     id: 'kitchen', name: 'The Kitchen', waves: 5, trophy: 'grinder_blade', arenaTint: 0xbcd4ff,
     intro: 'Everything in here is sharp.',
-    boss: { name: 'The Meat Grinder', tint: 0x9fc4e0, scale: 1.1, fireMult: 0.85, minion: 'spatula', extraAttack: false },
+    boss: { name: 'The Meat Grinder', texture: 'enemy-grinder', tint: 0xffffff, scale: 1.1, fireMult: 0.85, minion: 'spatula', extraAttack: false },
   },
   {
     id: 'smokehouse', name: 'The Smokehouse', waves: 5, trophy: 'smoked_brisket', arenaTint: 0xc8a088,
     intro: 'Low and slow. Very slow.',
-    boss: { name: 'Big Smokey', tint: 0x7a6258, scale: 1.25, fireMult: 0.8, minion: 'ketchup', extraAttack: true },
+    boss: { name: 'Big Smokey', texture: 'enemy-smokey', tint: 0xffffff, scale: 1.25, fireMult: 0.8, minion: 'ketchup', extraAttack: true },
   },
 ];
 
