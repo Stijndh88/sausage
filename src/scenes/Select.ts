@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindPrompt, hint } from '../ui/inputMode';
 import { GAME_H, GAME_W } from '../art/textures';
 import { SAUSAGES, SAUSAGE_IDS, unlockText, type SausageId } from '../data/sausages';
 import { WEAPONS } from '../data/weapons';
@@ -171,7 +172,7 @@ export class SelectScene extends Phaser.Scene {
     add(new Button(this, GAME_W / 2 + 130, GAME_H - 54, canStart ? `Fry ${SAUSAGES[this.selected].name}  ▶` : 'Locked', {
       width: 300, height: 56, fontSize: 21, fill: 0x3c8d3c, hover: 0x2f7a2f,
     }, () => this.start()).setEnabled(canStart));
-    add(new Button(this, GAME_W / 2 - 160, GAME_H - 54, 'Back (Esc)', { width: 200, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.back()));
+    bindPrompt(add(new Button(this, GAME_W / 2 - 160, GAME_H - 54, 'Back', { width: 200, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => this.back())), () => `Back${hint('Esc', 'B')}`);
   }
 
   private start(): void {

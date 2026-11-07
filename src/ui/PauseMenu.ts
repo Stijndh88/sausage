@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindPrompt, getInputMode, hint } from './inputMode';
 import { GAME_H, GAME_W } from '../art/textures';
 import { ITEMS } from '../data/items';
 import { RARITIES } from '../data/rarity';
@@ -50,14 +51,16 @@ export class PauseMenu {
     const bx = 250;
     const mk = (y: number, label: string, fn: () => void, fill = 0xb8502a) =>
       add(new Button(s, bx, y, label, { width: 280, height: 54, fill, fontSize: 21 }, fn));
-    const resume = mk(220, 'Resume (Esc)', () => this.actions.resume(), 0x3c8d3c);
+    const resume = mk(220, 'Resume', () => this.actions.resume(), 0x3c8d3c);
+    bindPrompt(resume, () => `Resume${hint('Esc', 'B')}`);
     const restart = mk(290, 'Restart run', () => this.confirm('restart', restart, 'Restart? Press again'), 0x5a4a3a);
     const settings = mk(360, 'Settings', () => this.actions.settings(), 0x5a4a3a);
     const quit = mk(430, 'Main menu', () => this.confirm('quit', quit, 'Quit run? Press again'), 0x5a4a3a);
     if (this.list) this.list.setButtons([resume, restart, settings, quit]);
     else this.list = new MenuList(s, [resume, restart, settings, quit], () => this.open);
     this.list.active = true;
-    add(s.add.text(bx, 500, '↑↓ + Enter, or click', { fontFamily: FONT, fontSize: '13px', color: '#b09080' }).setOrigin(0.5));
+    const help = add(s.add.text(bx, 500, '', { fontFamily: FONT, fontSize: '13px', color: '#b09080' }).setOrigin(0.5));
+    bindPrompt(help, () => ({ keyboard: '↑↓ + Enter, or click', pad: '↑↓ + (A) · (B) resumes', touch: 'Tap a button' })[getInputMode()]);
 
     // Build overview
     const px = 470;

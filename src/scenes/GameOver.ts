@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindPrompt, hint } from '../ui/inputMode';
 import { GAME_H, GAME_W } from '../art/textures';
 import { TOTAL_WAVES } from '../data/waves';
 import { SAUSAGES } from '../data/sausages';
@@ -57,8 +58,8 @@ export function endScreen(scene: Phaser.Scene, run: RunState, title: string, sub
     }).setOrigin(0.5);
     scene.tweens.add({ targets: t, scale: 1.08, duration: 500, yoyo: true, repeat: -1 });
   }
-  new Button(scene, GAME_W / 2 - 150, 600, 'Try again (Enter)', { width: 260, height: 56 }, again);
-  new Button(scene, GAME_W / 2 + 150, 600, 'Main menu (Esc)', { width: 260, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => go('Menu'));
+  bindPrompt(new Button(scene, GAME_W / 2 - 150, 600, '', { width: 260, height: 56 }, again), () => `Try again${hint('Enter', 'A')}`);
+  bindPrompt(new Button(scene, GAME_W / 2 + 150, 600, '', { width: 260, height: 56, fill: 0x5a4a3a, hover: 0x7a6650 }, () => go('Menu')), () => `Main menu${hint('Esc', 'B')}`);
   onKeyPress(scene.input.keyboard!, 'ENTER', again, () => scene.time.now >= readyAt);
   onKeyPress(scene.input.keyboard!, 'ESC', () => go('Menu'), () => scene.time.now >= readyAt);
   // Gamepad: A / Start = try again, B = main menu.

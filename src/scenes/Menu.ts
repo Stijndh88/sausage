@@ -10,7 +10,21 @@ import { audio } from '../audio/Audio';
 import { fitCamera } from '../ui/view';
 import { labelForCode, layoutReady, moveLabel } from '../ui/keyboardLayout';
 import { getSettings, onSettingsChange } from '../state/settings';
+import { bindPrompt, getInputMode, hint, onInputModeChange } from '../ui/inputMode';
 import { versionLabel } from '../version';
+
+/** On phones, go full screen and hold landscape when the player taps START (Android; iOS can't). */
+function goImmersive(scene: Phaser.Scene): void {
+  try {
+    if (getInputMode() !== 'touch' || scene.scale.isFullscreen || !scene.sys.game.device.fullscreen.available) return;
+    if (new URLSearchParams(location.search).get('touch') === '1') return; // desktop testing
+    scene.scale.startFullscreen();
+    const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    o?.lock?.('landscape')?.catch(() => {});
+  } catch {
+    // Not allowed here: play in the browser window.
+  }
+}
 
 export class MenuScene extends Phaser.Scene {
   private head!: Phaser.GameObjects.Image;
@@ -18,6 +32,9 @@ export class MenuScene extends Phaser.Scene {
   private icons: Phaser.GameObjects.Image[] = [];
   private readonly pad = new PadPoller();
   private startFn: () => void = () => {};
+  /** Bottom row (Settings, START, Fullscreen) for D-pad / stick focus; START is focused first. */
+  private row: Button[] = [];
+  private focus = 1;
   private settingsPanel: SettingsPanel | null = null;
 
   constructor() {
@@ -39,7 +56,11 @@ export class MenuScene extends Phaser.Scene {
         else if (b === 'left' || b === 'right') sp.change(b === 'left' ? -1 : 1);
         else if (b === 'a') sp.confirm();
         else if (b === 'b' || b === 'start') sp.back();
-      } else if (b === 'a' || b === 'start') this.startFn();
+      } else if (b === 'left' || b === 'right') {
+        this.focus = (this.focus + (b === 'left' ? -1 : 1) + this.row.length) % this.row.length;
+        this.row.forEach((btn, i) => btn.setFocused(i === this.focus));
+      } else if (b === 'a') this.row[this.focus]?.press();
+      else if (b === 'start') this.startFn();
       else if (b === 'x') sp?.show();
     }
   }
@@ -62,14 +83,22 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(GAME_W / 2, 170, 'Escape the backyard BBQ.', { fontFamily: FONT, fontSize: '22px', color: '#e8c8a8' }).setOrigin(0.5);
 
     // Key names as printed on this keyboard (ZQSD on AZERTY), from the player's bindings.
+    // ...or the controller's buttons, or what to do with your thumbs, depending on the device in use.
     const helpText = () => {
       const b = getSettings().keyBindings;
       const dash = b.dash.slice(0, 2).map(labelForCode).join(' / ');
+      const mode = getInputMode();
+      const dashSide = getSettings().dashSide;
+      const controls = mode === 'pad'
+        ? 'Move: left stick / D-pad        Dash: (A) / bumpers / triggers        Pause: (Start)'
+        : mode === 'touch'
+          ? `Move: drag on the ${dashSide === 'left' ? 'right' : 'left'} side        Dash: tap the ${dashSide} side        Pause: II button`
+          : `Move: ${moveLabel(b)} / arrows        Dash: ${dash}        Pause: Esc / ${labelForCode(b.pause[0])}`;
       return [
-        `Move: ${moveLabel(b)} / arrows / left stick        Dash: ${dash} / (A)        Pause: Esc / ${labelForCode(b.pause[0])} / (Start)`,
+        controls,
         '',
         'Your weapons ride on your links and fire on their own. Only your head can be hit.',
-        'Tips pop up during your first wave. Change keys in Settings.',
+        mode === 'keyboard' ? 'Tips pop up during your first wave. Change keys in Settings.' : 'Tips pop up during your first wave.',
       ].join('\n');
     };
     const help = this.add.text(GAME_W / 2, 440, helpText(), {
@@ -78,7 +107,8 @@ export class MenuScene extends Phaser.Scene {
     const refreshHelp = () => { if (help.active) help.setText(helpText()); };
     void layoutReady.then(refreshHelp);
     const offSettings = onSettingsChange(refreshHelp);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offSettings);
+    const offMode = onInputModeChange(refreshHelp);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { offSettings(); offMode(); });
 
     let leaving = false;
     const settings = new SettingsPanel(this, () => {});
@@ -86,6 +116,7 @@ export class MenuScene extends Phaser.Scene {
     const start = () => {
       if (leaving || settings.isOpen) return;
       leaving = true;
+      goImmersive(this);
       this.scene.start('Select');
     };
     const save = loadSave();
@@ -95,12 +126,20 @@ export class MenuScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
     this.startFn = start;
-    new Button(this, GAME_W / 2, 630, 'START  (Enter)', { width: 280, height: 60, fontSize: 24 }, start);
-    new Button(this, GAME_W / 2 - 270, 630, 'Settings', { width: 180, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => settings.show());
+    const startBtn = new Button(this, GAME_W / 2, 630, 'START', { width: 280, height: 60, fontSize: 24 }, start);
+    bindPrompt(startBtn, () => `START${hint('Enter', 'A')}`);
+    const settingsBtn = new Button(this, GAME_W / 2 - 270, 630, 'Settings', { width: 180, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => settings.show());
     const fs = new Button(this, GAME_W / 2 + 270, 630, this.scale.isFullscreen ? 'Windowed' : 'Fullscreen', { width: 180, height: 52, fill: 0x5a4a3a, hover: 0x7a6650 }, () => {
       if (this.scale.isFullscreen) this.scale.stopFullscreen();
       else this.scale.startFullscreen();
     });
+    this.row = [settingsBtn, startBtn, fs];
+    this.focus = 1;
+    // The focus ring only matters with a controller.
+    const showFocus = () => this.row.forEach((btn, i) => btn.setFocused(getInputMode() === 'pad' && i === this.focus));
+    showFocus();
+    const offFocus = onInputModeChange(showFocus);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offFocus);
     this.scale.on('enterfullscreen', () => fs.setText('Windowed'));
     this.scale.on('leavefullscreen', () => fs.setText('Fullscreen'));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

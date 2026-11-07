@@ -334,7 +334,7 @@ module.exports = {
       fn: async ({ page, g }) => {
         await page.mouse.click(640 - 270, 630); // Settings
         await frames(g, 3);
-        for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowDown'); // "Keyboard controls"
+        for (let i = 0; i < 9; i++) await page.keyboard.press('ArrowDown'); // "Keyboard controls" (last row)
         await page.keyboard.press('Enter');
         await frames(g, 3);
         assert.equal(await g.evaluate(() => window.__game.scene.getScene('Menu').settingsPanel.controls.isOpen), true, 'controls screen open');
