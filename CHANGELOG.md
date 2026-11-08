@@ -3,6 +3,9 @@
 Versions follow [semantic versioning](https://semver.org). The main menu shows the running version.
 
 ## Unreleased
+- **Free restock**: buy every card in the shop and it restocks for free (doesn't raise the reroll price).
+- Playtest fixes: no full-screen flash when buying, the shop skips items whose stats are already capped,
+  condiments wait on the floor while you're at full HP, and links shoot bosses, elites and the loot goblin first.
 - **Balance pass** after the 2026-11-07 playtest (late bosses were one-shot, one run filled the Spice Rack).
   Details and numbers: `docs/BALANCE.md`.
   - Every item has a stack limit (Golden Sausage 2, Secret Sauce 5, Paprika 10, Mustard Seed 6, ...).

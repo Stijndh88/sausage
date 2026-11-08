@@ -116,7 +116,7 @@ const SHOP: HelpEntry[] = [
   },
   {
     id: 'shop:reroll', section: 'shop', title: 'Reroll',
-    body: 'Swaps the cards for new ones. It gets a bit pricier every time you use it in the same shop.',
+    body: 'Swaps the cards for new ones. It gets a bit pricier every time you use it in the same shop. Buy every card and the stand restocks for free.',
   },
   {
     id: 'shop:keep', section: 'shop', title: 'Keep',

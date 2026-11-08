@@ -474,7 +474,22 @@ export class ShopScene extends Phaser.Scene {
     this.offers[i] = null;
     this.locked.delete(i);
     this.upgradeMode.delete(i);
+    if (this.offers.every((o) => !o)) this.restock();
+    else this.render();
+  }
+
+  /** Bought every card: the stand restocks for free (doesn't raise the reroll price or use a free reroll). */
+  private restock(): void {
+    this.rerollsDone++;
+    audio.play('reroll');
+    this.offers = generateOffers(shopRng(this.run.seed, this.run.wave, this.rerollsDone), this.run.wave + 1, [], undefined, this.run.weapons, this.shopContext());
+    this.locked.clear();
+    this.upgradeMode.clear();
     this.render();
+    const note = this.add.text(GAME_W / 2, 118, 'Sold out! Fresh stock, on the house', {
+      fontFamily: FONT, fontSize: '18px', fontStyle: 'bold', color: '#9fe7a8', stroke: '#140d0a', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(40);
+    this.tweens.add({ targets: note, alpha: 0, delay: 1600, duration: 500, onComplete: () => note.destroy() });
   }
 
   private toggleLock(i: number): void {
