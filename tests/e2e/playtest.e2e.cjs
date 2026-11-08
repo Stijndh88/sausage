@@ -11,7 +11,7 @@ const shopState = (g) => g.evaluate(() => {
 module.exports = {
   tests: [
     {
-      name: 'buying every offer leaves the shop sold out: no free reroll, no screen flash',
+      name: 'buying every offer restocks the shop for free, without a screen flash',
       fn: async ({ page, g }) => {
         await g.openShop({ run: { crumbs: 9999, wave: 3 } });
         await g.wait(500);
@@ -22,11 +22,12 @@ module.exports = {
           await g.wait(60);
           assert.equal((await shopState(g)).flashing, false, 'buying flashes the screen');
         }
-        await g.wait(600);
+        await g.wait(300);
         const end = await shopState(g);
-        assert.deepEqual(end.offers, [null, null, null, null], 'shop restocked after selling out');
-        assert.equal(end.rerolls, 0);
-        assert.equal(end.crumbs, start.crumbs - total);
+        assert.equal(end.offers.filter(Boolean).length, 4, 'shop did not restock after selling out');
+        assert.equal(end.crumbs, start.crumbs - total, 'the restock cost crumbs');
+        const price = await g.evaluate(() => { const s = window.__game.scene.getScene('Shop'); return [s.run.rerollCount, s.rerollPrice()]; });
+        assert.equal(price[0], 0, 'the restock raised the reroll price');
       },
     },
     {
