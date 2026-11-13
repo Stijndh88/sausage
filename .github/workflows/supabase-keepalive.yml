@@ -1,0 +1,50 @@
+# Keeps the game's free-tier Supabase project ("wurst") from being paused for inactivity.
+# Supabase pauses free projects after 7 days without activity, so this makes a real database
+# request every 3 days. It uses the same publishable URL/key the game ships with
+# (src/state/playDataSync.ts), so no repo secrets are needed.
+#
+# The anon role may only INSERT into play_runs (supabase/play_data.sql), so the SELECT below is
+# answered by Postgres itself with "permission denied" (42501). That still counts as a database
+# query, and it adds no rows to the play data. Any other answer (paused project, network error,
+# changed key) fails the run, and GitHub emails the repo owner.
+#
+# GitHub also switches off scheduled workflows after 60 days without repo activity, so the last
+# step re-enables this workflow each run, which resets that timer. Set and forget.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://sabxjyesqcymeayxirxk.supabase.co
+      SUPABASE_KEY: sb_publishable_5tZtxHFFSzf8XIcxMgEkmw_1Re8NoX9
+    steps:
+      - name: Query the database
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -sS -o body.json -w '%{http_code}' \
+              "$SUPABASE_URL/rest/v1/play_runs?select=id&limit=1" \
+              -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY" || echo 000)
+            echo "Attempt $attempt: HTTP $code"; cat body.json 2>/dev/null; echo
+            if [ "$code" = 200 ] || grep -q '"42501"' body.json 2>/dev/null; then
+              echo "Postgres answered; project is active."; exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Supabase did not answer with a database response (project paused or key changed?)"
+          exit 1
+      - name: Stop GitHub from disabling this schedule after 60 quiet days
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"
